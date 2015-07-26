@@ -1298,10 +1298,10 @@ public:
 			parallel_nodes_ready = g.parallel_nodes_ready;
 
 			map<petri::iterator, petri::iterator> result;
-			for (int i = 0; i < places.size(); i++)
+			for (int i = 0; i < (int)places.size(); i++)
 				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(place::type, i), petri::iterator(place::type, i)));
 
-			for (int i = 0; i < transitions.size(); i++)
+			for (int i = 0; i < (int)transitions.size(); i++)
 				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(transition::type, i), petri::iterator(transition::type, i)));
 
 			return result;
