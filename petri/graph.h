@@ -1506,7 +1506,7 @@ public:
 				rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
 				reverse(rem.begin(), rem.end());
 
-				for (int i = 0; i < rem.size(); i++)
+				for (int i = 0; i < (int)rem.size(); i++)
 				{
 					for (int j = 0; j < (int)converted_sink.size(); j++)
 						for (int k = (int)converted_sink[j].tokens.size()-1; k >= 0; k--)
