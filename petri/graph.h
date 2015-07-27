@@ -404,7 +404,7 @@ public:
 					if (s[i].tokens[j].index == n.index)
 						s[i].tokens.erase(s[i].tokens.begin() + j);
 					else if (s[i].tokens[j].index > n.index)
-						s[i].tokens[j]--;
+						s[i].tokens[j].index--;
 				}
 		}
 	}
@@ -1344,6 +1344,7 @@ public:
 			for (int i = 0; i < (int)g.reset.size(); i++)
 				converted_reset.push_back(g.reset[i].convert(result));
 
+
 			if (composition == choice || source.size() == 0)
 			{
 				for (int i = 0; i < (int)converted_source.size(); i++)
@@ -1366,6 +1367,113 @@ public:
 			}
 			else if (composition == parallel)
 			{
+				if (source.size() > 1)
+				{
+					vector<petri::iterator> rem;
+					petri::iterator p = create(place());
+					for (int i = 0; i < (int)source.size(); i++)
+					{
+						if (source[i].tokens.size() > 1)
+						{
+							petri::iterator t = create(transition());
+							connect(p, t);
+							for (int j = 0; j < (int)source[i].tokens.size(); j++)
+								connect(t, petri::iterator(place::type, source[i].tokens[j].index));
+						}
+						else if (source[i].tokens.size() == 1)
+						{
+							petri::iterator p0(place::type, source[i].tokens[0].index);
+							connect(p, next(p0));
+							connect(prev(p0), p);
+							rem.push_back(p0);
+						}
+
+						source[i] = state::collapse(parallel, p.index, source[i]);
+						if (i != 0)
+							source[0] = state::merge(choice, source[0], source[i]);
+					}
+					source = vector<state>(1, state::collapse(choice, p.index, source[0]));
+
+					sort(rem.begin(), rem.end());
+					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
+					reverse(rem.begin(), rem.end());
+
+					for (int i = 0; i < (int)rem.size(); i++)
+					{
+						for (int j = 0; j < (int)sink.size(); j++)
+							for (int k = (int)sink[j].tokens.size()-1; k >= 0; k--)
+								if (sink[j].tokens[k].index == rem[i].index)
+									sink[j].tokens[k].index = p.index;
+
+						for (int j = 0; j < (int)reset.size(); j++)
+							for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--)
+								if (reset[j].tokens[k].index == rem[i].index)
+									reset[j].tokens[k].index = p.index;
+
+						graph::erase(rem[i], converted_source);
+						graph::erase(rem[i], converted_sink);
+						graph::erase(rem[i], converted_reset);
+					}
+
+					erase(rem, true);
+				}
+
+				if (converted_source.size() > 1)
+				{
+					vector<petri::iterator> rem;
+					petri::iterator p = create(place());
+					for (int i = 0; i < (int)converted_source.size(); i++)
+					{
+						if (converted_source[i].tokens.size() > 1)
+						{
+							petri::iterator t = create(transition());
+							connect(p, t);
+							for (int j = 0; j < (int)converted_source[i].tokens.size(); j++)
+								connect(t, petri::iterator(place::type, converted_source[i].tokens[j].index));
+						}
+						else if (converted_source[i].tokens.size() == 1)
+						{
+							petri::iterator p0(place::type, converted_source[i].tokens[0].index);
+							connect(p, next(p0));
+							connect(prev(p0), p);
+							rem.push_back(p0);
+						}
+
+						converted_source[i] = state::collapse(parallel, p.index, converted_source[i]);
+						if (i != 0)
+							converted_source[0] = state::merge(choice, converted_source[0], converted_source[i]);
+					}
+					converted_source = vector<state>(1, state::collapse(choice, p.index, converted_source[0]));
+
+					sort(rem.begin(), rem.end());
+					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
+					reverse(rem.begin(), rem.end());
+
+					for (int i = 0; i < (int)rem.size(); i++)
+					{
+						for (int j = 0; j < (int)converted_sink.size(); j++)
+							for (int k = (int)converted_sink[j].tokens.size()-1; k >= 0; k--)
+								if (converted_sink[j].tokens[k].index == rem[i].index)
+									converted_sink[j].tokens[k].index = p.index;
+
+						for (int j = 0; j < (int)converted_reset.size(); j++)
+							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
+								if (converted_reset[j].tokens[k].index == rem[i].index)
+									converted_reset[j].tokens[k].index = p.index;
+
+						graph::erase(rem[i], converted_source);
+						graph::erase(rem[i], converted_sink);
+						graph::erase(rem[i], converted_reset);
+					}
+
+					erase(rem, true);
+				}
+
+				if (source.size() == 1 && converted_source.size() == 1)
+					source[0] = state::merge(parallel, source[0], converted_source[0]);
+				else if (converted_source.size() == 1)
+					source = converted_source;
+
 				if (reset.size() == 0 && converted_reset.size() > 0)
 					reset = source;
 				else if (reset.size() > 0 && converted_reset.size() == 0)
@@ -1382,15 +1490,6 @@ public:
 						for (int j = 0; j < s; j++)
 							reset[j] = state::merge(parallel, reset[j], converted_reset.back());
 				}
-
-				int s = (int)source.size();
-				for (int i = 0; i < (int)converted_source.size()-1; i++)
-					for (int j = 0; j < s; j++)
-						source.push_back(state::merge(parallel, source[j], converted_source[i]));
-
-				if (converted_source.size() > 0)
-					for (int j = 0; j < s; j++)
-						source[j] = state::merge(parallel, source[j], converted_source.back());
 			}
 
 			if (composition == choice || sink.size() == 0)
@@ -1406,14 +1505,112 @@ public:
 			}
 			else if (composition == parallel)
 			{
-				int s = (int)sink.size();
-				for (int i = 0; i < (int)converted_sink.size()-1; i++)
-					for (int j = 0; j < s; j++)
-						sink.push_back(state::merge(parallel, sink[j], converted_sink[i]));
+				if (sink.size() > 1)
+				{
+					vector<petri::iterator> rem;
+					petri::iterator p = create(place());
+					for (int i = 0; i < (int)sink.size(); i++)
+					{
+						if (sink[i].tokens.size() > 1)
+						{
+							petri::iterator t = create(transition());
+							connect(t, p);
+							for (int j = 0; j < (int)sink[i].tokens.size(); j++)
+								connect(petri::iterator(place::type, sink[i].tokens[j].index), t);
+						}
+						else if (sink[i].tokens.size() == 1)
+						{
+							petri::iterator p0(place::type, sink[i].tokens[0].index);
+							connect(p, next(p0));
+							connect(prev(p0), p);
+							rem.push_back(p0);
+						}
 
-				if (converted_sink.size() > 0)
-					for (int j = 0; j < s; j++)
-						sink[j] = state::merge(parallel, sink[j], converted_sink.back());
+						sink[i] = state::collapse(parallel, p.index, sink[i]);
+						if (i != 0)
+							sink[0] = state::merge(choice, sink[0], sink[i]);
+					}
+					sink = vector<state>(1, state::collapse(choice, p.index, sink[0]));
+
+					sort(rem.begin(), rem.end());
+					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
+					reverse(rem.begin(), rem.end());
+
+					for (int i = 0; i < (int)rem.size(); i++)
+					{
+						for (int j = 0; j < (int)source.size(); j++)
+							for (int k = (int)source[j].tokens.size()-1; k >= 0; k--)
+								if (source[j].tokens[k].index == rem[i].index)
+									source[j].tokens[k].index = p.index;
+
+						for (int j = 0; j < (int)reset.size(); j++)
+							for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--)
+								if (reset[j].tokens[k].index == rem[i].index)
+									reset[j].tokens[k].index = p.index;
+
+						graph::erase(rem[i], converted_source);
+						graph::erase(rem[i], converted_sink);
+						graph::erase(rem[i], converted_reset);
+					}
+
+					erase(rem, true);
+				}
+
+				if (converted_sink.size() > 1)
+				{
+					vector<petri::iterator> rem;
+					petri::iterator p = create(place());
+					for (int i = 0; i < (int)converted_sink.size(); i++)
+					{
+						if (converted_sink[i].tokens.size() > 1)
+						{
+							petri::iterator t = create(transition());
+							connect(t, p);
+							for (int j = 0; j < (int)converted_sink[i].tokens.size(); j++)
+								connect(petri::iterator(place::type, converted_sink[i].tokens[j].index), t);
+						}
+						else if (converted_sink[i].tokens.size() == 1)
+						{
+							petri::iterator p0(place::type, converted_sink[i].tokens[0].index);
+							connect(p, next(p0));
+							connect(prev(p0), p);
+							rem.push_back(p0);
+						}
+
+						converted_sink[i] = state::collapse(parallel, p.index, converted_sink[i]);
+						if (i != 0)
+							converted_sink[0] = state::merge(choice, converted_sink[0], converted_sink[i]);
+					}
+					converted_sink = vector<state>(1, state::collapse(choice, p.index, converted_sink[0]));
+
+					sort(rem.begin(), rem.end());
+					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
+					reverse(rem.begin(), rem.end());
+
+					for (int i = 0; i < (int)rem.size(); i++)
+					{
+						for (int j = 0; j < (int)converted_source.size(); j++)
+							for (int k = (int)converted_source[j].tokens.size()-1; k >= 0; k--)
+								if (converted_source[j].tokens[k].index == rem[i].index)
+									converted_source[j].tokens[k].index = p.index;
+
+						for (int j = 0; j < (int)converted_reset.size(); j++)
+							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
+								if (converted_reset[j].tokens[k].index == rem[i].index)
+									converted_reset[j].tokens[k].index = p.index;
+
+						graph::erase(rem[i], converted_source);
+						graph::erase(rem[i], converted_sink);
+						graph::erase(rem[i], converted_reset);
+					}
+
+					erase(rem, true);
+				}
+
+				if (sink.size() == 1 && converted_sink.size() == 1)
+					sink[0] = state::merge(parallel, sink[0], converted_sink[0]);
+				else if (converted_sink.size() == 1)
+					sink = converted_sink;
 			}
 			else if (composition == sequence)
 			{
