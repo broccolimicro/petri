@@ -1756,59 +1756,6 @@ public:
 		}
 	}
 
-	graph &wrap()
-	{
-		mark_modified();
-
-		if (source.size() > 1 || (source.size() > 0 && source[0].tokens.size() > 1))
-		{
-			petri::iterator split = create(place());
-
-			state result;
-			for (int i = 0; i < (int)source.size(); i++)
-			{
-				petri::iterator split_t = create(transition());
-				connect(split, split_t);
-
-				if (i == 0)
-					result = state::collapse(parallel, split_t.index, source[i]);
-				else
-					result = state::merge(choice, result, state::collapse(parallel, split_t.index, source[i]));
-
-				for (int j = 0; j < (int)source[i].tokens.size(); j++)
-					connect(split_t, petri::iterator(place::type, source[i].tokens[j].index));
-			}
-
-			source.clear();
-			source.push_back(state::collapse(choice, split.index, result));
-		}
-
-		if (sink.size() > 1 || (sink.size() > 0 && sink[0].tokens.size() > 1))
-		{
-			petri::iterator merge = create(place());
-
-			state result;
-			for (int i = 0; i < (int)sink.size(); i++)
-			{
-				petri::iterator merge_t = create(transition());
-				connect(merge_t, merge);
-
-				if (i == 0)
-					result = state::collapse(parallel, merge_t.index, sink[i]);
-				else
-					result = state::merge(choice, result, state::collapse(parallel, merge_t.index, sink[i]));
-
-				for (int j = 0; j < (int)sink[i].tokens.size(); j++)
-					connect(petri::iterator(place::type, sink[i].tokens[j].index), merge_t);
-			}
-
-			sink.clear();
-			sink.push_back(state::collapse(choice, merge.index, result));
-		}
-
-		return *this;
-	}
-
 	vector<vector<petri::iterator> > cycles() const
 	{
 		vector<vector<petri::iterator> > curr;
