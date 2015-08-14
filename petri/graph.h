@@ -50,6 +50,8 @@ struct iterator
 	bool operator>=(int i) const;
 };
 
+ostream &operator<<(ostream &os, iterator i);
+
 struct arc
 {
 	arc();
@@ -97,7 +99,6 @@ struct transition
 template <class place, class transition, class token, class state>
 struct graph
 {
-private:
 	vector<int> node_distances;
 	bool node_distances_ready;
 
@@ -156,11 +157,10 @@ private:
 
 		node_distances_ready = true;
 	}
-protected:
+
 	vector<pair<petri::iterator, petri::iterator> > parallel_nodes;
 	bool parallel_nodes_ready;
 
-public:
 	graph()
 	{
 		node_distances_ready = false;
@@ -1281,7 +1281,7 @@ public:
 		return result;
 	}
 
-	map<petri::iterator, petri::iterator> merge(int composition, const graph &g, bool remote)
+	map<petri::iterator, petri::iterator> merge(int composition, const graph &g)
 	{
 		if (places.size() == 0 && transitions.size() == 0)
 		{
@@ -1351,7 +1351,7 @@ public:
 				{
 					typename vector<state>::iterator iter = lower_bound(source.begin(), source.end(), converted_source[i]);
 					if (iter != source.end() && *iter == converted_source[i])
-						*iter = state::merge(choice, *iter, converted_source[i]);
+						*iter = state::merge(*iter, converted_source[i]);
 					else
 						source.insert(iter, converted_source[i]);
 				}
@@ -1360,7 +1360,7 @@ public:
 				{
 					typename vector<state>::iterator iter = lower_bound(reset.begin(), reset.end(), converted_reset[i]);
 					if (iter != reset.end() && *iter == converted_reset[i])
-						*iter = state::merge(choice, *iter, converted_reset[i]);
+						*iter = state::merge(*iter, converted_reset[i]);
 					else
 						reset.insert(iter, converted_reset[i]);
 				}
@@ -1388,11 +1388,11 @@ public:
 							rem.push_back(p0);
 						}
 
-						source[i] = state::collapse(parallel, p.index, source[i]);
+						source[i] = state::collapse(p.index, source[i]);
 						if (i != 0)
-							source[0] = state::merge(choice, source[0], source[i]);
+							source[0] = state::merge(source[0], source[i]);
 					}
-					source = vector<state>(1, state::collapse(choice, p.index, source[0]));
+					source = vector<state>(1, state::collapse(p.index, source[0]));
 
 					sort(rem.begin(), rem.end());
 					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
@@ -1439,11 +1439,11 @@ public:
 							rem.push_back(p0);
 						}
 
-						converted_source[i] = state::collapse(parallel, p.index, converted_source[i]);
+						converted_source[i] = state::collapse(p.index, converted_source[i]);
 						if (i != 0)
-							converted_source[0] = state::merge(choice, converted_source[0], converted_source[i]);
+							converted_source[0] = state::merge(converted_source[0], converted_source[i]);
 					}
-					converted_source = vector<state>(1, state::collapse(choice, p.index, converted_source[0]));
+					converted_source = vector<state>(1, state::collapse(p.index, converted_source[0]));
 
 					sort(rem.begin(), rem.end());
 					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
@@ -1470,7 +1470,7 @@ public:
 				}
 
 				if (source.size() == 1 && converted_source.size() == 1)
-					source[0] = state::merge(parallel, source[0], converted_source[0]);
+					source[0] = state::merge(source[0], converted_source[0]);
 				else if (converted_source.size() == 1)
 					source = converted_source;
 
@@ -1484,11 +1484,11 @@ public:
 					int s = (int)reset.size();
 					for (int i = 0; i < (int)converted_reset.size()-1; i++)
 						for (int j = 0; j < s; j++)
-							reset.push_back(state::merge(parallel, reset[j], converted_reset[i]));
+							reset.push_back(state::merge(reset[j], converted_reset[i]));
 
 					if (converted_reset.size() > 0)
 						for (int j = 0; j < s; j++)
-							reset[j] = state::merge(parallel, reset[j], converted_reset.back());
+							reset[j] = state::merge(reset[j], converted_reset.back());
 				}
 			}
 
@@ -1498,7 +1498,7 @@ public:
 				{
 					typename vector<state>::iterator iter = lower_bound(sink.begin(), sink.end(), converted_sink[i]);
 					if (iter != sink.end() && *iter == converted_sink[i])
-						*iter = state::merge(choice, *iter, converted_sink[i]);
+						*iter = state::merge(*iter, converted_sink[i]);
 					else
 						sink.insert(iter, converted_sink[i]);
 				}
@@ -1526,11 +1526,11 @@ public:
 							rem.push_back(p0);
 						}
 
-						sink[i] = state::collapse(parallel, p.index, sink[i]);
+						sink[i] = state::collapse(p.index, sink[i]);
 						if (i != 0)
-							sink[0] = state::merge(choice, sink[0], sink[i]);
+							sink[0] = state::merge(sink[0], sink[i]);
 					}
-					sink = vector<state>(1, state::collapse(choice, p.index, sink[0]));
+					sink = vector<state>(1, state::collapse(p.index, sink[0]));
 
 					sort(rem.begin(), rem.end());
 					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
@@ -1577,11 +1577,11 @@ public:
 							rem.push_back(p0);
 						}
 
-						converted_sink[i] = state::collapse(parallel, p.index, converted_sink[i]);
+						converted_sink[i] = state::collapse(p.index, converted_sink[i]);
 						if (i != 0)
-							converted_sink[0] = state::merge(choice, converted_sink[0], converted_sink[i]);
+							converted_sink[0] = state::merge(converted_sink[0], converted_sink[i]);
 					}
-					converted_sink = vector<state>(1, state::collapse(choice, p.index, converted_sink[0]));
+					converted_sink = vector<state>(1, state::collapse(p.index, converted_sink[0]));
 
 					sort(rem.begin(), rem.end());
 					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
@@ -1608,7 +1608,7 @@ public:
 				}
 
 				if (sink.size() == 1 && converted_sink.size() == 1)
-					sink[0] = state::merge(parallel, sink[0], converted_sink[0]);
+					sink[0] = state::merge(sink[0], converted_sink[0]);
 				else if (converted_sink.size() == 1)
 					sink = converted_sink;
 			}

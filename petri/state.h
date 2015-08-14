@@ -82,8 +82,8 @@ struct state
 
 	vector<token> tokens;
 
-	//static state merge(int composition, const state &s0, const state &s1);
-	//static state collapse(int composition, int index, const state &s);
+	//static state merge(const state &s0, const state &s1);
+	//static state collapse(int index, const state &s);
 	//state convert(map<petri::iterator, petri::iterator> translate);
 };
 

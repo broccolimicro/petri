@@ -150,6 +150,15 @@ bool iterator::operator>=(int i) const
 	return index >= i;
 }
 
+ostream &operator<<(ostream &os, iterator i)
+{
+	if (i.type == place::type)
+		os << "P" << i.index;
+	else
+		os << "T" << i.index;
+	return os;
+}
+
 arc::arc()
 {
 
