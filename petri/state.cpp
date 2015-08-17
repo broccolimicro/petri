@@ -10,54 +10,49 @@
 namespace petri
 {
 
-term_index::term_index()
+enabled_transition::enabled_transition()
 {
 	index = -1;
 }
 
-term_index::term_index(int index)
+enabled_transition::enabled_transition(int index)
 {
 	this->index = index;
 }
 
-term_index::~term_index()
+enabled_transition::~enabled_transition()
 {
 
 }
 
-void term_index::hash(hasher &hash) const
+bool operator<(enabled_transition t0, enabled_transition t1)
 {
-	hash.put(&index);
+	return t0.index < t1.index;
 }
 
-bool operator<(term_index i, term_index j)
+bool operator>(enabled_transition t0, enabled_transition t1)
 {
-	return i.index < j.index;
+	return t0.index > t1.index;
 }
 
-bool operator>(term_index i, term_index j)
+bool operator<=(enabled_transition t0, enabled_transition t1)
 {
-	return i.index > j.index;
+	return t0.index <= t1.index;
 }
 
-bool operator<=(term_index i, term_index j)
+bool operator>=(enabled_transition t0, enabled_transition t1)
 {
-	return i.index <= j.index;
+	return t0.index >= t1.index;
 }
 
-bool operator>=(term_index i, term_index j)
+bool operator==(enabled_transition t0, enabled_transition t1)
 {
-	return i.index >= j.index;
+	return t0.index == t1.index;
 }
 
-bool operator==(term_index i, term_index j)
+bool operator!=(enabled_transition t0, enabled_transition t1)
 {
-	return i.index == j.index;
-}
-
-bool operator!=(term_index i, term_index j)
-{
-	return i.index != j.index;
+	return t0.index != t1.index;
 }
 
 token::token()

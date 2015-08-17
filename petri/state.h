@@ -13,48 +13,22 @@
 namespace petri
 {
 
-/**
- * Used to index one of the possible transformations applied by a transition
- */
-struct term_index
+struct enabled_transition
 {
-	term_index();
-	term_index(int index);
-	~term_index();
+	enabled_transition();
+	enabled_transition(int index);
+	~enabled_transition();
 
-	// the transition
 	int index;
-
-	void hash(hasher &hash) const;
-};
-
-bool operator<(term_index i, term_index j);
-bool operator>(term_index i, term_index j);
-bool operator<=(term_index i, term_index j);
-bool operator>=(term_index i, term_index j);
-bool operator==(term_index i, term_index j);
-bool operator!=(term_index i, term_index j);
-
-template <class term_index>
-struct enabled_transition : term_index
-{
-	enabled_transition()
-	{
-
-	}
-
-	enabled_transition(int index) : term_index(index)
-	{
-
-	}
-
-	~enabled_transition()
-	{
-
-	}
-
 	vector<int> tokens;
 };
+
+bool operator<(enabled_transition t0, enabled_transition t1);
+bool operator>(enabled_transition t0, enabled_transition t1);
+bool operator<=(enabled_transition t0, enabled_transition t1);
+bool operator>=(enabled_transition t0, enabled_transition t1);
+bool operator==(enabled_transition t0, enabled_transition t1);
+bool operator!=(enabled_transition t0, enabled_transition t1);
 
 struct token
 {
