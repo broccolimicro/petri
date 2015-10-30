@@ -2045,64 +2045,6 @@ struct graph
 
 		return (find(parallel_nodes.begin(), parallel_nodes.end(), pair<petri::iterator, petri::iterator>(a, b)) != parallel_nodes.end());
 	}
-
-	/**
-	 * Get the list of transitions have have a sufficient number of local at the input places.
-	 * The input tokens will be sorted if they aren't already.
-	 */
-	template <class token1, class enabled_transition>
-	vector<enabled_transition> enabled(vector<token1> &tokens, bool sorted) const
-	{
-		if (!sorted)
-			sort(tokens.begin(), tokens.end());
-
-		vector<enabled_transition> result;
-		vector<int> disabled;
-
-		result.reserve(tokens.size()*2);
-		disabled.reserve(transitions.size());
-		for (vector<arc>::const_iterator a = arcs[place::type].begin(); a != arcs[place::type].end(); a++)
-		{
-			// Check to see if we haven't already determined that this transition can't be enabled
-			vector<int>::iterator d = lower_bound(disabled.begin(), disabled.end(), a->to.index);
-			bool d_invalid = (d == disabled.end() || *d != a->to.index);
-
-			if (d_invalid)
-			{
-				// Find the index of this transition (if any) in the result pool
-				typename vector<enabled_transition>::iterator e = lower_bound(result.begin(), result.end(), enabled_transition(a->to.index));
-				bool e_invalid = (e == result.end() || e->index != a->to.index);
-
-				// Check to see if there is any token at the input place of this arc and make sure that
-				// this token has not already been consumed by this particular transition
-				// Also since we only need one token per arc, we can stop once we've found a token
-				bool found = false;
-				for (int j = 0; j < (int)tokens.size() && !found; j++)
-					if (a->from.index == tokens[j].index &&
-						(e_invalid || find(e->tokens.begin(), e->tokens.end(), j) == e->tokens.end()))
-					{
-						// We are safe to add this to the list of possibly enabled transitions
-						found = true;
-						if (e_invalid)
-							e = result.insert(e, enabled_transition(a->to.index));
-
-						e->tokens.push_back(j);
-					}
-
-				// If we didn't find a token at the input place, then we know that this transition can't
-				// be enabled. So lets remove this from the list of possibly enabled transitions and
-				// remember as much in the disabled list.
-				if (!found)
-				{
-					disabled.insert(d, a->to.index);
-					if (!e_invalid)
-						result.erase(e);
-				}
-			}
-		}
-
-		return result;
-	}
 };
 
 }

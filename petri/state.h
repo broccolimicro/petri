@@ -52,6 +52,10 @@ template <class token>
 struct state
 {
 	state() {}
+	state(vector<token> tokens)
+	{
+		this->tokens = tokens;
+	}
 	~state() {}
 
 	vector<token> tokens;
