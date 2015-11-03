@@ -128,7 +128,7 @@ struct graph
 	 *                (p+t-1)*(p+t) |                |                    |
 	 *    __________________________|________________|____________________|
 	 */
-	void calculate_node_distances()
+	virtual void calculate_node_distances()
 	{
 		// clear the current set of distances
 		int nodes = (int)(places.size() + transitions.size());
@@ -178,67 +178,67 @@ struct graph
 	vector<state> source, sink;
 	vector<state> reset;
 
-	void mark_modified()
+	virtual void mark_modified()
 	{
 		node_distances_ready = false;
 		parallel_nodes_ready = false;
 	}
 
-	petri::iterator begin(int type)
+	virtual petri::iterator begin(int type)
 	{
 		return petri::iterator(type, 0);
 	}
 
-	petri::iterator end(int type)
+	virtual petri::iterator end(int type)
 	{
 		return petri::iterator(type, type == place::type ? (int)places.size() : (int)transitions.size());
 	}
 
-	petri::iterator rbegin(int type)
+	virtual petri::iterator rbegin(int type)
 	{
 		return petri::iterator(type, (type == place::type ? (int)places.size() : (int)transitions.size()) - 1);
 	}
 
-	petri::iterator rend(int type)
+	virtual petri::iterator rend(int type)
 	{
 		return petri::iterator(type, -1);
 	}
 
-	petri::iterator begin_arc(int type)
+	virtual petri::iterator begin_arc(int type)
 	{
 		return petri::iterator(type, 0);
 	}
 
-	petri::iterator end_arc(int type)
+	virtual petri::iterator end_arc(int type)
 	{
 		return petri::iterator(type, (int)arcs[type].size());
 	}
 
-	petri::iterator rbegin_arc(int type)
+	virtual petri::iterator rbegin_arc(int type)
 	{
 		return petri::iterator(type, (int)arcs[type].size()-1);
 	}
 
-	petri::iterator rend_arc(int type)
+	virtual petri::iterator rend_arc(int type)
 	{
 		return petri::iterator(type, -1);
 	}
 
-	petri::iterator create(place p)
+	virtual petri::iterator create(place p)
 	{
 		mark_modified();
 		places.push_back(p);
 		return petri::iterator(place::type, (int)places.size()-1);
 	}
 
-	petri::iterator create(transition t)
+	virtual petri::iterator create(transition t)
 	{
 		mark_modified();
 		transitions.push_back(t);
 		return petri::iterator(transition::type, (int)transitions.size()-1);
 	}
 
-	petri::iterator create(int n)
+	virtual petri::iterator create(int n)
 	{
 		if (n == place::type)
 			return create(place());
@@ -248,7 +248,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	vector<petri::iterator> create(vector<place> p)
+	virtual vector<petri::iterator> create(vector<place> p)
 	{
 		mark_modified();
 		vector<petri::iterator> result;
@@ -260,7 +260,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> create(vector<transition> t)
+	virtual vector<petri::iterator> create(vector<transition> t)
 	{
 		mark_modified();
 		vector<petri::iterator> result;
@@ -272,7 +272,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> create(place p, int num)
+	virtual vector<petri::iterator> create(place p, int num)
 	{
 		mark_modified();
 		vector<petri::iterator> result;
@@ -284,7 +284,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> create(transition t, int num)
+	virtual vector<petri::iterator> create(transition t, int num)
 	{
 		mark_modified();
 		vector<petri::iterator> result;
@@ -296,7 +296,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> create(int n, int num)
+	virtual vector<petri::iterator> create(int n, int num)
 	{
 		if (n == place::type)
 			return create(place(), num);
@@ -306,7 +306,7 @@ struct graph
 			return vector<petri::iterator>();
 	}
 
-	pair<vector<petri::iterator>, vector<petri::iterator> > erase(petri::iterator n)
+	virtual pair<vector<petri::iterator>, vector<petri::iterator> > erase(petri::iterator n)
 	{
 		mark_modified();
 		pair<vector<petri::iterator>, vector<petri::iterator> > result;
@@ -373,10 +373,31 @@ struct graph
 	{
 		for (int i = (int)iter_list.size()-1; i >= 0; i--)
 		{
-			if (iter_list.at(i) == n)
+			if (iter_list[i] == n)
 				iter_list.erase(iter_list.begin() + i);
 			else if (iter_list[i].type == n.type && iter_list[i].index > n.index)
 				iter_list[i].index--;
+		}
+	}
+
+	static void erase(vector<petri::iterator> n, vector<petri::iterator> &iter_list)
+	{
+		sort(n.rbegin(), n.rend());
+		for (int i = 0; i < (int)n.size(); i++)
+			erase(n[i], iter_list);
+	}
+
+	static void erase(petri::iterator n, int type, vector<int> &iter_list)
+	{
+		if (n.type != type)
+			return;
+
+		for (int i = (int)iter_list.size()-1; i >= 0; i--)
+		{
+			if (iter_list[i] == n.index)
+				iter_list.erase(iter_list.begin() + i);
+			else if (iter_list[i] > n.index)
+				iter_list[i]--;
 		}
 	}
 
@@ -409,7 +430,7 @@ struct graph
 		}
 	}
 
-	void erase(vector<petri::iterator> n, bool rsorted = false)
+	virtual void erase(vector<petri::iterator> n, bool rsorted = false)
 	{
 		if (!rsorted)
 			sort(n.rbegin(), n.rend());
@@ -418,7 +439,7 @@ struct graph
 			erase(n[i]);
 	}
 
-	petri::iterator connect(petri::iterator from, petri::iterator to)
+	virtual petri::iterator connect(petri::iterator from, petri::iterator to)
 	{
 		if (from.type == place::type && to.type == place::type)
 		{
@@ -440,21 +461,21 @@ struct graph
 		return to;
 	}
 
-	vector<petri::iterator> connect(petri::iterator from, vector<petri::iterator> to)
+	virtual vector<petri::iterator> connect(petri::iterator from, vector<petri::iterator> to)
 	{
 		for (int i = 0; i < (int)to.size(); i++)
 			connect(from, to[i]);
 		return to;
 	}
 
-	petri::iterator connect(vector<petri::iterator> from, petri::iterator to)
+	virtual petri::iterator connect(vector<petri::iterator> from, petri::iterator to)
 	{
 		for (int i = 0; i < (int)from.size(); i++)
 			connect(from[i], to);
 		return to;
 	}
 
-	vector<petri::iterator> connect(vector<petri::iterator> from, vector<petri::iterator> to)
+	virtual vector<petri::iterator> connect(vector<petri::iterator> from, vector<petri::iterator> to)
 	{
 		for (int i = 0; i < (int)from.size(); i++)
 			for (int j = 0; j < (int)to.size(); j++)
@@ -462,12 +483,12 @@ struct graph
 		return to;
 	}
 
-	petri::iterator connect(arc a)
+	virtual petri::iterator connect(arc a)
 	{
 		return connect(a.from, a.to);
 	}
 
-	vector<petri::iterator> connect(vector<arc> a)
+	virtual vector<petri::iterator> connect(vector<arc> a)
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)a.size(); i++)
@@ -475,14 +496,14 @@ struct graph
 		return result;
 	}
 
-	void disconnect(petri::iterator a)
+	virtual void disconnect(petri::iterator a)
 	{
 		mark_modified();
 		arcs[a.type].erase(arcs[a.type].begin() + a.index);
 	}
 
 
-	petri::iterator copy(petri::iterator i)
+	virtual petri::iterator copy(petri::iterator i)
 	{
 		if (i.type == place::type && i.index < (int)places.size())
 		{
@@ -503,7 +524,7 @@ struct graph
 		}
 	}
 
-	vector<petri::iterator> copy(petri::iterator i, int num)
+	virtual vector<petri::iterator> copy(petri::iterator i, int num)
 	{
 		vector<petri::iterator> result;
 		if (i.type == place::type && i.index < (int)places.size())
@@ -528,7 +549,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> copy(vector<petri::iterator> i, int num = 1)
+	virtual vector<petri::iterator> copy(vector<petri::iterator> i, int num = 1)
 	{
 		vector<petri::iterator> result;
 		for (int j = 0; j < (int)i.size(); j++)
@@ -539,7 +560,7 @@ struct graph
 		return result;
 	}
 
-	petri::iterator copy_combine(int composition, petri::iterator i0, petri::iterator i1)
+	virtual petri::iterator copy_combine(int composition, petri::iterator i0, petri::iterator i1)
 	{
 		if (i0.type == place::type && i1.type == place::type)
 			return create(place::merge(composition, places[i0.index], places[i1.index]));
@@ -560,7 +581,7 @@ struct graph
 		}
 	}
 
-	petri::iterator combine(int composition, petri::iterator i0, petri::iterator i1)
+	virtual petri::iterator combine(int composition, petri::iterator i0, petri::iterator i1)
 	{
 		if (i0.type == place::type && i1.type == place::type)
 		{
@@ -635,7 +656,7 @@ struct graph
 		return connect(create(n, num), to);
 	}
 
-	petri::iterator insert(petri::iterator a, place n)
+	virtual petri::iterator insert(petri::iterator a, place n)
 	{
 		petri::iterator i[2];
 		i[place::type] = create(n);
@@ -646,7 +667,7 @@ struct graph
 		return i[place::type];
 	}
 
-	petri::iterator insert(petri::iterator a, transition n)
+	virtual petri::iterator insert(petri::iterator a, transition n)
 	{
 		petri::iterator i[2];
 		i[place::type] = create(place());
@@ -657,7 +678,7 @@ struct graph
 		return i[transition::type];
 	}
 
-	petri::iterator insert(petri::iterator a, int n)
+	virtual petri::iterator insert(petri::iterator a, int n)
 	{
 		if (n == place::type)
 			return insert(a, place());
@@ -667,7 +688,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	petri::iterator insert_alongside(petri::iterator from, petri::iterator to, place n)
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, place n)
 	{
 		petri::iterator i = create(n);
 		if (from.type == i.type)
@@ -691,7 +712,7 @@ struct graph
 		return i;
 	}
 
-	petri::iterator insert_alongside(petri::iterator from, petri::iterator to, transition n)
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, transition n)
 	{
 		petri::iterator i = create(n);
 		if (from.type == i.type)
@@ -715,7 +736,7 @@ struct graph
 		return i;
 	}
 
-	petri::iterator insert_alongside(petri::iterator from, petri::iterator to, int n)
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, int n)
 	{
 		if (n == place::type)
 			return insert_alongside(from, to, place());
@@ -725,7 +746,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	petri::iterator insert_before(petri::iterator to, place n)
+	virtual petri::iterator insert_before(petri::iterator to, place n)
 	{
 		petri::iterator i[2];
 		i[transition::type] = create(transition());
@@ -738,7 +759,7 @@ struct graph
 		return i[place::type];
 	}
 
-	petri::iterator insert_before(petri::iterator to, transition n)
+	virtual petri::iterator insert_before(petri::iterator to, transition n)
 	{
 		petri::iterator i[2];
 		i[transition::type] = create(n);
@@ -751,7 +772,7 @@ struct graph
 		return i[transition::type];
 	}
 
-	petri::iterator insert_before(petri::iterator to, int n)
+	virtual petri::iterator insert_before(petri::iterator to, int n)
 	{
 		if (n == place::type)
 			return insert_before(to, place());
@@ -761,7 +782,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	petri::iterator insert_after(petri::iterator from, place n)
+	virtual petri::iterator insert_after(petri::iterator from, place n)
 	{
 		petri::iterator i[2];
 		i[transition::type] = create(transition());
@@ -775,7 +796,7 @@ struct graph
 	}
 
 
-	petri::iterator insert_after(petri::iterator from, transition n)
+	virtual petri::iterator insert_after(petri::iterator from, transition n)
 	{
 		petri::iterator i[2];
 		i[transition::type] = create(n);
@@ -788,7 +809,7 @@ struct graph
 		return i[transition::type];
 	}
 
-	petri::iterator insert_after(petri::iterator from, int n)
+	virtual petri::iterator insert_after(petri::iterator from, int n)
 	{
 		if (n == place::type)
 			return insert_after(from, place());
@@ -798,7 +819,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	petri::iterator duplicate(int composition, petri::iterator i, bool add = true)
+	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true)
 	{
 		petri::iterator d = copy(i);
 		if (i.type == composition)
@@ -883,7 +904,7 @@ struct graph
 		return d;
 	}
 
-	vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true)
+	virtual vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true)
 	{
 		vector<petri::iterator> d = copy(i, num-1);
 		if (i.type == composition)
@@ -983,7 +1004,7 @@ struct graph
 		return d;
 	}
 
-	vector<petri::iterator> duplicate(int composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true)
+	virtual vector<petri::iterator> duplicate(int composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true)
 	{
 		vector<petri::iterator> result;
 		result.reserve(n.size()*num);
@@ -999,7 +1020,7 @@ struct graph
 		return result;
 	}
 
-	void pinch(petri::iterator n)
+	virtual map<petri::iterator, vector<petri::iterator> > pinch(petri::iterator n)
 	{
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
@@ -1047,9 +1068,15 @@ struct graph
 		}
 
 		erase(right);
+		erase(right, left);
+
+		map<petri::iterator, vector<petri::iterator> > result;
+		for (int i = 0; i < (int)left.size(); i++)
+			result.insert(pair<petri::iterator, vector<petri::iterator> >(right[i], vector<petri::iterator>(1, left[i])));
+		return result;
 	}
 
-	vector<petri::iterator> next(petri::iterator n) const
+	virtual vector<petri::iterator> next(petri::iterator n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++)
@@ -1058,7 +1085,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> next(vector<petri::iterator> n) const
+	virtual vector<petri::iterator> next(vector<petri::iterator> n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++)
@@ -1069,7 +1096,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> prev(petri::iterator n) const
+	virtual vector<petri::iterator> prev(petri::iterator n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
@@ -1078,7 +1105,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> prev(vector<petri::iterator> n) const
+	virtual vector<petri::iterator> prev(vector<petri::iterator> n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++)
@@ -1089,7 +1116,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> next(int type, int n) const
+	virtual vector<int> next(int type, int n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
@@ -1098,7 +1125,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> next(int type, vector<int> n) const
+	virtual vector<int> next(int type, vector<int> n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
@@ -1107,7 +1134,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> prev(int type, int n) const
+	virtual vector<int> prev(int type, int n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1116,7 +1143,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> prev(int type, vector<int> n) const
+	virtual vector<int> prev(int type, vector<int> n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1125,7 +1152,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> out(petri::iterator n) const
+	virtual vector<petri::iterator> out(petri::iterator n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++)
@@ -1134,7 +1161,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> out(vector<petri::iterator> n) const
+	virtual vector<petri::iterator> out(vector<petri::iterator> n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++)
@@ -1145,7 +1172,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> in(petri::iterator n) const
+	virtual vector<petri::iterator> in(petri::iterator n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
@@ -1154,7 +1181,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> in(vector<petri::iterator> n) const
+	virtual vector<petri::iterator> in(vector<petri::iterator> n) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++)
@@ -1165,7 +1192,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> out(int type, int n) const
+	virtual vector<int> out(int type, int n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
@@ -1174,7 +1201,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> out(int type, vector<int> n) const
+	virtual vector<int> out(int type, vector<int> n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
@@ -1183,7 +1210,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> in(int type, int n) const
+	virtual vector<int> in(int type, int n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1192,7 +1219,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> in(int type, vector<int> n) const
+	virtual vector<int> in(int type, vector<int> n) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1201,7 +1228,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> next_arcs(petri::iterator a) const
+	virtual vector<petri::iterator> next_arcs(petri::iterator a) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-a.type].size(); i++)
@@ -1210,7 +1237,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> next_arcs(vector<petri::iterator> a) const
+	virtual vector<petri::iterator> next_arcs(vector<petri::iterator> a) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)a.size(); i++)
@@ -1221,7 +1248,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> prev_arcs(petri::iterator a) const
+	virtual vector<petri::iterator> prev_arcs(petri::iterator a) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-a.type].size(); i++)
@@ -1230,7 +1257,7 @@ struct graph
 		return result;
 	}
 
-	vector<petri::iterator> prev_arcs(vector<petri::iterator> a) const
+	virtual vector<petri::iterator> prev_arcs(vector<petri::iterator> a) const
 	{
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)a.size(); i++)
@@ -1241,7 +1268,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> next_arcs(int type, int a) const
+	virtual vector<int> next_arcs(int type, int a) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1250,7 +1277,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> next_arcs(int type, vector<int> a) const
+	virtual vector<int> next_arcs(int type, vector<int> a) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)a.size(); i++)
@@ -1261,7 +1288,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> prev_arcs(int type, int a) const
+	virtual vector<int> prev_arcs(int type, int a) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
@@ -1270,7 +1297,7 @@ struct graph
 		return result;
 	}
 
-	vector<int> prev_arcs(int type, vector<int> a) const
+	virtual vector<int> prev_arcs(int type, vector<int> a) const
 	{
 		vector<int> result;
 		for (int i = 0; i < (int)a.size(); i++)
@@ -1281,7 +1308,7 @@ struct graph
 		return result;
 	}
 
-	map<petri::iterator, petri::iterator> merge(int composition, const graph &g)
+	virtual map<petri::iterator, vector<petri::iterator> > merge(int composition, const graph &g)
 	{
 		if (places.size() == 0 && transitions.size() == 0)
 		{
@@ -1297,39 +1324,45 @@ struct graph
 			parallel_nodes = g.parallel_nodes;
 			parallel_nodes_ready = g.parallel_nodes_ready;
 
-			map<petri::iterator, petri::iterator> result;
+			map<petri::iterator, vector<petri::iterator> > result;
 			for (int i = 0; i < (int)places.size(); i++)
-				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(place::type, i), petri::iterator(place::type, i)));
+				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(place::type, i), vector<petri::iterator>(1, petri::iterator(place::type, i))));
 
 			for (int i = 0; i < (int)transitions.size(); i++)
-				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(transition::type, i), petri::iterator(transition::type, i)));
+				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(transition::type, i), vector<petri::iterator>(1, petri::iterator(transition::type, i))));
 
 			return result;
 		}
 		else if ((g.places.size() == 0 && g.transitions.size() == 0) || (composition == sequence && (sink.size() == 0 || g.source.size() == 0)))
-			return map<petri::iterator, petri::iterator>();
+			return map<petri::iterator, vector<petri::iterator> >();
 		else
 		{
 			mark_modified();
-			map<petri::iterator, petri::iterator> result;
+			map<petri::iterator, vector<petri::iterator> > result;
 
 			places.reserve(places.size() + g.places.size());
 			for (int i = 0; i < (int)g.places.size(); i++)
 			{
-				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(place::type, i), petri::iterator(place::type, (int)places.size())));
+				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(place::type, i), vector<petri::iterator>(1, petri::iterator(place::type, (int)places.size()))));
 				places.push_back(g.places[i]);
 			}
 
 			transitions.reserve(transitions.size() + g.transitions.size());
 			for (int i = 0; i < (int)g.transitions.size(); i++)
 			{
-				result.insert(pair<petri::iterator, petri::iterator>(petri::iterator(transition::type, i), petri::iterator(transition::type, (int)transitions.size())));
+				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(transition::type, i), vector<petri::iterator>(1, petri::iterator(transition::type, (int)transitions.size()))));
 				transitions.push_back(g.transitions[i]);
 			}
 
 			for (int i = 0; i < 2; i++)
 				for (int j = 0; j < (int)g.arcs[i].size(); j++)
-					arcs[i].push_back(arc(result[g.arcs[i][j].from], result[g.arcs[i][j].to]));
+				{
+					vector<petri::iterator> from = result[g.arcs[i][j].from];
+					vector<petri::iterator> to = result[g.arcs[i][j].to];
+					for (int k = 0; k < (int)from.size(); k++)
+						for (int l = 0; l < (int)to.size(); l++)
+							arcs[i].push_back(arc(from[k], to[l]));
+				}
 
 			vector<state> converted_source;
 			vector<state> converted_sink;
@@ -1410,6 +1443,18 @@ struct graph
 								if (reset[j].tokens[k].index == rem[i].index)
 									reset[j].tokens[k].index = p.index;
 
+						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
+						{
+							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
+							if (loc != j->second.end())
+							{
+								j->second.erase(loc);
+								j->second.push_back(p);
+								sort(j->second.begin(), j->second.end());
+								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+							}
+						}
+
 						graph::erase(rem[i], converted_source);
 						graph::erase(rem[i], converted_sink);
 						graph::erase(rem[i], converted_reset);
@@ -1460,6 +1505,18 @@ struct graph
 							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
 								if (converted_reset[j].tokens[k].index == rem[i].index)
 									converted_reset[j].tokens[k].index = p.index;
+
+						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
+						{
+							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
+							if (loc != j->second.end())
+							{
+								j->second.erase(loc);
+								j->second.push_back(p);
+								sort(j->second.begin(), j->second.end());
+								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+							}
+						}
 
 						graph::erase(rem[i], converted_source);
 						graph::erase(rem[i], converted_sink);
@@ -1548,6 +1605,18 @@ struct graph
 								if (reset[j].tokens[k].index == rem[i].index)
 									reset[j].tokens[k].index = p.index;
 
+						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
+						{
+							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
+							if (loc != j->second.end())
+							{
+								j->second.erase(loc);
+								j->second.push_back(p);
+								sort(j->second.begin(), j->second.end());
+								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+							}
+						}
+
 						graph::erase(rem[i], converted_source);
 						graph::erase(rem[i], converted_sink);
 						graph::erase(rem[i], converted_reset);
@@ -1598,6 +1667,18 @@ struct graph
 							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
 								if (converted_reset[j].tokens[k].index == rem[i].index)
 									converted_reset[j].tokens[k].index = p.index;
+
+						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
+						{
+							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
+							if (loc != j->second.end())
+							{
+								j->second.erase(loc);
+								j->second.push_back(p);
+								sort(j->second.begin(), j->second.end());
+								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+							}
+						}
 
 						graph::erase(rem[i], converted_source);
 						graph::erase(rem[i], converted_sink);
@@ -1746,6 +1827,18 @@ struct graph
 								source[j].tokens.erase(source[j].tokens.begin() + k);
 							}
 						}
+
+					for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
+					{
+						vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
+						if (loc != j->second.end())
+						{
+							j->second.erase(loc);
+							j->second.insert(j->second.end(), m.begin(), m.end());
+							sort(j->second.begin(), j->second.end());
+							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+						}
+					}
 				}
 
 				sink = converted_sink;
@@ -1756,7 +1849,7 @@ struct graph
 		}
 	}
 
-	vector<vector<petri::iterator> > cycles() const
+	virtual vector<vector<petri::iterator> > cycles() const
 	{
 		vector<vector<petri::iterator> > curr;
 		vector<vector<petri::iterator> > result;
@@ -1792,7 +1885,7 @@ struct graph
 		return result;
 	}
 
-	bool reduce(bool proper_nesting = true)
+	virtual bool reduce(bool proper_nesting = true)
 	{
 		bool result = false;
 		bool change = true;
@@ -2020,7 +2113,7 @@ struct graph
 		return result;
 	}
 
-	bool is_floating(petri::iterator n) const
+	virtual bool is_floating(petri::iterator n) const
 	{
 		for (int i = 0; i < 2; i++)
 			for (int j = 0; j < (int)arcs[i].size(); j++)
@@ -2029,7 +2122,7 @@ struct graph
 		return true;
 	}
 
-	bool is_reachable(petri::iterator from, petri::iterator to)
+	virtual bool is_reachable(petri::iterator from, petri::iterator to)
 	{
 		if (!node_distances_ready)
 			calculate_node_distances();
@@ -2037,7 +2130,7 @@ struct graph
 		return (node_distances[(places.size()*to.type + to.index)*(places.size() + transitions.size()) + (places.size()*from.type + from.index)] < (int)(places.size() + transitions.size()));
 	}
 
-	bool is_parallel(petri::iterator a, petri::iterator b)
+	virtual bool is_parallel(petri::iterator a, petri::iterator b)
 	{
 		// TODO can I do better than this?
 		if (!parallel_nodes_ready)

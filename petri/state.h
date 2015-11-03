@@ -62,7 +62,7 @@ struct state
 
 	//static state merge(const state &s0, const state &s1);
 	//static state collapse(int index, const state &s);
-	//state convert(map<petri::iterator, petri::iterator> translate);
+	//state convert(map<petri::iterator, vector<petri::iterator> > translate);
 };
 
 template <class token>
