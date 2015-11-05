@@ -1116,6 +1116,22 @@ struct graph
 		return result;
 	}
 
+	virtual vector<petri::iterator> neighbors(petri::iterator n, bool sorted = false) const
+	{
+		vector<petri::iterator> result;
+		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
+			if (arcs[1-n.type][i].to.index == n.index)
+				result.push_back(arcs[1-n.type][i].from);
+
+		for (int i = 0; i < (int)arcs[n.type].size(); i++)
+			if (arcs[n.type][i].from.index == n.index)
+				result.push_back(arcs[n.type][i].to);
+
+		if (sorted)
+			sort(result.begin(), result.end());
+		return result;
+	}
+
 	virtual vector<int> next(int type, int n) const
 	{
 		vector<int> result;
@@ -1149,6 +1165,40 @@ struct graph
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end())
 				result.push_back(arcs[1-type][i].from.index);
+		return result;
+	}
+
+	virtual vector<int> neighbors(int type, int n, bool sorted = false) const
+	{
+		vector<int> result;
+		for (int i = 0; i < (int)arcs[1-type].size(); i++)
+			if (arcs[1-type][i].to.index == n)
+				result.push_back(arcs[1-type][i].from.index);
+
+		for (int i = 0; i < (int)arcs[type].size(); i++)
+			if (arcs[type][i].from.index == n)
+				result.push_back(arcs[type][i].to.index);
+
+		if (sorted)
+			sort(result.begin(), result.end());
+
+		return result;
+	}
+
+	virtual vector<int> neighbors(int type, vector<int> n, bool sorted = false) const
+	{
+		vector<int> result;
+		for (int i = 0; i < (int)arcs[1-type].size(); i++)
+			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end())
+				result.push_back(arcs[1-type][i].from.index);
+
+		for (int i = 0; i < (int)arcs[type].size(); i++)
+			if (find(n.begin(), n.end(), arcs[type][i].from.index) != n.end())
+				result.push_back(arcs[type][i].to.index);
+
+		if (sorted)
+			sort(result.begin(), result.end());
+
 		return result;
 	}
 
