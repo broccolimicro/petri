@@ -1495,14 +1495,19 @@ struct graph
 
 						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
 						{
-							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
-							if (loc != j->second.end())
+							for (int k = (int)j->second.size()-1; k >= 0; k--)
 							{
-								j->second.erase(loc);
-								j->second.push_back(p);
-								sort(j->second.begin(), j->second.end());
-								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+								if (j->second[k] > rem[i])
+									j->second[k]--;
+								else if (j->second[k] == rem[i])
+								{
+									j->second.erase(j->second.begin() + k);
+									j->second.push_back(p);
+								}
 							}
+
+							sort(j->second.begin(), j->second.end());
+							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
 						}
 
 						graph::erase(rem[i], converted_source);
@@ -1558,14 +1563,19 @@ struct graph
 
 						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
 						{
-							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
-							if (loc != j->second.end())
+							for (int k = (int)j->second.size()-1; k >= 0; k--)
 							{
-								j->second.erase(loc);
-								j->second.push_back(p);
-								sort(j->second.begin(), j->second.end());
-								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+								if (j->second[k] > rem[i])
+									j->second[k]--;
+								else if (j->second[k] == rem[i])
+								{
+									j->second.erase(j->second.begin() + k);
+									j->second.push_back(p);
+								}
 							}
+
+							sort(j->second.begin(), j->second.end());
+							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
 						}
 
 						graph::erase(rem[i], converted_source);
@@ -1657,14 +1667,19 @@ struct graph
 
 						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
 						{
-							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
-							if (loc != j->second.end())
+							for (int k = (int)j->second.size()-1; k >= 0; k--)
 							{
-								j->second.erase(loc);
-								j->second.push_back(p);
-								sort(j->second.begin(), j->second.end());
-								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+								if (j->second[k] > rem[i])
+									j->second[k]--;
+								else if (j->second[k] == rem[i])
+								{
+									j->second.erase(j->second.begin() + k);
+									j->second.push_back(p);
+								}
 							}
+
+							sort(j->second.begin(), j->second.end());
+							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
 						}
 
 						graph::erase(rem[i], converted_source);
@@ -1720,14 +1735,19 @@ struct graph
 
 						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
 						{
-							vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
-							if (loc != j->second.end())
+							for (int k = (int)j->second.size()-1; k >= 0; k--)
 							{
-								j->second.erase(loc);
-								j->second.push_back(p);
-								sort(j->second.begin(), j->second.end());
-								j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+								if (j->second[k] > rem[i])
+									j->second[k]--;
+								else if (j->second[k] == rem[i])
+								{
+									j->second.erase(j->second.begin() + k);
+									j->second.push_back(p);
+								}
 							}
+
+							sort(j->second.begin(), j->second.end());
+							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
 						}
 
 						graph::erase(rem[i], converted_source);
@@ -1880,14 +1900,19 @@ struct graph
 
 					for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
 					{
-						vector<petri::iterator>::iterator loc = find(j->second.begin(), j->second.end(), rem[i]);
-						if (loc != j->second.end())
+						for (int k = (int)j->second.size()-1; k >= 0; k--)
 						{
-							j->second.erase(loc);
-							j->second.insert(j->second.end(), m.begin(), m.end());
-							sort(j->second.begin(), j->second.end());
-							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
+							if (j->second[k] > rem[i])
+								j->second[k]--;
+							else if (j->second[k] == rem[i])
+							{
+								j->second.erase(j->second.begin() + k);
+								j->second.insert(j->second.end(), m.begin(), m.end());
+							}
 						}
+
+						sort(j->second.begin(), j->second.end());
+						j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
 					}
 				}
 
