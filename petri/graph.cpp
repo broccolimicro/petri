@@ -175,6 +175,35 @@ arc::~arc()
 
 }
 
+bool operator<(arc a0, arc a1)
+{
+	return a0.from < a1.from || (a0.from == a1.from && a0.to < a1.to);
+}
+bool operator>(arc a0, arc a1)
+{
+	return a0.from > a1.from || (a0.from == a1.from && a0.to > a1.to);
+}
+
+bool operator<=(arc a0, arc a1)
+{
+	return a0.from < a1.from || (a0.from == a1.from && a0.to <= a1.to);
+}
+
+bool operator>=(arc a0, arc a1)
+{
+	return a0.from > a1.from || (a0.from == a1.from && a0.to >= a1.to);
+}
+
+bool operator==(arc a0, arc a1)
+{
+	return a0.from == a1.from && a0.to == a1.to;
+}
+
+bool operator!=(arc a0, arc a1)
+{
+	return a0.from != a1.from || a0.to != a1.to;
+}
+
 place::place()
 {
 

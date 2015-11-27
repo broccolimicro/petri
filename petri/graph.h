@@ -62,6 +62,13 @@ struct arc
 	petri::iterator to;
 };
 
+bool operator<(arc a0, arc a1);
+bool operator>(arc a0, arc a1);
+bool operator<=(arc a0, arc a1);
+bool operator>=(arc a0, arc a1);
+bool operator==(arc a0, arc a1);
+bool operator!=(arc a0, arc a1);
+
 enum composition
 {
 	parallel = 0,
