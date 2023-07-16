@@ -7,6 +7,7 @@
 
 #include <common/standard.h>
 #include <common/message.h>
+#include <common/text.h>
 
 #ifndef petri_graph_h
 #define petri_graph_h
@@ -913,6 +914,10 @@ struct graph
 
 	virtual vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true)
 	{
+		if (num == 0) {
+			return vector<petri::iterator>();
+		}
+
 		vector<petri::iterator> d = copy(i, num-1);
 		if (i.type == composition)
 		{
@@ -1034,9 +1039,13 @@ struct graph
 		vector<petri::iterator> left = duplicate(1-n.type, neighbors.first, neighbors.second.size(), false);
 		vector<petri::iterator> right = duplicate(1-n.type, neighbors.second, neighbors.first.size(), true);
 
+		cout << to_string(left) << endl;
+		cout << to_string(right) << endl;
+
 		for (int i = 0; i < (int)right.size(); i++)
 		{
-			combine(right[i].type, left[i], right[i]);
+			cout << i << endl;
+			combine(sequence, left[i], right[i]);
 
 			for (int j = 0; j < (int)arcs[right[i].type].size(); j++)
 				if (arcs[right[i].type][j].from == right[i])
@@ -1967,7 +1976,7 @@ struct graph
 		return result;
 	}
 
-	virtual bool reduce(bool proper_nesting = true)
+	virtual bool reduce(bool proper_nesting = true, bool aggressive = false)
 	{
 		bool result = false;
 		bool change = true;
@@ -2128,40 +2137,40 @@ struct graph
 					change = true;
 			}
 
+			// TODO check to see if we can merge any sequenced transitions
 
-			/*vector<petri::iterator> left;
-			vector<petri::iterator> right;
+			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
+			if (aggressive) {
+				vector<petri::iterator> left;
+				vector<petri::iterator> right;
 
-			vector<vector<petri::iterator> > n, p;
-			vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
+				vector<vector<petri::iterator> > n, p;
+				vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
 
-			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; i++)
-			{
-				n.push_back(next(i));
-				p.push_back(prev(i));
-
-				sort(n.back().begin(), n.back().end());
-				sort(p.back().begin(), p.back().end());
-
-				nx.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
-				px.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
-				for (int j = 0; j < (int)n.back().size(); j++)
+				for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; i++)
 				{
-					nx.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n.back()[j]), next(n.back()[j])));
-					sort(nx.back().back().first.begin(), nx.back().back().first.end());
-					sort(nx.back().back().second.begin(), nx.back().back().second.end());
-				}
-				for (int j = 0; j < (int)p.back().size(); j++)
-				{
-					px.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p.back()[j]), next(p.back()[j])));
-					sort(px.back().back().first.begin(), px.back().back().first.end());
-					sort(px.back().back().second.begin(), px.back().back().second.end());
-				}
+					n.push_back(next(i));
+					p.push_back(prev(i));
 
-				for (petri::iterator j = i-1; j >= 0 && !change; j--)
-				{
-					// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
-					if (transitions[j.index].behavior == transitions[i.index].behavior && transitions[i.index].behavior == transition::)
+					sort(n.back().begin(), n.back().end());
+					sort(p.back().begin(), p.back().end());
+
+					nx.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
+					px.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
+					for (int j = 0; j < (int)n.back().size(); j++)
+					{
+						nx.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n.back()[j]), next(n.back()[j])));
+						sort(nx.back().back().first.begin(), nx.back().back().first.end());
+						sort(nx.back().back().second.begin(), nx.back().back().second.end());
+					}
+					for (int j = 0; j < (int)p.back().size(); j++)
+					{
+						px.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p.back()[j]), next(p.back()[j])));
+						sort(px.back().back().first.begin(), px.back().back().first.end());
+						sort(px.back().back().second.begin(), px.back().back().second.end());
+					}
+
+					for (petri::iterator j = i-1; j >= 0 && !change; j--)
 					{
 						// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
 						// share all of the same input and output places.
@@ -2187,7 +2196,7 @@ struct graph
 						}
 					}
 				}
-			}*/
+			}
 
 			result = (result || change);
 		}
