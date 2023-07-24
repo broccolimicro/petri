@@ -517,7 +517,35 @@ struct graph
 		{
 			mark_modified();
 			places.push_back(places[i.index]);
-			return petri::iterator(i.type, places.size()-1);
+			petri::iterator result(i.type, places.size()-1);
+			if (i.type == place::type)
+			{
+				for (int j = 0; j < (int)source.size(); j++)
+					for (int k = 0; k < (int)source[j].tokens.size(); k++)
+						if (source[j].tokens[k].index == i.index)
+						{
+							source[j].tokens.push_back(source[j].tokens[k]);
+							source[j].tokens.back().index = result.index;
+						}
+
+				for (int j = 0; j < (int)reset.size(); j++)
+					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
+						if (reset[j].tokens[k].index == i.index)
+						{
+							reset[j].tokens.push_back(reset[j].tokens[k]);
+							reset[j].tokens.back().index = result.index;
+						}
+
+				for (int j = 0; j < (int)sink.size(); j++)
+					for (int k = 0; k < (int)sink[j].tokens.size(); k++)
+						if (sink[j].tokens[k].index == i.index)
+						{
+							sink[j].tokens.push_back(sink[j].tokens[k]);
+							sink[j].tokens.back().index = result.index;
+						}
+			}
+
+			return result;
 		}
 		else if (i.type == transition::type && i.index < (int)transitions.size())
 		{
@@ -535,21 +563,51 @@ struct graph
 	virtual vector<petri::iterator> copy(petri::iterator i, int num)
 	{
 		vector<petri::iterator> result;
-		if (i.type == place::type && i.index < (int)places.size())
+		if (i.type == place::type && i.index < (int)places.size()) {
 			for (int j = 0; j < num; j++)
 			{
 				mark_modified();
 				places.push_back(places[i.index]);
 				result.push_back(petri::iterator(i.type, places.size()-1));
 			}
-		else if (i.type == transition::type && i.index < (int)transitions.size())
+
+			if (i.type == place::type)
+			{
+				for (int j = 0; j < (int)source.size(); j++)
+					for (int k = 0; k < (int)source[j].tokens.size(); k++)
+						if (source[j].tokens[k].index == i.index)
+							for (int l = 0; l < (int)result.size(); l++)
+							{
+								source[j].tokens.push_back(source[j].tokens[k]);
+								source[j].tokens.back().index = result[l].index;
+							}
+
+				for (int j = 0; j < (int)reset.size(); j++)
+					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
+						if (reset[j].tokens[k].index == i.index)
+							for (int l = 0; l < (int)result.size(); l++)
+							{
+								reset[j].tokens.push_back(reset[j].tokens[k]);
+								reset[j].tokens.back().index = result[l].index;
+							}
+
+				for (int j = 0; j < (int)sink.size(); j++)
+					for (int k = 0; k < (int)sink[j].tokens.size(); k++)
+						if (sink[j].tokens[k].index == i.index)
+							for (int l = 0; l < (int)result.size(); l++)
+							{
+								sink[j].tokens.push_back(sink[j].tokens[k]);
+								sink[j].tokens.back().index = result[l].index;
+							}
+			}
+		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
 			for (int j = 0; j < num; j++)
 			{
 				mark_modified();
 				transitions.push_back(transitions[i.index]);
 				result.push_back(petri::iterator(i.type, transitions.size()-1));
 			}
-		else
+		} else
 		{
 			internal("petri::copy", "iterator out of bounds", __FILE__, __LINE__);
 			return vector<petri::iterator>();
@@ -882,33 +940,6 @@ struct graph
 			connect(i, n);
 		}
 
-		if (i.type == place::type)
-		{
-			for (int j = 0; j < (int)source.size(); j++)
-				for (int k = 0; k < (int)source[j].tokens.size(); k++)
-					if (source[j].tokens[k].index == i.index)
-					{
-						source[j].tokens.push_back(source[j].tokens[k]);
-						source[j].tokens.back().index = d.index;
-					}
-
-			for (int j = 0; j < (int)reset.size(); j++)
-				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-					if (reset[j].tokens[k].index == i.index)
-					{
-						reset[j].tokens.push_back(reset[j].tokens[k]);
-						reset[j].tokens.back().index = d.index;
-					}
-
-			for (int j = 0; j < (int)sink.size(); j++)
-				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-					if (sink[j].tokens[k].index == i.index)
-					{
-						sink[j].tokens.push_back(sink[j].tokens[k]);
-						sink[j].tokens.back().index = d.index;
-					}
-		}
-
 		return d;
 	}
 
@@ -981,36 +1012,6 @@ struct graph
 			connect(i, n);
 		}
 
-		if (i.type == place::type)
-		{
-			for (int j = 0; j < (int)source.size(); j++)
-				for (int k = 0; k < (int)source[j].tokens.size(); k++)
-					if (source[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)d.size(); l++)
-						{
-							source[j].tokens.push_back(source[j].tokens[k]);
-							source[j].tokens.back().index = d[l].index;
-						}
-
-			for (int j = 0; j < (int)reset.size(); j++)
-				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-					if (reset[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)d.size(); l++)
-						{
-							reset[j].tokens.push_back(reset[j].tokens[k]);
-							reset[j].tokens.back().index = d[l].index;
-						}
-
-			for (int j = 0; j < (int)sink.size(); j++)
-				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-					if (sink[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)d.size(); l++)
-						{
-							sink[j].tokens.push_back(sink[j].tokens[k]);
-							sink[j].tokens.back().index = d[l].index;
-						}
-		}
-
 		d.push_back(i);
 
 		return d;
@@ -1039,12 +1040,8 @@ struct graph
 		vector<petri::iterator> left = duplicate(1-n.type, neighbors.first, neighbors.second.size(), false);
 		vector<petri::iterator> right = duplicate(1-n.type, neighbors.second, neighbors.first.size(), true);
 
-		cout << to_string(left) << endl;
-		cout << to_string(right) << endl;
-
 		for (int i = 0; i < (int)right.size(); i++)
 		{
-			cout << i << endl;
 			combine(sequence, left[i], right[i]);
 
 			for (int j = 0; j < (int)arcs[right[i].type].size(); j++)
@@ -1806,6 +1803,9 @@ struct graph
 							petri::iterator pm = petri::iterator(place::type, sink[i].tokens[0].index);
 							connect(prev(pm), m);
 							connect(m, next(pm));
+							for (int k = 0; k < (int)m.size(); k++) {
+								places[m[k].index] = place::merge(sequence, places[pm.index], places[m[k].index]);
+							}
 							rem.push_back(pm);
 						}
 					}
@@ -1824,6 +1824,9 @@ struct graph
 							petri::iterator pm = petri::iterator(place::type, converted_source[i].tokens[0].index);
 							connect(prev(pm), m);
 							connect(m, next(pm));
+							for (int k = 0; k < (int)m.size(); k++) {
+								places[m[k].index] = place::merge(sequence, places[m[k].index], places[pm.index]);
+							}
 							rem.push_back(pm);
 						}
 					}
@@ -1846,6 +1849,7 @@ struct graph
 						for (int k = 0; k < (int)sink[0].tokens.size(); k++)
 						{
 							m.push_back(petri::iterator(place::type, sink[0].tokens[k].index));
+							places[m.back().index] = place::merge(sequence, places[m.back().index], places[p.index]);
 							connect(m.back(), nm);
 							connect(pm, m.back());
 						}
@@ -1859,6 +1863,7 @@ struct graph
 						for (int k = 0; k < (int)converted_source[0].tokens.size(); k++)
 						{
 							m.push_back(petri::iterator(place::type, converted_source[0].tokens[k].index));
+							places[m.back().index] = place::merge(sequence, places[p.index], places[m.back().index]);
 							connect(m.back(), nm);
 							connect(pm, m.back());
 						}
@@ -2136,8 +2141,6 @@ struct graph
 				else
 					change = true;
 			}
-
-			// TODO check to see if we can merge any sequenced transitions
 
 			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
 			if (aggressive) {
