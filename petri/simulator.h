@@ -5,11 +5,10 @@
  *      Author: nbingham
  */
 
+#pragma once
+
 #include <common/standard.h>
 #include "graph.h"
-
-#ifndef petri_simulator_h
-#define petri_simulator_h
 
 namespace petri
 {
@@ -245,5 +244,3 @@ struct simulator
 };
 
 }
-
-#endif

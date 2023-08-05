@@ -5,10 +5,9 @@
  *      Author: nbingham
  */
 
-#include <common/standard.h>
+#pragma once
 
-#ifndef petri_state_h
-#define petri_state_h
+#include <common/standard.h>
 
 namespace petri
 {
@@ -102,5 +101,3 @@ bool operator!=(state<token> t0, state<token> t1)
 }
 
 }
-
-#endif

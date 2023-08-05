@@ -5,12 +5,12 @@
  *      Author: nbingham
  */
 
+#pragma once
+
 #include <common/standard.h>
 #include <common/message.h>
 #include <common/text.h>
-
-#ifndef petri_graph_h
-#define petri_graph_h
+#include "state.h"
 
 namespace petri
 {
@@ -77,10 +77,27 @@ enum composition
 	sequence = 2
 };
 
+struct parallel_group
+{
+	parallel_group();
+	parallel_group(int split, int branch, int count);
+	~parallel_group();
+	
+	int split;
+	vector<int> branch;
+	int count;
+};
+
+bool operator<(const parallel_group &g0, const parallel_group &g1);
+bool operator==(const parallel_group &g0, const parallel_group &g1);
+
 struct place
 {
 	place();
 	~place();
+
+	// sorted, transition index of parallel split -> place index of parallel branch
+	vector<parallel_group> parallel_groups;
 
 	static const int type = 0;
 
@@ -91,6 +108,9 @@ struct transition
 {
 	transition();
 	~transition();
+
+	// sorted, transition index of parallel split -> place index of parallel branch
+	vector<parallel_group> parallel_groups;
 
 	static const int type = 1;
 
@@ -166,8 +186,100 @@ struct graph
 		node_distances_ready = true;
 	}
 
-	vector<pair<petri::iterator, petri::iterator> > parallel_nodes;
 	bool parallel_nodes_ready;
+
+	virtual void compute_parallel_nodes()
+	{
+		vector<vector<petri::iterator> > prev_places, prev_trans;
+		for (int i = 0; i < (int)places.size(); i++) {
+			places[i].parallel_groups.clear();
+			prev_trans.push_back(prev(petri::iterator(place::type, i)));
+		}
+		for (int i = 0; i < (int)transitions.size(); i++) {
+			transitions[i].parallel_groups.clear();
+			prev_places.push_back(prev(petri::iterator(transition::type, i)));
+		}
+
+		vector<vector<parallel_group> > init;
+		init.resize(places.size());
+		for (int i = 0; i < (int)transitions.size(); i++) {
+			vector<petri::iterator> n = next(petri::iterator(transition::type, i));
+			if (n.size() > 1) {
+				for (int j = 0; j < (int)n.size(); j++) {
+					init[n[j].index].push_back(parallel_group(i, n[j].index, n.size()));
+				}
+			}
+		}
+
+		bool change = true;
+		while (change) {
+			change = false;
+
+			for (auto i = prev_places.begin(); i != prev_places.end(); i++) {
+				int tid = i - prev_places.begin();
+				vector<parallel_group> group;
+				for (auto j = i->begin(); j != i->end(); j++) {
+					for (auto k = transitions[j->index].parallel_groups.begin(); k != transitions[j->index].parallel_groups.end(); k++) {
+						if (k->split != tid) {
+							auto loc = lower_bound(group.begin(), group.end(), *k);
+							if (loc == group.end() || loc->split != k->split) {
+								group.insert(loc, *k);
+							} else {
+								loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
+							}
+						}
+					}
+				}
+
+				for (auto j = group.begin(); j != group.end();) {
+					sort(j->branch.begin(), j->branch.end());
+					j->branch.resize(unique(j->branch.begin(), j->branch.end()) - j->branch.begin());
+					if ((int)j->branch.size() == j->count) {
+						j = group.erase(j);
+					} else {
+						j++;
+					}
+				}
+
+				if (transitions[tid].parallel_groups != group) {
+					transitions[tid].parallel_groups = group;
+					change = true;
+				}
+			}
+
+			for (auto i = prev_trans.begin(); i != prev_trans.end(); i++) {
+				int pid = i-prev_trans.begin();
+				vector<parallel_group> group = init[pid];
+				for (auto j = i->begin(); j != i->end(); j++) {
+					for (auto k = places[j->index].parallel_groups.begin(); k != places[j->index].parallel_groups.end(); k++) {
+						auto loc = lower_bound(group.begin(), group.end(), *k);
+						if (loc == group.end() || loc->split != k->split) {
+							group.insert(loc, *k);
+						} else {
+							loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
+						}
+					}
+				}
+
+				for (auto j = group.begin(); j != group.end();) {
+					sort(j->branch.begin(), j->branch.end());
+					j->branch.resize(unique(j->branch.begin(), j->branch.end()) - j->branch.begin());
+					if ((int)j->branch.size() == j->count) {
+						j = group.erase(j);
+					} else {
+						j++;
+					}
+				}
+
+				if (places[pid].parallel_groups != group) {
+					places[pid].parallel_groups = group;
+					change = true;
+				}
+			}
+		}
+
+		parallel_nodes_ready = true;
+	}
 
 	graph()
 	{
@@ -1384,7 +1496,6 @@ struct graph
 			reset = g.reset;
 			node_distances = g.node_distances;
 			node_distances_ready = g.node_distances_ready;
-			parallel_nodes = g.parallel_nodes;
 			parallel_nodes_ready = g.parallel_nodes_ready;
 
 			map<petri::iterator, vector<petri::iterator> > result;
@@ -2216,24 +2327,57 @@ struct graph
 		return true;
 	}
 
-	virtual bool is_reachable(petri::iterator from, petri::iterator to)
+	virtual int distance(petri::iterator from, petri::iterator to)
 	{
 		if (!node_distances_ready)
 			calculate_node_distances();
 
-		return (node_distances[(places.size()*to.type + to.index)*(places.size() + transitions.size()) + (places.size()*from.type + from.index)] < (int)(places.size() + transitions.size()));
+		return node_distances[(places.size()*to.type + to.index)*(places.size() + transitions.size()) + (places.size()*from.type + from.index)];
+	}
+
+	virtual bool is_reachable(petri::iterator from, petri::iterator to)
+	{
+		return (distance(from, to) < (int)(places.size() + transitions.size()));
 	}
 
 	virtual bool is_parallel(petri::iterator a, petri::iterator b)
 	{
-		// TODO can I do better than this?
 		if (!parallel_nodes_ready)
-			internal("petri::graph::is_parallel", "parallel nodes data is out of date", __FILE__, __LINE__);
+			compute_parallel_nodes();
 
-		return (find(parallel_nodes.begin(), parallel_nodes.end(), pair<petri::iterator, petri::iterator>(a, b)) != parallel_nodes.end());
+		vector<parallel_group> a_groups, b_groups;
+		if (a.type == place::type) {
+			a_groups = places[a.index].parallel_groups;
+		} else {
+			a_groups = transitions[a.index].parallel_groups;
+		}
+
+		if (b.type == place::type) {
+			b_groups = places[b.index].parallel_groups;
+		} else {
+			b_groups = transitions[b.index].parallel_groups;
+		}
+
+		for (int i = 0, j = 0; i < (int)a_groups.size() && j < (int)b_groups.size(); ) {
+			if (a_groups[i].split == b_groups[j].split) {
+				if (a_groups[i].branch.size() != b_groups[j].branch.size()) {
+					return true;
+				}
+				for (int k = 0; k < (int)a_groups[i].branch.size(); k++) {
+					if (a_groups[i].branch[k] != b_groups[j].branch[k]) {
+						return true;
+					}
+				}
+				i++;
+				j++;
+			} else if (a_groups[i].split < b_groups[j].split) {
+				i++;
+			} else {
+				j++;
+			}
+		}
+		return false;
 	}
 };
 
 }
-
-#endif

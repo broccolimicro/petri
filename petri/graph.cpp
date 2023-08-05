@@ -249,4 +249,40 @@ bool transition::is_vacuous()
 	return false;
 }
 
+parallel_group::parallel_group() {}
+
+parallel_group::parallel_group(int split, int branch, int count)
+{
+	this->split = split;
+	this->branch.push_back(branch);
+	this->count = count;
 }
+
+parallel_group::~parallel_group() {}
+
+bool operator<(const parallel_group &g0, const parallel_group &g1)
+{
+	return g0.split < g1.split;
+}
+
+bool operator==(const parallel_group &g0, const parallel_group &g1)
+{
+	if (g0.split != g1.split) {
+		return false;
+	}
+
+	if (g0.branch.size() != g1.branch.size()) {
+		return false;
+	}
+
+	for (int i = 0; i < (int)g0.branch.size(); i++) {
+		if (g0.branch[i] != g1.branch[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
+}
+
