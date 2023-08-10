@@ -150,6 +150,11 @@ bool iterator::operator>=(int i) const
 	return index >= i;
 }
 
+string iterator::to_string() const
+{
+	return (type == place::type ? "P" : "T") + ::to_string(index);
+}
+
 ostream &operator<<(ostream &os, iterator i)
 {
 	if (i.type == place::type)
@@ -259,6 +264,10 @@ parallel_group::parallel_group(int split, int branch, int count)
 }
 
 parallel_group::~parallel_group() {}
+
+string parallel_group::to_string() const {
+	return "(" + ::to_string(split) + "," + ::to_string(branch) + "/" + ::to_string(count) + ")";
+}
 
 bool operator<(const parallel_group &g0, const parallel_group &g1)
 {

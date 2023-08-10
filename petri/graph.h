@@ -49,6 +49,8 @@ struct iterator
 	bool operator>(int i) const;
 	bool operator<=(int i) const;
 	bool operator>=(int i) const;
+
+	string to_string() const;
 };
 
 ostream &operator<<(ostream &os, iterator i);
@@ -86,6 +88,8 @@ struct parallel_group
 	int split;
 	vector<int> branch;
 	int count;
+
+	string to_string() const;
 };
 
 bool operator<(const parallel_group &g0, const parallel_group &g1);
@@ -202,6 +206,12 @@ struct graph
 
 		vector<vector<parallel_group> > init;
 		init.resize(places.size());
+		if (reset.size() > 0) {
+			for (int i = 0; i < (int)reset[0].tokens.size(); i++) {
+				init[reset[0].tokens[i].index].push_back(parallel_group(-1, reset[0].tokens[i].index, reset[0].tokens.size()));
+			}
+		}
+
 		for (int i = 0; i < (int)transitions.size(); i++) {
 			vector<petri::iterator> n = next(petri::iterator(transition::type, i));
 			if (n.size() > 1) {
@@ -219,7 +229,7 @@ struct graph
 				int tid = i - prev_places.begin();
 				vector<parallel_group> group;
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = transitions[j->index].parallel_groups.begin(); k != transitions[j->index].parallel_groups.end(); k++) {
+					for (auto k = places[j->index].parallel_groups.begin(); k != places[j->index].parallel_groups.end(); k++) {
 						if (k->split != tid) {
 							auto loc = lower_bound(group.begin(), group.end(), *k);
 							if (loc == group.end() || loc->split != k->split) {
@@ -251,7 +261,7 @@ struct graph
 				int pid = i-prev_trans.begin();
 				vector<parallel_group> group = init[pid];
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = places[j->index].parallel_groups.begin(); k != places[j->index].parallel_groups.end(); k++) {
+					for (auto k = transitions[j->index].parallel_groups.begin(); k != transitions[j->index].parallel_groups.end(); k++) {
 						auto loc = lower_bound(group.begin(), group.end(), *k);
 						if (loc == group.end() || loc->split != k->split) {
 							group.insert(loc, *k);
@@ -342,6 +352,26 @@ struct graph
 	virtual petri::iterator rend_arc(int type)
 	{
 		return petri::iterator(type, -1);
+	}
+
+	virtual petri::iterator create_at(place p, int index)
+	{
+		mark_modified();
+		if (index >= (int)places.size()) {
+			places.resize(index+1);
+		}
+		places[index] = p;
+		return petri::iterator(place::type, index);
+	}
+
+	virtual petri::iterator create_at(transition t, int index)
+	{
+		mark_modified();
+		if (index >= (int)transitions.size()) {
+			transitions.resize(index+1);
+		}
+		transitions[index] = t;
+		return petri::iterator(transition::type, index);
 	}
 
 	virtual petri::iterator create(place p)
