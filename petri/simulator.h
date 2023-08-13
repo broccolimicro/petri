@@ -13,7 +13,7 @@
 namespace petri
 {
 
-template <class place, class transition, class token, class state>
+template <class graph, class token, class state>
 struct simulator
 {
 	simulator()
@@ -21,7 +21,7 @@ struct simulator
 		base = NULL;
 	}
 
-	simulator(const graph<place, transition, token, state> *base, state initial)
+	simulator(const graph *base, state initial)
 	{
 		//cout << "Reset" << endl;
 		this->base = base;
@@ -35,7 +35,7 @@ struct simulator
 
 	}
 
-	const graph<place, transition, token, state> *base;
+	const graph *base;
 
 	vector<token> tokens;
 	vector<enabled_transition> ready;
