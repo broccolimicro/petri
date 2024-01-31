@@ -128,11 +128,14 @@ struct transition
 /**
  * Generic petri net graph representation.
  */
-template <class place, class transition, class token, class state>
+template <class place_t, class transition_t, class token, class state>
 struct graph
 {
 	vector<int> node_distances;
 	bool node_distances_ready;
+
+	using place = place_t;
+	using transition = transition_t;
 
 	/**
 	 * Calculate the minimum number of arcs between any two nodes. This data

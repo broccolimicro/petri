@@ -13,7 +13,7 @@
 namespace petri
 {
 
-template <class graph, class token, class state>
+template <class graph, class token, class state, class enabled_transition>
 struct simulator
 {
 	simulator()
@@ -54,25 +54,25 @@ struct simulator
 			return 0;
 		}
 
+		if (tokens.size() == 0)
+			return 0;
+
 		if (!sorted)
 			sort(tokens.begin(), tokens.end());
 
-		vector<enabled_transition> result;
+		vector<enabled_transition> preload;
 		vector<int> disabled;
 
-		result.reserve(tokens.size()*2);
+		preload.reserve(tokens.size()*2);
 		disabled.reserve(base->transitions.size());
-		for (vector<arc>::const_iterator a = base->arcs[place::type].begin(); a != base->arcs[place::type].end(); a++)
-		{
+		for (auto a = base->arcs[graph::place::type].begin(); a != base->arcs[graph::place::type].end(); a++) {
 			// Check to see if we haven't already determined that this transition can't be enabled
 			vector<int>::iterator d = lower_bound(disabled.begin(), disabled.end(), a->to.index);
-			bool d_invalid = (d == disabled.end() || *d != a->to.index);
-
-			if (d_invalid)
+			if (d == disabled.end() || *d != a->to.index)
 			{
-				// Find the index of this transition (if any) in the result pool
-				typename vector<enabled_transition>::iterator e = lower_bound(result.begin(), result.end(), enabled_transition(a->to.index));
-				bool e_invalid = (e == result.end() || e->index != a->to.index);
+				// Find the index of this transition (if any) in the preload pool
+				typename vector<enabled_transition>::iterator e = lower_bound(preload.begin(), preload.end(), enabled_transition(a->to.index));
+				bool e_invalid = (e == preload.end() || e->index != a->to.index);
 
 				// Check to see if there is any token at the input place of this arc and make sure that
 				// this token has not already been consumed by this particular transition
@@ -85,7 +85,7 @@ struct simulator
 						// We are safe to add this to the list of possibly enabled transitions
 						found = true;
 						if (e_invalid)
-							e = result.insert(e, enabled_transition(a->to.index));
+							e = preload.insert(e, enabled_transition(a->to.index));
 
 						e->tokens.push_back(j);
 					}
@@ -97,12 +97,12 @@ struct simulator
 				{
 					disabled.insert(d, a->to.index);
 					if (!e_invalid)
-						result.erase(e);
+						preload.erase(e);
 				}
 			}
 		}
 
-		ready = result;
+		ready = preload;
 
 		return ready.size();
 	}
@@ -123,13 +123,11 @@ struct simulator
 
 		result.reserve(tokens.size()*2);
 		disabled.reserve(base->transitions.size());
-		for (vector<arc>::const_iterator a = base->arcs[transition::type].begin(); a != base->arcs[transition::type].end(); a++)
+		for (vector<arc>::const_iterator a = base->arcs[graph::transition::type].begin(); a != base->arcs[graph::transition::type].end(); a++)
 		{
 			// Check to see if we haven't already determined that this transition can't be enabled
 			vector<int>::iterator d = lower_bound(disabled.begin(), disabled.end(), a->from.index);
-			bool d_invalid = (d == disabled.end() || *d != a->from.index);
-
-			if (d_invalid)
+			if (d == disabled.end() || *d != a->from.index)
 			{
 				// Find the index of this transition (if any) in the result pool
 				typename vector<enabled_transition>::iterator e = lower_bound(result.begin(), result.end(), enabled_transition(a->from.index));
@@ -188,7 +186,7 @@ struct simulator
 		for (int i = t.tokens.size()-1; i >= 0; i--)
 			tokens.erase(tokens.begin() + t.tokens[i]);
 
-		vector<int> n = base->next(transition::type, t.index);
+		vector<int> n = base->next(graph::transition::type, t.index);
 		for (int i = 0; i < (int)n.size(); i++)
 			tokens.push_back(token(n[i]));
 
@@ -215,7 +213,7 @@ struct simulator
 		for (int i = t.tokens.size()-1; i >= 0; i--)
 			tokens.erase(tokens.begin() + t.tokens[i]);
 
-		vector<int> n = base->prev(transition::type, t.index);
+		vector<int> n = base->prev(graph::transition::type, t.index);
 		for (int i = 0; i < (int)n.size(); i++)
 			tokens.push_back(token(n[i]));
 
