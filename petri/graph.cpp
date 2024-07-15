@@ -254,27 +254,27 @@ bool transition::is_vacuous()
 	return false;
 }
 
-parallel_group::parallel_group() {}
+split_group::split_group() {}
 
-parallel_group::parallel_group(int split, int branch, int count)
+split_group::split_group(int split, int branch, int count)
 {
 	this->split = split;
 	this->branch.push_back(branch);
 	this->count = count;
 }
 
-parallel_group::~parallel_group() {}
+split_group::~split_group() {}
 
-string parallel_group::to_string() const {
+string split_group::to_string() const {
 	return "(" + ::to_string(split) + "," + ::to_string(branch) + "/" + ::to_string(count) + ")";
 }
 
-bool operator<(const parallel_group &g0, const parallel_group &g1)
+bool operator<(const split_group &g0, const split_group &g1)
 {
 	return g0.split < g1.split;
 }
 
-bool operator==(const parallel_group &g0, const parallel_group &g1)
+bool operator==(const split_group &g0, const split_group &g1)
 {
 	if (g0.split != g1.split) {
 		return false;

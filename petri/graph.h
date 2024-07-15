@@ -74,26 +74,26 @@ bool operator!=(arc a0, arc a1);
 
 enum composition
 {
-	parallel = 0,
-	choice = 1,
+	choice = 0,
+	parallel = 1,
 	sequence = 2
 };
 
-struct parallel_group
+struct split_group
 {
-	parallel_group();
-	parallel_group(int split, int branch, int count);
-	~parallel_group();
+	split_group();
+	split_group(int split, int branch, int count);
+	~split_group();
 	
-	int split;
-	vector<int> branch;
-	int count;
+	int split; // index of place/transition with split
+	std::vector<int> branch; // index of transitions/places coming out of split
+	int count; // total number of branches out of this split
 
 	string to_string() const;
 };
 
-bool operator<(const parallel_group &g0, const parallel_group &g1);
-bool operator==(const parallel_group &g0, const parallel_group &g1);
+bool operator<(const split_group &g0, const split_group &g1);
+bool operator==(const split_group &g0, const split_group &g1);
 
 struct place
 {
@@ -101,7 +101,8 @@ struct place
 	~place();
 
 	// sorted, transition index of parallel split -> place index of parallel branch
-	vector<parallel_group> parallel_groups;
+	// index with place::type or transition::type
+	vector<split_group> groups[2];
 
 	static const int type = 0;
 
@@ -114,7 +115,8 @@ struct transition
 	~transition();
 
 	// sorted, transition index of parallel split -> place index of parallel branch
-	vector<parallel_group> parallel_groups;
+	// index with place::type or transition::type
+	vector<split_group> groups[2];
 
 	static const int type = 1;
 
@@ -190,33 +192,40 @@ struct graph
 		node_distances_ready = true;
 	}
 
-	bool parallel_nodes_ready;
+	bool split_groups_ready[2];
 
-	virtual void compute_parallel_nodes()
+	virtual void compute_split_groups(int type)
 	{
+		// clear previous executions of this function and cache previous places and
+		// transitions as an optimization.
 		vector<vector<petri::iterator> > prev_places, prev_trans;
 		for (int i = 0; i < (int)places.size(); i++) {
-			places[i].parallel_groups.clear();
+			places[i].groups[type].clear();
 			prev_trans.push_back(prev(petri::iterator(place::type, i)));
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
-			transitions[i].parallel_groups.clear();
+			transitions[i].groups[type].clear();
 			prev_places.push_back(prev(petri::iterator(transition::type, i)));
 		}
 
-		vector<vector<parallel_group> > init;
+		// each place belongs to some set of parallel splits (init[place])
+		vector<vector<split_group> > init;
 		init.resize(places.size());
-		if (reset.size() > 0) {
-			for (int i = 0; i < (int)reset[0].tokens.size(); i++) {
-				init[reset[0].tokens[i].index].push_back(parallel_group(-1, reset[0].tokens[i].index, reset[0].tokens.size()));
+		if (type == transition::type) {
+			// add parallel splits from reset states
+			if (reset.size() > 0) {
+				for (int i = 0; i < (int)reset[0].tokens.size(); i++) {
+					init[reset[0].tokens[i].index].push_back(split_group(-1, reset[0].tokens[i].index, reset[0].tokens.size()));
+				}
 			}
 		}
 
-		for (int i = 0; i < (int)transitions.size(); i++) {
-			vector<petri::iterator> n = next(petri::iterator(transition::type, i));
+		// add splits from graph structure
+		for (petri::iterator i = begin(type); i != end(type); i++) {
+			vector<petri::iterator> n = next(i);
 			if (n.size() > 1) {
 				for (int j = 0; j < (int)n.size(); j++) {
-					init[n[j].index].push_back(parallel_group(i, n[j].index, n.size()));
+					init[n[j].index].push_back(split_group(i.index, n[j].index, n.size()));
 				}
 			}
 		}
@@ -227,9 +236,9 @@ struct graph
 
 			for (auto i = prev_places.begin(); i != prev_places.end(); i++) {
 				int tid = i - prev_places.begin();
-				vector<parallel_group> group;
+				vector<split_group> group;
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = places[j->index].parallel_groups.begin(); k != places[j->index].parallel_groups.end(); k++) {
+					for (auto k = places[j->index].groups[type].begin(); k != places[j->index].groups[type].end(); k++) {
 						if (k->split != tid) {
 							auto loc = lower_bound(group.begin(), group.end(), *k);
 							if (loc == group.end() || loc->split != k->split) {
@@ -251,17 +260,17 @@ struct graph
 					}
 				}
 
-				if (transitions[tid].parallel_groups != group) {
-					transitions[tid].parallel_groups = group;
+				if (transitions[tid].groups[type] != group) {
+					transitions[tid].groups[type] = group;
 					change = true;
 				}
 			}
 
 			for (auto i = prev_trans.begin(); i != prev_trans.end(); i++) {
 				int pid = i-prev_trans.begin();
-				vector<parallel_group> group = init[pid];
+				vector<split_group> group = init[pid];
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = transitions[j->index].parallel_groups.begin(); k != transitions[j->index].parallel_groups.end(); k++) {
+					for (auto k = transitions[j->index].groups[type].begin(); k != transitions[j->index].groups[type].end(); k++) {
 						auto loc = lower_bound(group.begin(), group.end(), *k);
 						if (loc == group.end() || loc->split != k->split) {
 							group.insert(loc, *k);
@@ -281,20 +290,20 @@ struct graph
 					}
 				}
 
-				if (places[pid].parallel_groups != group) {
-					places[pid].parallel_groups = group;
+				if (places[pid].groups[type] != group) {
+					places[pid].groups[type] = group;
 					change = true;
 				}
 			}
 		}
 
-		parallel_nodes_ready = true;
+		split_groups_ready[type] = true;
 	}
 
 	graph()
 	{
 		node_distances_ready = false;
-		parallel_nodes_ready = false;
+		split_groups_ready = {false, false};
 	}
 
 	virtual ~graph()
@@ -311,7 +320,11 @@ struct graph
 	virtual void mark_modified()
 	{
 		node_distances_ready = false;
-		parallel_nodes_ready = false;
+		split_groups_ready = {false, false};
+	}
+
+	virtual int size(int type=-1) {
+		return type == -1 ? (int)(places.size()+transitions.size()) : (type == place::type ? (int)places.size() : (int)transitions.size());
 	}
 
 	virtual petri::iterator begin(int type)
@@ -321,12 +334,12 @@ struct graph
 
 	virtual petri::iterator end(int type)
 	{
-		return petri::iterator(type, type == place::type ? (int)places.size() : (int)transitions.size());
+		return petri::iterator(type, size(type));
 	}
 
 	virtual petri::iterator rbegin(int type)
 	{
-		return petri::iterator(type, (type == place::type ? (int)places.size() : (int)transitions.size()) - 1);
+		return petri::iterator(type, size(type));
 	}
 
 	virtual petri::iterator rend(int type)
@@ -1526,7 +1539,8 @@ struct graph
 			reset = g.reset;
 			node_distances = g.node_distances;
 			node_distances_ready = g.node_distances_ready;
-			parallel_nodes_ready = g.parallel_nodes_ready;
+			split_groups_ready[0] = g.split_groups_ready[0];
+			split_groups_ready[1] = g.split_groups_ready[1];
 
 			map<petri::iterator, vector<petri::iterator> > result;
 			for (int i = 0; i < (int)places.size(); i++)
@@ -2365,27 +2379,48 @@ struct graph
 		return node_distances[(places.size()*to.type + to.index)*(places.size() + transitions.size()) + (places.size()*from.type + from.index)];
 	}
 
+	virtual int distance(vector<petri::iterator> from, vector<petri::iterator> to) {
+		int result = (int)(places.size() + transitions.size());
+		for (int i = 0; i < (int)from.size(); i++) {
+			for (int j = 0; j < (int)to.size(); j++) {
+				int test = distance(from[i], to[j]);
+				if (test < result) {
+					result = test;
+				}
+			}
+		}
+		return result;
+	}
+
 	virtual bool is_reachable(petri::iterator from, petri::iterator to)
 	{
 		return (distance(from, to) < (int)(places.size() + transitions.size()));
 	}
 
-	virtual bool is_parallel(petri::iterator a, petri::iterator b)
+	virtual bool is(int type, petri::iterator a, petri::iterator b)
 	{
-		if (!parallel_nodes_ready)
-			compute_parallel_nodes();
+		if (a == b) {
+			return false;
+		}
 
-		vector<parallel_group> a_groups, b_groups;
+		if (type == sequence) {
+			return not(is(parallel, a, b) and not is(choice, a, b));
+		}
+
+		if (!split_groups_ready[type])
+			compute_split_groups(type);
+
+		vector<split_group> a_groups, b_groups;
 		if (a.type == place::type) {
-			a_groups = places[a.index].parallel_groups;
+			a_groups = places[a.index].groups[type];
 		} else {
-			a_groups = transitions[a.index].parallel_groups;
+			a_groups = transitions[a.index].groups[type];
 		}
 
 		if (b.type == place::type) {
-			b_groups = places[b.index].parallel_groups;
+			b_groups = places[b.index].groups[type];
 		} else {
-			b_groups = transitions[b.index].parallel_groups;
+			b_groups = transitions[b.index].groups[type];
 		}
 
 		for (int i = 0, j = 0; i < (int)a_groups.size() && j < (int)b_groups.size(); ) {
@@ -2407,6 +2442,17 @@ struct graph
 			}
 		}
 		return false;
+	}
+
+	virtual bool is(int type, std::vector<petri::iterator> from, std::vector<petri::iterator> to) {
+		for (int i = 0; i < (int)from.size(); i++) {
+			for (int j = 0; j < (int)to.size(); j++) {
+				if (not is(type, from[i], to[j])) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 };
 
