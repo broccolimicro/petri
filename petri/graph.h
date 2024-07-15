@@ -303,7 +303,8 @@ struct graph
 	graph()
 	{
 		node_distances_ready = false;
-		split_groups_ready = {false, false};
+		split_groups_ready[0] = false;
+		split_groups_ready[1] = false;
 	}
 
 	virtual ~graph()
@@ -320,7 +321,8 @@ struct graph
 	virtual void mark_modified()
 	{
 		node_distances_ready = false;
-		split_groups_ready = {false, false};
+		split_groups_ready[0] = false;
+		split_groups_ready[1] = false;
 	}
 
 	virtual int size(int type=-1) {

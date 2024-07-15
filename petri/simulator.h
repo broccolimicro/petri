@@ -21,7 +21,7 @@ struct simulator
 		base = NULL;
 	}
 
-	simulator(const graph<place, transition, token, state> *base, state initial)
+	simulator(graph<place, transition, token, state> *base, state initial)
 	{
 		//cout << "Reset" << endl;
 		this->base = base;
@@ -35,7 +35,7 @@ struct simulator
 
 	}
 
-	const graph<place, transition, token, state> *base;
+	graph<place, transition, token, state> *base;
 
 	vector<token> tokens;
 	vector<enabled_transition> ready;
@@ -118,11 +118,11 @@ struct simulator
 				bool found = true;
 				for (int j = 0; j < (int)disabled.size(); j++) {
 					if (j != i and base->is(parallel,
-							petri::iterator(place::type, tokens[disabled[i].tokens[0]].index)
-							petri::iterator(transition::type, disabled[j].index),
+							iterator(place::type, tokens[disabled[i].tokens[0]].index),
+							iterator(transition::type, disabled[j].index)
 						) and not base->is(parallel,
-							petri::iterator(transition::type, disabled[i].index),
-							petri::iterator(transition::type, disabled[j].index)
+							iterator(transition::type, disabled[i].index),
+							iterator(transition::type, disabled[j].index)
 						)) {
 						found = false;
 						break;
