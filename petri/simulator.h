@@ -102,7 +102,7 @@ struct simulator
 				// If we didn't find a token at the input place, then we know that this transition can't
 				// be enabled. So lets remove this from the list of possibly enabled transitions and
 				// remember as much in the disabled list.
-				if (!found) {
+				if (!found and e != result.end()) {
 					disabled.insert(d, *e);
 					if (!e_invalid) {
 						result.erase(e);

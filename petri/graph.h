@@ -10,6 +10,8 @@
 #include <common/standard.h>
 #include <common/message.h>
 #include <common/text.h>
+
+#include <array>
 #include "state.h"
 
 namespace petri
@@ -102,7 +104,7 @@ struct place
 
 	// sorted, transition index of parallel split -> place index of parallel branch
 	// index with place::type or transition::type
-	vector<split_group> groups[2];
+	array<vector<split_group>, 2> groups;
 
 	static const int type = 0;
 
@@ -116,7 +118,7 @@ struct transition
 
 	// sorted, transition index of parallel split -> place index of parallel branch
 	// index with place::type or transition::type
-	vector<split_group> groups[2];
+	array<vector<split_group>, 2> groups;
 
 	static const int type = 1;
 
@@ -314,7 +316,7 @@ struct graph
 
 	vector<place> places;
 	vector<transition> transitions;
-	vector<arc> arcs[2];
+	array<vector<arc>, 2> arcs;
 	vector<state> source, sink;
 	vector<state> reset;
 

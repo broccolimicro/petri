@@ -1,4 +1,5 @@
 #include "path.h"
+#include <common/standard.h>
 
 namespace petri
 {
@@ -7,7 +8,7 @@ path::path(int num_places, int num_transitions)
 {
 	this->num_places = num_places;
 	this->num_transitions = num_transitions;
-	hops.resize(num_transitions+num_places);
+	hops.resize(num_places+num_transitions);
 }
 
 path::~path()
@@ -15,17 +16,17 @@ path::~path()
 
 }
 
-int path::idx(iterator i)
+int path::idx(petri::iterator i) const
 {
-	return (i.type == petri::place::type) * num_transitions + i.index;
+	return (i.type == petri::transition::type) * num_places + i.index;
 }
 
-iterator path::iter(int i)
+petri::iterator path::iter(int i) const
 {
-	iterator j;
-	if (i >= num_transitions) {
+	petri::iterator j;
+	if (i >= num_places) {
 		j.type = petri::transition::type;
-		j.index = i - num_transitions;
+		j.index = i - num_places;
 	} else {
 		j.type = petri::place::type;
 		j.index = i;
@@ -48,10 +49,10 @@ bool path::is_empty()
 	return true;
 }
 
-vector<iterator> path::maxima()
+vector<petri::iterator> path::maxima()
 {
 	int n = 0;
-	vector<iterator> result;
+	vector<petri::iterator> result;
 	for (int i = 0; i < (int)hops.size(); i++) {
 		if (hops[i] > n) {
 			n = hops[i];
@@ -109,23 +110,23 @@ path path::inverse_mask()
 	return result;
 }
 
-void path::zero(iterator i)
+void path::zero(petri::iterator i)
 {
 	hops[idx(i)] = 0;
 }
 
-void path::zero(vector<iterator> i)
+void path::zero(vector<petri::iterator> i)
 {
 	for (int j = 0; j < (int)i.size(); j++)
 		hops[idx(i[j])] = 0;
 }
 
-void path::inc(iterator i, int v)
+void path::inc(petri::iterator i, int v)
 {
 	hops[idx(i)] += v;
 }
 
-void path::dec(iterator i, int v)
+void path::dec(petri::iterator i, int v)
 {
 	hops[idx(i)] -= v;
 }
@@ -184,7 +185,7 @@ path &path::operator/=(int n)
 	return *this;
 }
 
-int &path::operator[](iterator i)
+int &path::operator[](petri::iterator i)
 {
 	return hops[idx(i)];
 }
@@ -240,7 +241,7 @@ list<path>::iterator path_set::end()
 	return paths.end();
 }
 
-void path_set::zero(iterator i)
+void path_set::zero(petri::iterator i)
 {
 	for (list<path>::iterator p = paths.begin(); p != paths.end();) {
 		p->hops[p->idx(i)] = 0;
@@ -253,7 +254,7 @@ void path_set::zero(iterator i)
 	total.hops[total.idx(i)] = 0;
 }
 
-void path_set::zero(vector<iterator> i)
+void path_set::zero(vector<petri::iterator> i)
 {
 	for (list<path>::iterator p = paths.begin(); p != paths.end();) {
 		for (int j = 0; j < (int)i.size(); j++) {
@@ -271,7 +272,7 @@ void path_set::zero(vector<iterator> i)
 	}
 }
 
-void path_set::inc(iterator i, int v)
+void path_set::inc(petri::iterator i, int v)
 {
 	total.hops[total.idx(i)] += paths.size()*v;
 	for (list<path>::iterator p = paths.begin(); p != paths.end();) {
@@ -284,7 +285,7 @@ void path_set::inc(iterator i, int v)
 	}
 }
 
-void path_set::dec(iterator i, int v)
+void path_set::dec(petri::iterator i, int v)
 {
 	total.hops[total.idx(i)] -= paths.size()*v;
 	for (list<path>::iterator p = paths.begin(); p != paths.end();) {
@@ -297,13 +298,13 @@ void path_set::dec(iterator i, int v)
 	}
 }
 
-void path_set::inc(list<path>::iterator i, iterator j, int v)
+void path_set::inc(list<path>::iterator i, petri::iterator j, int v)
 {
 	i->hops[i->idx(j)] += v;
 	total.hops[total.idx(j)] += v;
 }
 
-void path_set::dec(list<path>::iterator i, iterator j, int v)
+void path_set::dec(list<path>::iterator i, petri::iterator j, int v)
 {
 	i->hops[i->idx(j)] -= v;
 	total.hops[total.idx(j)] -= v;
@@ -325,7 +326,7 @@ path_set path_set::inverse_mask()
 	return result;
 }
 
-path_set path_set::coverage(iterator i)
+path_set path_set::coverage(petri::iterator i)
 {
 	path_set result(total.num_places, total.num_transitions);
 	for (list<path>::iterator p = paths.begin(); p != paths.end(); p++)
@@ -334,7 +335,7 @@ path_set path_set::coverage(iterator i)
 	return result;
 }
 
-path_set path_set::avoidance(iterator i)
+path_set path_set::avoidance(petri::iterator i)
 {
 	path_set result(total.num_places, total.num_transitions);
 	for (list<path>::iterator p = paths.begin(); p != paths.end(); p++)
@@ -371,20 +372,23 @@ path_set &path_set::operator*=(path p)
 	return *this;
 }
 
-}
-
-ostream &operator<<(ostream &os, petri::path p)
+ostream &operator<<(ostream &os, const path &p)
 {
-	os << "[" << p.from << "-";
+	os << "[" << to_string(p.from) << "-";
 
-	for (vector<int>::iterator i = p.hops.begin(); i != p.hops.end(); i++)
-		os << *i << " ";
+	for (int i = 0; i < (int)p.hops.size(); i++) {
+		if (p.hops[i] == 1) {
+			os << p.iter(i) << " ";
+		} else if (p.hops[i] > 1) {
+			os << p.iter(i) << ":" << p.hops[i] << " ";
+		}
+	}
 
-	os << ">" << p.to << "]";
+	os << ">" << to_string(p.to) << "]";
 	return os;
 }
 
-petri::path operator+(petri::path p0, petri::path p1)
+path operator+(path p0, path p1)
 {
 	p0.from.insert(p0.from.end(), p1.from.begin(), p1.from.end());
 	p0.to.insert(p0.to.end(), p1.to.begin(), p1.to.end());
@@ -394,7 +398,7 @@ petri::path operator+(petri::path p0, petri::path p1)
 	return p0;
 }
 
-petri::path operator-(petri::path p0, petri::path p1)
+path operator-(path p0, path p1)
 {
 	sort(p0.from.begin(), p0.from.end());
 	sort(p0.to.begin(), p0.to.end());
@@ -408,7 +412,7 @@ petri::path operator-(petri::path p0, petri::path p1)
 	return p0;
 }
 
-petri::path operator*(petri::path p0, petri::path p1)
+path operator*(path p0, path p1)
 {
 	p0.hops.resize(min(p0.hops.size(), p1.hops.size()), 0);
 	for (int i = 0; i < (int)p0.hops.size(); i++)
@@ -416,38 +420,37 @@ petri::path operator*(petri::path p0, petri::path p1)
 	return p0;
 }
 
-petri::path operator*(petri::path p0, int n)
+path operator*(path p0, int n)
 {
 	for (int i = 0; i < (int)p0.hops.size(); i++)
 		p0.hops[i] *= n;
 	return p0;
 }
 
-petri::path operator/(petri::path p0, int n)
+path operator/(path p0, int n)
 {
 	for (int i = 0; i < (int)p0.hops.size(); i++)
 		p0.hops[i] *= n;
 	return p0;
 }
 
-ostream &operator<<(ostream &os, petri::path_set p)
+ostream &operator<<(ostream &os, const path_set &p)
 {
-	list<petri::path>::iterator i;
-	for (i = p.paths.begin(); i != p.paths.end(); i++)
+	for (auto i = p.paths.begin(); i != p.paths.end(); i++)
 		os << *i << endl;
 	return os;
 }
 
-petri::path_set operator+(petri::path_set p0, petri::path_set p1)
+path_set operator+(path_set p0, path_set p1)
 {
 	p0.paths.insert(p0.paths.end(), p1.paths.begin(), p1.paths.end());
 	p0.total += p1.total;
 	return p0;
 }
 
-petri::path_set operator*(petri::path_set p0, petri::path p1)
+path_set operator*(path_set p0, path p1)
 {
-	for (list<petri::path>::iterator i = p0.paths.begin(); i != p0.paths.end();)
+	for (list<path>::iterator i = p0.paths.begin(); i != p0.paths.end();)
 	{
 		*i *= p1;
 		if (i->is_empty())
@@ -459,9 +462,9 @@ petri::path_set operator*(petri::path_set p0, petri::path p1)
 	return p0;
 }
 
-petri::path_set operator*(petri::path p0, petri::path_set p1)
+path_set operator*(path p0, path_set p1)
 {
-	for (list<petri::path>::iterator i = p1.paths.begin(); i != p1.paths.end();)
+	for (list<path>::iterator i = p1.paths.begin(); i != p1.paths.end();)
 	{
 		*i *= p0;
 		if (i->is_empty())
@@ -472,3 +475,6 @@ petri::path_set operator*(petri::path p0, petri::path_set p1)
 	p1.total *= p0;
 	return p1;
 }
+
+}
+

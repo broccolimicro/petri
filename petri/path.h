@@ -17,7 +17,7 @@ struct path
 	~path();
 
 	// The start and end of the path
-	vector<iterator> from, to;
+	vector<petri::iterator> from, to;
 
 	// This vector is resized to contain an integer for every place and
 	// transition in the graph with places listed first, then transitions. Each
@@ -32,14 +32,14 @@ struct path
 	// The total number of transitions in the graph
 	int num_transitions;
 
-	// Convertions between iterator and an index into path::hops.
-	int idx(iterator i);
-	iterator iter(int i);
+	// Convertions between petri::iterator and an index into path::hops.
+	int idx(petri::iterator i) const;
+	petri::iterator iter(int i) const;
 
 	void clear();
 	bool is_empty();
 
-	vector<iterator> maxima();
+	vector<petri::iterator> maxima();
 	int max();
 	int max(int i);
 	int max(vector<int> i);
@@ -47,10 +47,10 @@ struct path
 	path mask();
 	path inverse_mask();
 
-	void zero(iterator i);
-	void zero(vector<iterator> i);
-	void inc(iterator i, int v = 1);
-	void dec(iterator i, int v = 1);
+	void zero(petri::iterator i);
+	void zero(vector<petri::iterator> i);
+	void inc(petri::iterator i, int v = 1);
+	void dec(petri::iterator i, int v = 1);
 
 	path &operator=(path p);
 	path &operator+=(path p);
@@ -59,7 +59,7 @@ struct path
 	path &operator*=(int n);
 	path &operator/=(int n);
 
-	int &operator[](iterator i);
+	int &operator[](petri::iterator i);
 };
 
 // A path set helps to manage multiple paths from one place or region to
@@ -86,31 +86,45 @@ struct path_set
 	list<path>::iterator begin();
 	list<path>::iterator end();
 
-	void zero(iterator i);
-	void zero(vector<iterator> i);
-	void inc(iterator i, int v = 1);
-	void dec(iterator i, int v = 1);
-	void inc(list<path>::iterator i, iterator j, int v = 1);
-	void dec(list<path>::iterator i, iterator j, int v = 1);
+	void zero(petri::iterator i);
+	void zero(vector<petri::iterator> i);
+	void inc(petri::iterator i, int v = 1);
+	void dec(petri::iterator i, int v = 1);
+	void inc(list<path>::iterator i, petri::iterator j, int v = 1);
+	void dec(list<path>::iterator i, petri::iterator j, int v = 1);
 
 	path_set mask();
 	path_set inverse_mask();
 
-	path_set coverage(iterator i);
-	path_set avoidance(iterator i);
+	path_set coverage(petri::iterator i);
+	path_set avoidance(petri::iterator i);
 
 	path_set &operator=(path_set p);
 	path_set &operator+=(path_set p);
 	path_set &operator*=(path p);
 };
 
+ostream &operator<<(ostream &os, const path &p);
+
+path operator+(path p0, path p1);
+path operator-(path p0, path p1);
+path operator*(path p0, path p1);
+path operator/(path p1, int n);
+path operator*(path p1, int n);
+
+ostream &operator<<(ostream &os, const path_set &p);
+
+path_set operator+(path_set p0, path_set p1);
+path_set operator*(path_set p0, path p1);
+path_set operator*(path p0, path_set p1);
+
 template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, token, state> &g, vector<iterator> from, vector<iterator> to) {
+path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to) {
 	// precache "next" list for all nodes in graph to accelerate
 	// computation.
-	vector<vector<iterator> > n[2];
+	array<vector<vector<petri::iterator> >, 2> n = {vector<vector<petri::iterator> >(), vector<vector<petri::iterator> >()};
 	for (int type = 0; type < 2; type++) {
-		n[type].resize(g.size(type));
+		n[type].resize(g.size(type), vector<petri::iterator>());
 
 		// cut off sections of graph that don't lead to a node in the
 		// "to" vector by ignoring those branches. The split groups
@@ -118,7 +132,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 		// lead to our target node.
 		if (!g.split_groups_ready[type])
 			g.compute_split_groups(type);
-		
+
 		vector<split_group> groups;
 		for (auto i = to.begin(); i != to.end(); i++) {
 			vector<split_group> group;
@@ -156,26 +170,27 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 		}
 
 		for (auto j = groups.begin(); j != groups.end(); j++) {
-			for (auto k = j->branch.begin(); k != j->branch.end(); k++) {
-				n[type][j->split].push_back(iterator(1-type, *k));
+			if (j->split >= 0) {
+				cout << j->to_string() << " " << n[type].size() << endl;
+				for (auto k = j->branch.begin(); k != j->branch.end(); k++) {
+					cout << 1-type << " " << *k << endl;
+					n[type][j->split].push_back(petri::iterator(1-type, *k));
+				}
 			}
 		}
 
 		// clean up and fill out the precached "next" lists for the
 		// remaining nodes.
 		for (auto i = g.begin(type); i != g.end(type); i++) {
-			if (n[type][i.index].empty()) {
-				n[type][i.index] = g.next(i);
-			} else {
-				sort(n[type][i.index].begin(), n[type][i.index].end());
-				n[type][i.index].erase(unique(n[type][i.index].begin(), n[type][i.index].end()));
+			if (n[i.type][i.index].empty()) {
+				n[i.type][i.index] = g.next(i);
 			}
 		}
 	}
 
 	// This is an optimization. Make it easier to identify from/to nodes
-	path fromCount;
-	path toCount;
+	path fromCount(g.places.size(), g.transitions.size());
+	path toCount(g.places.size(), g.transitions.size());
 	for (auto i = from.begin(); i != from.end(); i++) {
 		fromCount.inc(*i);
 	}
@@ -183,7 +198,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 		toCount.inc(*i);
 	}
 
-	path_set result;
+	path_set result(g.places.size(), g.transitions.size());
 	// each item in the stack is a pair
 	// The first element in the pair represents the frontier of the
 	// trace. When the frontier is empty, we have completed the trace.
@@ -192,11 +207,11 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 	// into the path's "to" list. If the trace completes and there are
 	// no elements in the path's "to" list, then there was no path
 	// found.
-	vector<pair<vector<iterator>, path> > stack;
+	vector<pair<vector<petri::iterator>, path> > stack;
 	// initialize the stack. To do this, we break the from list into conditional
 	// groups of parallel nodes. Nodes that are in sequence with eachother should
 	// be treated as conditional as well.
-	vector<vector<iterator> > start;
+	vector<vector<petri::iterator> > start;
 	start.push_back(from);
 
 	while (not start.empty()) {
@@ -217,7 +232,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 		}
 
 		if (done) {
-			stack.push_back(pair<vector<iterator>, path>(curr, path(g.places.size(), g.transitions.size())));
+			stack.push_back(pair<vector<petri::iterator>, path>(curr, path(g.places.size(), g.transitions.size())));
 			stack.back().second.from = curr;
 		}
 	}
@@ -226,7 +241,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 		auto curr = stack.back();
 		stack.pop_back();
 
-		iterator pos = curr.first.back();
+		petri::iterator pos = curr.first.back();
 		curr.first.pop_back();
 
 		if (pos.type == transition::type) {
@@ -247,8 +262,9 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 			}
 		}	else {
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
-				auto copy = curr;
+				pair<vector<petri::iterator>, path> copy = curr;
 				if (toCount[*i] > 0) {
+					copy.second.inc(*i);
 					copy.second.to.push_back(*i);
 				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
 					copy.second.inc(*i);
@@ -269,18 +285,4 @@ path_set trace(graph<place, transition, token, state> &g, vector<iterator> from,
 }
 
 }
-
-ostream &operator<<(ostream &os, petri::path p);
-
-petri::path operator+(petri::path p0, petri::path p1);
-petri::path operator-(petri::path p0, petri::path p1);
-petri::path operator*(petri::path p0, petri::path p1);
-petri::path operator/(petri::path p1, int n);
-petri::path operator*(petri::path p1, int n);
-
-ostream &operator<<(ostream &os, petri::path_set p);
-
-petri::path_set operator+(petri::path_set p0, petri::path_set p1);
-petri::path_set operator*(petri::path_set p0, petri::path p1);
-petri::path_set operator*(petri::path p0, petri::path_set p1);
 
