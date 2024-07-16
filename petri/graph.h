@@ -200,20 +200,20 @@ struct graph
 	{
 		// clear previous executions of this function and cache previous places and
 		// transitions as an optimization.
-		vector<vector<petri::iterator> > prev_places, prev_trans;
+		array<vector<vector<petri::iterator> >, 2> p;
 		for (int i = 0; i < (int)places.size(); i++) {
 			places[i].groups[type].clear();
-			prev_trans.push_back(prev(petri::iterator(place::type, i)));
+			p[place::type].push_back(prev(petri::iterator(place::type, i)));
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
 			transitions[i].groups[type].clear();
-			prev_places.push_back(prev(petri::iterator(transition::type, i)));
+			p[transition::type].push_back(prev(petri::iterator(transition::type, i)));
 		}
 
 		// each place belongs to some set of parallel splits (init[place])
 		vector<vector<split_group> > init;
 		init.resize(places.size());
-		if (type == transition::type) {
+		if (type == parallel) {
 			// add parallel splits from reset states
 			if (reset.size() > 0) {
 				for (int i = 0; i < (int)reset[0].tokens.size(); i++) {
@@ -236,12 +236,15 @@ struct graph
 		while (change) {
 			change = false;
 
-			for (auto i = prev_places.begin(); i != prev_places.end(); i++) {
-				int tid = i - prev_places.begin();
+			for (auto i = p[transition::type].begin(); i != p[transition::type].end(); i++) {
+				int tid = i - p[transition::type].begin();
 				vector<split_group> group;
+				if (type == choice) {
+					group = init[tid];
+				}
 				for (auto j = i->begin(); j != i->end(); j++) {
 					for (auto k = places[j->index].groups[type].begin(); k != places[j->index].groups[type].end(); k++) {
-						if (k->split != tid) {
+						if (type == choice or k->split != tid) {
 							auto loc = lower_bound(group.begin(), group.end(), *k);
 							if (loc == group.end() || loc->split != k->split) {
 								group.insert(loc, *k);
@@ -252,14 +255,9 @@ struct graph
 					}
 				}
 
-				for (auto j = group.begin(); j != group.end();) {
+				for (auto j = group.begin(); j != group.end(); j++) {
 					sort(j->branch.begin(), j->branch.end());
-					j->branch.resize(unique(j->branch.begin(), j->branch.end()) - j->branch.begin());
-					if ((int)j->branch.size() == j->count) {
-						j = group.erase(j);
-					} else {
-						j++;
-					}
+					j->branch.erase(unique(j->branch.begin(), j->branch.end()), j->branch.end());
 				}
 
 				if (transitions[tid].groups[type] != group) {
@@ -268,33 +266,49 @@ struct graph
 				}
 			}
 
-			for (auto i = prev_trans.begin(); i != prev_trans.end(); i++) {
-				int pid = i-prev_trans.begin();
-				vector<split_group> group = init[pid];
+			for (auto i = p[place::type].begin(); i != p[place::type].end(); i++) {
+				int pid = i - p[place::type].begin();
+				vector<split_group> group;
+				if (type == parallel) {
+					group = init[pid];
+				}
 				for (auto j = i->begin(); j != i->end(); j++) {
 					for (auto k = transitions[j->index].groups[type].begin(); k != transitions[j->index].groups[type].end(); k++) {
-						auto loc = lower_bound(group.begin(), group.end(), *k);
-						if (loc == group.end() || loc->split != k->split) {
-							group.insert(loc, *k);
-						} else {
-							loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
+						if (type == parallel or k->split != pid) {
+							auto loc = lower_bound(group.begin(), group.end(), *k);
+							if (loc == group.end() || loc->split != k->split) {
+								group.insert(loc, *k);
+							} else {
+								loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
+							}
 						}
 					}
 				}
 
-				for (auto j = group.begin(); j != group.end();) {
+				for (auto j = group.begin(); j != group.end(); j++) {
 					sort(j->branch.begin(), j->branch.end());
-					j->branch.resize(unique(j->branch.begin(), j->branch.end()) - j->branch.begin());
-					if ((int)j->branch.size() == j->count) {
-						j = group.erase(j);
-					} else {
-						j++;
-					}
+					j->branch.erase(unique(j->branch.begin(), j->branch.end()), j->branch.end());
 				}
 
 				if (places[pid].groups[type] != group) {
 					places[pid].groups[type] = group;
 					change = true;
+				}
+			}
+		}
+
+		for (auto i = places.begin(); i != places.end(); i++) {
+			for (int j = (int)i->groups[type].size()-1; j >= 0; j--) {
+				if ((int)i->groups[type][j].branch.size() == i->groups[type][j].count) {
+					i->groups[type].erase(i->groups[type].begin() + j);
+				}
+			}
+		}
+		
+		for (auto i = transitions.begin(); i != transitions.end(); i++) {
+			for (int j = (int)i->groups[type].size()-1; j >= 0; j--) {
+				if ((int)i->groups[type][j].branch.size() == i->groups[type][j].count) {
+					i->groups[type].erase(i->groups[type].begin() + j);
 				}
 			}
 		}

@@ -51,6 +51,7 @@ struct path
 	void zero(vector<petri::iterator> i);
 	void inc(petri::iterator i, int v = 1);
 	void dec(petri::iterator i, int v = 1);
+	void set(petri::iterator i, int v = 1);
 
 	path &operator=(path p);
 	path &operator+=(path p);
@@ -122,7 +123,7 @@ template <class place, class transition, class token, class state>
 path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to) {
 	// precache "next" list for all nodes in graph to accelerate
 	// computation.
-	array<vector<vector<petri::iterator> >, 2> n = {vector<vector<petri::iterator> >(), vector<vector<petri::iterator> >()};
+	array<vector<vector<petri::iterator> >, 2> n;
 	for (int type = 0; type < 2; type++) {
 		n[type].resize(g.size(type), vector<petri::iterator>());
 
@@ -147,8 +148,8 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 				continue;
 			}
 
-			int j = (int)group.size()-1;
-			int k = (int)groups.size()-1;
+			int j = ((int)group.size())-1;
+			int k = ((int)groups.size())-1;
 			while (j >= 0 and k >= 0) {
 				if (group[j].split == groups[k].split) {
 					groups[k].branch.insert(groups[k].branch.end(), group[j].branch.begin(), group[j].branch.end());
@@ -171,9 +172,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 
 		for (auto j = groups.begin(); j != groups.end(); j++) {
 			if (j->split >= 0) {
-				cout << j->to_string() << " " << n[type].size() << endl;
 				for (auto k = j->branch.begin(); k != j->branch.end(); k++) {
-					cout << 1-type << " " << *k << endl;
 					n[type][j->split].push_back(petri::iterator(1-type, *k));
 				}
 			}
@@ -192,10 +191,10 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 	path fromCount(g.places.size(), g.transitions.size());
 	path toCount(g.places.size(), g.transitions.size());
 	for (auto i = from.begin(); i != from.end(); i++) {
-		fromCount.inc(*i);
+		fromCount.set(*i);
 	}
 	for (auto i = to.begin(); i != to.end(); i++) {
-		toCount.inc(*i);
+		toCount.set(*i);
 	}
 
 	path_set result(g.places.size(), g.transitions.size());
@@ -211,29 +210,47 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 	// initialize the stack. To do this, we break the from list into conditional
 	// groups of parallel nodes. Nodes that are in sequence with eachother should
 	// be treated as conditional as well.
-	vector<vector<petri::iterator> > start;
-	start.push_back(from);
 
-	while (not start.empty()) {
-		auto curr = start.back();
-		start.pop_back();
+	// This is the problem of identifying all maximal cliques in the
+	// graph constructed using the nodes in "from" as vertices and
+	// creating edges between each pair of parallel nodes. This is an
+	// NP-complete problem and we are solving it using the Bron–Kerbosch
+	// algorithm.
+	struct BronKerboschFrame {
+		vector<petri::iterator> R, P, X;
+	};
 
-		bool done = true;
-		for (int i = (int)curr.size()-1; i >= 1; i--) {
-			for (int j = i-1; j >= 0; j--) {
-				if (not g.is(parallel, curr[i], curr[j])) {
-					start.push_back(curr);
-					start.back().erase(start.back().begin() + i);
-					start.push_back(curr);
-					start.back().erase(start.back().begin() + j);
-					done = false;
+	vector<BronKerboschFrame> frames;
+	frames.push_back(BronKerboschFrame());
+	frames.back().P = from;
+
+	while (not frames.empty()) {
+		auto frame = frames.back();
+		frames.pop_back();
+
+		if (frame.P.empty() and frame.X.empty()) {
+			// Then we've found a maximal clique
+			stack.push_back(pair<vector<petri::iterator>, path>(frame.R, path(g.places.size(), g.transitions.size())));
+			stack.back().second.from = frame.R;
+		} else {
+			// Otherwise, we need to recurse
+			while (not frame.P.empty()) {
+				frames.push_back(frame);
+				frames.back().R.push_back(frame.P.back());
+				for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
+					if (not g.is(parallel, frames.back().P[i], frame.P.back())) {
+						frames.back().P.erase(frames.back().P.begin() + i);
+					}
 				}
-			}
-		}
+				for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
+					if (not g.is(parallel, frames.back().X[i], frame.P.back())) {
+						frames.back().X.erase(frames.back().X.begin() + i);
+					}
+				}
 
-		if (done) {
-			stack.push_back(pair<vector<petri::iterator>, path>(curr, path(g.places.size(), g.transitions.size())));
-			stack.back().second.from = curr;
+				frame.X.push_back(frame.P.back());
+				frame.P.pop_back();
+			}
 		}
 	}
 
@@ -249,7 +266,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 				if (toCount[*i] > 0) {
 					curr.second.to.push_back(*i);
 				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
-					curr.second.inc(*i);
+					curr.second.set(*i);
 					curr.first.push_back(*i);
 				}
 			}
@@ -264,10 +281,10 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
 				pair<vector<petri::iterator>, path> copy = curr;
 				if (toCount[*i] > 0) {
-					copy.second.inc(*i);
+					copy.second.set(*i);
 					copy.second.to.push_back(*i);
 				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
-					copy.second.inc(*i);
+					copy.second.set(*i);
 					copy.first.push_back(*i);
 				}
 				if (copy.first.empty()) {

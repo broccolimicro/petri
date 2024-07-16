@@ -131,6 +131,11 @@ void path::dec(petri::iterator i, int v)
 	hops[idx(i)] -= v;
 }
 
+void path::set(petri::iterator i, int v)
+{
+	hops[idx(i)] = v;
+}
+
 path &path::operator=(path p)
 {
 	from = p.from;
