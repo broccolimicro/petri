@@ -168,6 +168,7 @@ struct graph
 	{
 		// clear the current set of distances
 		int nodes = (int)(places.size() + transitions.size());
+		node_distances.clear();
 		node_distances.assign(nodes*nodes, nodes);
 		for (int i = 0; i < (int)places.size(); i++)
 			node_distances[i*nodes + i] = 0;
@@ -584,31 +585,31 @@ struct graph
 
 	static void erase(petri::iterator n, state &s)
 	{
-		if (n.type == place::type)
+		if (n.type != place::type)
+			return;
+			
+		for (int i = (int)s.tokens.size()-1; i >= 0; i--)
 		{
-			for (int i = (int)s.tokens.size()-1; i >= 0; i--)
-			{
-				if (s.tokens[i].index == n.index)
-					s.tokens.erase(s.tokens.begin() + i);
-				else if (s.tokens[i].index > n.index)
-					s.tokens[i]--;
-			}
+			if (s.tokens[i].index == n.index)
+				s.tokens.erase(s.tokens.begin() + i);
+			else if (s.tokens[i].index > n.index)
+				s.tokens[i]--;
 		}
 	}
 
 	static void erase(petri::iterator n, vector<state> &s)
 	{
-		if (n.type == place::type)
-		{
-			for (int i = 0; i < (int)s.size(); i++)
-				for (int j = (int)s[i].tokens.size()-1; j >= 0; j--)
-				{
-					if (s[i].tokens[j].index == n.index)
-						s[i].tokens.erase(s[i].tokens.begin() + j);
-					else if (s[i].tokens[j].index > n.index)
-						s[i].tokens[j].index--;
-				}
-		}
+		if (n.type != place::type)
+			return;
+			
+		for (int i = 0; i < (int)s.size(); i++)
+			for (int j = (int)s[i].tokens.size()-1; j >= 0; j--)
+			{
+				if (s[i].tokens[j].index == n.index)
+					s[i].tokens.erase(s[i].tokens.begin() + j);
+				else if (s[i].tokens[j].index > n.index)
+					s[i].tokens[j].index--;
+			}
 	}
 
 	virtual void erase(vector<petri::iterator> n, bool rsorted = false)
@@ -2391,8 +2392,9 @@ struct graph
 
 	virtual int distance(petri::iterator from, petri::iterator to)
 	{
-		if (!node_distances_ready)
+		if (!node_distances_ready) {
 			calculate_node_distances();
+		}
 
 		return node_distances[(places.size()*to.type + to.index)*(places.size() + transitions.size()) + (places.size()*from.type + from.index)];
 	}

@@ -57,11 +57,43 @@ struct path
 	path &operator+=(path p);
 	path &operator-=(path p);
 	path &operator*=(path p);
+	path &operator&=(path p);
 	path &operator*=(int n);
 	path &operator/=(int n);
 
 	int &operator[](petri::iterator i);
 };
+
+template <class place, class transition, class token, class state>
+bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
+	bool p0_empty = true;
+	bool p1_empty = true;
+	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
+		if (p0.hops[i] > p1.hops[i]) {
+			bool found = false;
+			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
+				found = (p1.hops[j] > 0 and g.is(choice, p0.iter(i), p1.iter(j)));
+			}
+
+			if (not found) {
+				p0.hops[i] = p1.hops[i];
+			}
+		} else if (p0.hops[i] < p1.hops[i]) {
+			bool found = false;
+			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
+				found = (p0.hops[j] > 0 and g.is(choice, p0.iter(j), p1.iter(i)));
+			}
+
+			if (not found) {
+				p1.hops[i] = p0.hops[i];
+			}
+		}
+		p0_empty = p0_empty and p0.hops[i] == 0;
+		p1_empty = p1_empty and p1.hops[i] == 0;
+	}
+
+	return not p0_empty and not p1_empty;
+}
 
 // A path set helps to manage multiple paths from one place or region to
 // another to ensure the state variable insertion algorithm is able to cut them
@@ -78,7 +110,6 @@ struct path_set
 	// paths are added to or removed from the set.
 	path total;
 
-	void merge(const path_set &s);
 	void push(path p);
 	void clear();
 	void repair();
@@ -100,9 +131,41 @@ struct path_set
 	path_set coverage(petri::iterator i);
 	path_set avoidance(petri::iterator i);
 
-	path_set &operator=(path_set p);
-	path_set &operator+=(path_set p);
-	path_set &operator*=(path p);
+	path_set &operator=(const path_set &p);
+	path_set &operator+=(const path_set &p);
+	path_set &operator*=(const path &p);
+
+	template <class place, class transition, class token, class state>
+	bool normalize(graph<place, transition, token, state> &g) {
+		for (auto x = paths.begin(); x != paths.end(); x++) {
+			for (auto y = std::next(x); y != paths.end(); y++) {
+				if (not petri::normalize(g, *x, *y)) {
+					clear();
+					return false;
+				}
+			}
+		}
+
+		repair();
+		return true;
+	}
+
+	template <class place, class transition, class token, class state>
+	bool merge(graph<place, transition, token, state> &g, path_set p1)
+	{
+		for (auto x = paths.begin(); x != paths.end(); x++) {
+			for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
+				if (not petri::normalize(g, *x, *y)) {
+					clear();
+					return false;
+				}
+			}
+		}
+
+		paths.insert(paths.end(), p1.paths.begin(), p1.paths.end());
+		repair();
+		return true;
+	}
 };
 
 ostream &operator<<(ostream &os, const path &p);
@@ -116,11 +179,16 @@ path operator*(path p1, int n);
 ostream &operator<<(ostream &os, const path_set &p);
 
 path_set operator+(path_set p0, path_set p1);
+path_set operator&(path_set p0, path_set p1);
 path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
 template <class place, class transition, class token, class state>
 path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to) {
+	if (from.empty() or to.empty()) {
+		return path_set(g.places.size(), g.transitions.size());
+	}
+
 	// precache "next" list for all nodes in graph to accelerate
 	// computation.
 	array<vector<vector<petri::iterator> >, 2> n;

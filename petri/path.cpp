@@ -176,6 +176,14 @@ path &path::operator*=(path p)
 	return *this;
 }
 
+path &path::operator&=(path p)
+{
+	hops.resize(min(hops.size(), p.hops.size()), 0);
+	for (int i = 0; i < (int)hops.size(); i++)
+		hops[i] = min(hops[i], p.hops[i]);
+	return *this;
+}
+
 path &path::operator*=(int n)
 {
 	for (int i = 0; i < (int)hops.size(); i++)
@@ -203,12 +211,6 @@ path_set::path_set(int num_places, int num_transitions) : total(num_places, num_
 path_set::~path_set()
 {
 
-}
-
-void path_set::merge(const path_set &s)
-{
-	paths.insert(paths.end(), s.paths.begin(), s.paths.end());
-	total += s.total;
 }
 
 void path_set::push(path p)
@@ -349,21 +351,21 @@ path_set path_set::avoidance(petri::iterator i)
 	return result;
 }
 
-path_set &path_set::operator=(path_set p)
+path_set &path_set::operator=(const path_set &p)
 {
 	paths = p.paths;
 	total = p.total;
 	return *this;
 }
 
-path_set &path_set::operator+=(path_set p)
+path_set &path_set::operator+=(const path_set &p)
 {
 	paths.insert(paths.end(), p.paths.begin(), p.paths.end());
 	total += p.total;
 	return *this;
 }
 
-path_set &path_set::operator*=(path p)
+path_set &path_set::operator*=(const path &p)
 {
 	for (list<path>::iterator i = paths.begin(); i != paths.end();)
 	{
