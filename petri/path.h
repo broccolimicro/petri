@@ -332,10 +332,12 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 		if (pos.type == transition::type) {
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
 				if (toCount[*i] > 0) {
-					curr.second.to.push_back(*i);
+					if (curr.second[*i] == 0) {
+						curr.second.to.push_back(*i);
+					}
 				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
-					curr.second.set(*i);
 					curr.first.push_back(*i);
+					curr.second.set(*i);
 				}
 			}
 			if (curr.first.empty()) {
@@ -349,8 +351,10 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
 				pair<vector<petri::iterator>, path> copy = curr;
 				if (toCount[*i] > 0) {
+					if (copy.second[*i] == 0) {
+						copy.second.to.push_back(*i);
+					}
 					copy.second.set(*i);
-					copy.second.to.push_back(*i);
 				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
 					copy.second.set(*i);
 					copy.first.push_back(*i);
