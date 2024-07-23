@@ -709,32 +709,29 @@ struct graph
 			mark_modified();
 			places.push_back(places[i.index]);
 			petri::iterator result(i.type, places.size()-1);
-			if (i.type == place::type)
-			{
-				for (int j = 0; j < (int)source.size(); j++)
-					for (int k = 0; k < (int)source[j].tokens.size(); k++)
-						if (source[j].tokens[k].index == i.index)
-						{
-							source[j].tokens.push_back(source[j].tokens[k]);
-							source[j].tokens.back().index = result.index;
-						}
+			for (int j = 0; j < (int)source.size(); j++)
+				for (int k = 0; k < (int)source[j].tokens.size(); k++)
+					if (source[j].tokens[k].index == i.index)
+					{
+						source[j].tokens.push_back(source[j].tokens[k]);
+						source[j].tokens.back().index = result.index;
+					}
 
-				for (int j = 0; j < (int)reset.size(); j++)
-					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-						if (reset[j].tokens[k].index == i.index)
-						{
-							reset[j].tokens.push_back(reset[j].tokens[k]);
-							reset[j].tokens.back().index = result.index;
-						}
+			for (int j = 0; j < (int)reset.size(); j++)
+				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
+					if (reset[j].tokens[k].index == i.index)
+					{
+						reset[j].tokens.push_back(reset[j].tokens[k]);
+						reset[j].tokens.back().index = result.index;
+					}
 
-				for (int j = 0; j < (int)sink.size(); j++)
-					for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-						if (sink[j].tokens[k].index == i.index)
-						{
-							sink[j].tokens.push_back(sink[j].tokens[k]);
-							sink[j].tokens.back().index = result.index;
-						}
-			}
+			for (int j = 0; j < (int)sink.size(); j++)
+				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
+					if (sink[j].tokens[k].index == i.index)
+					{
+						sink[j].tokens.push_back(sink[j].tokens[k]);
+						sink[j].tokens.back().index = result.index;
+					}
 
 			return result;
 		}
@@ -762,35 +759,32 @@ struct graph
 				result.push_back(petri::iterator(i.type, places.size()-1));
 			}
 
-			if (i.type == place::type)
-			{
-				for (int j = 0; j < (int)source.size(); j++)
-					for (int k = 0; k < (int)source[j].tokens.size(); k++)
-						if (source[j].tokens[k].index == i.index)
-							for (int l = 0; l < (int)result.size(); l++)
-							{
-								source[j].tokens.push_back(source[j].tokens[k]);
-								source[j].tokens.back().index = result[l].index;
-							}
+			for (int j = 0; j < (int)source.size(); j++)
+				for (int k = 0; k < (int)source[j].tokens.size(); k++)
+					if (source[j].tokens[k].index == i.index)
+						for (int l = 0; l < (int)result.size(); l++)
+						{
+							source[j].tokens.push_back(source[j].tokens[k]);
+							source[j].tokens.back().index = result[l].index;
+						}
 
-				for (int j = 0; j < (int)reset.size(); j++)
-					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-						if (reset[j].tokens[k].index == i.index)
-							for (int l = 0; l < (int)result.size(); l++)
-							{
-								reset[j].tokens.push_back(reset[j].tokens[k]);
-								reset[j].tokens.back().index = result[l].index;
-							}
+			for (int j = 0; j < (int)reset.size(); j++)
+				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
+					if (reset[j].tokens[k].index == i.index)
+						for (int l = 0; l < (int)result.size(); l++)
+						{
+							reset[j].tokens.push_back(reset[j].tokens[k]);
+							reset[j].tokens.back().index = result[l].index;
+						}
 
-				for (int j = 0; j < (int)sink.size(); j++)
-					for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-						if (sink[j].tokens[k].index == i.index)
-							for (int l = 0; l < (int)result.size(); l++)
-							{
-								sink[j].tokens.push_back(sink[j].tokens[k]);
-								sink[j].tokens.back().index = result[l].index;
-							}
-			}
+			for (int j = 0; j < (int)sink.size(); j++)
+				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
+					if (sink[j].tokens[k].index == i.index)
+						for (int l = 0; l < (int)result.size(); l++)
+						{
+							sink[j].tokens.push_back(sink[j].tokens[k]);
+							sink[j].tokens.back().index = result[l].index;
+						}
 		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
 			for (int j = 0; j < num; j++)
 			{
@@ -1079,7 +1073,7 @@ struct graph
 	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true)
 	{
 		petri::iterator d = copy(i);
-		if (i.type == composition)
+		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel))
 		{
 			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
 				if (arcs[i.type][j].from == i)
@@ -1141,7 +1135,7 @@ struct graph
 		}
 
 		vector<petri::iterator> d = copy(i, num-1);
-		if (i.type == composition)
+		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel))
 		{
 			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
 				if (arcs[i.type][j].from == i)
@@ -1228,8 +1222,8 @@ struct graph
 	{
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
-		vector<petri::iterator> left = duplicate(1-n.type, neighbors.first, neighbors.second.size(), false);
-		vector<petri::iterator> right = duplicate(1-n.type, neighbors.second, neighbors.first.size(), true);
+		vector<petri::iterator> left = duplicate(n.type, neighbors.first, neighbors.second.size(), false);
+		vector<petri::iterator> right = duplicate(n.type, neighbors.second, neighbors.first.size(), true);
 
 		for (int i = 0; i < (int)right.size(); i++)
 		{
