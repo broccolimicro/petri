@@ -292,6 +292,27 @@ bool operator==(const split_group &g0, const split_group &g1)
 	return true;
 }
 
+bool overlap(vector<split_group> g0, vector<split_group> g1) {
+	for (int i = 0, j = 0; i < (int)g0.size() && j < (int)g1.size(); ) {
+		if (g0[i].split == g1[j].split) {
+			if (g0[i].branch.size() != g1[j].branch.size()) {
+				return true;
+			}
+			for (int k = 0; k < (int)g0[i].branch.size(); k++) {
+				if (g0[i].branch[k] != g1[j].branch[k]) {
+					return true;
+				}
+			}
+			i++;
+			j++;
+		} else if (g0[i].split < g1[j].split) {
+			i++;
+		} else {
+			j++;
+		}
+	}
+	return false;
+}
 
 }
 

@@ -97,6 +97,8 @@ struct split_group
 bool operator<(const split_group &g0, const split_group &g1);
 bool operator==(const split_group &g0, const split_group &g1);
 
+bool overlap(vector<split_group> g0, vector<split_group> g1);
+
 struct place
 {
 	place();
@@ -213,9 +215,7 @@ struct graph
 
 		// each place belongs to some set of parallel splits (init[place])
 		vector<vector<split_group> > init;
-		vector<vector<int> > blocked;
 		init.resize(size(1-type));
-		blocked.resize(size(1-type));
 		if (type == parallel) {
 			// add parallel splits from reset states
 			if (reset.size() > 0) {
@@ -235,9 +235,14 @@ struct graph
 			}
 		}
 
-		bool change = true;
-		while (change) {
-			change = false;
+		// TODO(edward.bingham) For a given split type, merges of that type
+		// shouldn't be able to proceed until there is a split group of that split
+		// from each input node. This will prevent completed split groups from
+		// incorrectly propagating out into the rest of the handshake.
+
+		bool done = false;
+		while (not done) {
+			done = true;
 
 			// Transitions
 			for (auto i = p[transition::type].begin(); i != p[transition::type].end(); i++) {
@@ -262,22 +267,23 @@ struct graph
 				for (int j = (int)group.size()-1; j >= 0; j--) {
 					sort(group[j].branch.begin(), group[j].branch.end());
 					group[j].branch.erase(unique(group[j].branch.begin(), group[j].branch.end()), group[j].branch.end());
-					if (type == choice) {
-						auto pos = lower_bound(blocked[tid].begin(), blocked[tid].end(), group[j].split);
-						if (pos != blocked[tid].end() and *pos == group[j].split) {
-							group.erase(group.begin() + j);
-						} else if ((int)group[j].branch.size() == group[j].count) {
-							blocked[tid].insert(pos, group[j].split);
-							group.erase(group.begin() + j);
+					bool found = true;
+					if (type == parallel) {
+						for (auto k = i->begin(); k != i->end() and found; k++) {
+							found = false;
+							for (auto l = places[k->index].groups[type].begin(); l != places[k->index].groups[type].end() and not found; l++) {
+								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and overlap(transitions[l->split].groups[type], transitions[group[j].split].groups[type]));
+							}
 						}
-					} else if ((int)group[j].branch.size() == group[j].count) {
+					}
+					if (not found or (int)group[j].branch.size() == group[j].count) {
 						group.erase(group.begin() + j);
 					}
 				}
 
 				if (transitions[tid].groups[type] != group) {
 					transitions[tid].groups[type] = group;
-					change = true;
+					done = false;
 				}
 			}
 
@@ -304,22 +310,23 @@ struct graph
 				for (int j = (int)group.size()-1; j >= 0; j--) {
 					sort(group[j].branch.begin(), group[j].branch.end());
 					group[j].branch.erase(unique(group[j].branch.begin(), group[j].branch.end()), group[j].branch.end());
-					if (type == parallel) {
-						auto pos = lower_bound(blocked[pid].begin(), blocked[pid].end(), group[j].split);
-						if (pos != blocked[pid].end() and *pos == group[j].split) {
-							group.erase(group.begin() + j);
-						} else if ((int)group[j].branch.size() == group[j].count) {
-							blocked[pid].insert(pos, group[j].split);
-							group.erase(group.begin() + j);
+					bool found = true;
+					if (type == choice) {
+						for (auto k = i->begin(); k != i->end() and found; k++) {
+							found = false;
+							for (auto l = transitions[k->index].groups[type].begin(); l != transitions[k->index].groups[type].end() and not found; l++) {
+								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and overlap(places[l->split].groups[type], places[group[j].split].groups[type]));
+							}
 						}
-					} else if ((int)group[j].branch.size() == group[j].count) {
+					}
+					if (not found or (int)group[j].branch.size() == group[j].count) {
 						group.erase(group.begin() + j);
 					}
 				}
 
 				if (places[pid].groups[type] != group) {
 					places[pid].groups[type] = group;
-					change = true;
+					done = false;
 				}
 			}
 		}
@@ -2453,25 +2460,7 @@ struct graph
 			b_groups = transitions[b.index].groups[type];
 		}
 
-		for (int i = 0, j = 0; i < (int)a_groups.size() && j < (int)b_groups.size(); ) {
-			if (a_groups[i].split == b_groups[j].split) {
-				if (a_groups[i].branch.size() != b_groups[j].branch.size()) {
-					return true;
-				}
-				for (int k = 0; k < (int)a_groups[i].branch.size(); k++) {
-					if (a_groups[i].branch[k] != b_groups[j].branch[k]) {
-						return true;
-					}
-				}
-				i++;
-				j++;
-			} else if (a_groups[i].split < b_groups[j].split) {
-				i++;
-			} else {
-				j++;
-			}
-		}
-		return false;
+		return overlap(a_groups, b_groups);
 	}
 
 	virtual bool is(int type, std::vector<petri::iterator> from, std::vector<petri::iterator> to) {
