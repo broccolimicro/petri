@@ -351,6 +351,22 @@ path_set path_set::avoidance(petri::iterator i)
 	return result;
 }
 
+path_set path_set::avoidance(vector<petri::iterator> i)
+{
+	path_set result(total.num_places, total.num_transitions);
+	for (list<path>::iterator p = paths.begin(); p != paths.end(); p++) {
+		bool found = true;
+		for (auto j = i.begin(); j != i.end() and found; j++) {
+			found = p->hops[p->idx(*j)] == 0;
+		}
+
+		if (found) {
+			result.push(*p);
+		}
+	}
+	return result;
+}
+
 bool path_set::covers(petri::iterator i) {
 	return total[i] > 0;
 }
@@ -362,6 +378,15 @@ bool path_set::covers(vector<petri::iterator> i) {
 		}
 	}
 	return true;
+}
+
+bool path_set::touches(vector<petri::iterator> i) {
+	for (int j = 0; j < (int)i.size(); j++) {
+		if (total[i[j]] > 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 path_set &path_set::operator=(const path_set &p)

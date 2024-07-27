@@ -160,8 +160,10 @@ struct path_set
 
 	path_set coverage(petri::iterator i);
 	path_set avoidance(petri::iterator i);
+	path_set avoidance(vector<petri::iterator> i);
 	bool covers(petri::iterator i);
 	bool covers(vector<petri::iterator> i);
+	bool touches(vector<petri::iterator> i);
 
 	path_set &operator=(const path_set &p);
 	path_set &operator+=(const path_set &p);

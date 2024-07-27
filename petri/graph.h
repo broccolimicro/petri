@@ -1071,6 +1071,68 @@ struct graph
 			return petri::iterator();
 	}
 
+	virtual petri::iterator insert_at(vector<petri::iterator> from, transition n) {
+		petri::iterator t = create(n);
+		vector<petri::iterator> to;
+		for (int i = 0; i < (int)from.size(); i++) {
+			to.push_back(create(from[i].type));
+			for (int j = (int)arcs[from[i].type].size()-1; j >= 0; j--) {
+				if (arcs[from[i].type][j].from.index == from[i].index) {
+					connect(to[i], arcs[from[i].type][j].to);
+					if (from[i].type == place::type) {
+						arcs[from[i].type][j].to.index = t.index;
+					} else {
+						petri::iterator p = create(place());
+						arcs[from[i].type][j].to.index = p.index;
+						connect(p, t);
+					}
+				}
+			}
+			connect(t, to[i]);
+		}
+
+		vector<vector<petri::iterator> > nto;
+		nto.reserve(to.size());
+		for (auto i = to.begin(); i != to.end(); i++) {
+			nto.push_back(next(*i));
+		}
+		
+		vector<vector<petri::iterator> > pfrom;
+		pfrom.reserve(from.size());
+		for (auto i = from.begin(); i != from.end(); i++) {
+			pfrom.push_back(prev(*i));
+		}
+
+		/*vector<petri::iterator> remove;
+		for (int i = (int)to.size()-1; i >= 1; i--) {
+			for (int j = i-1; j >= 0; j--) {
+				if (nto[i] == nto[j]) {
+					remove.push_back(to[i]);
+					break;
+				}
+			}
+		}
+		for (int i = (int)from.size()-1; i >= 1; i--) {
+			for (int j = i-1; j >= 0; j--) {
+				if (pfrom[i] == pfrom[j]) {
+					remove.push_back(from[i]);
+					break;
+				}
+			}
+		}
+
+		sort(remove.begin(), remove.end());
+		remove.erase(unique(remove.begin(), remove.end()), remove.end());
+		for (int i = (int)remove.size()-1; i >= 0; i--) {
+			erase(remove[i]);
+			if (remove[i].type == transition::type and remove[i].index < t.index) {
+				t.index--;
+			}
+		}*/
+
+		return t;
+	}
+
 	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true)
 	{
 		petri::iterator d = copy(i);
