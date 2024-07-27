@@ -348,6 +348,7 @@ struct graph
 
 	vector<place> places;
 	vector<transition> transitions;
+	// index by from.type
 	array<vector<arc>, 2> arcs;
 	vector<state> source, sink;
 	vector<state> reset;

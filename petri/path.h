@@ -95,6 +95,36 @@ bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
 	return not p0_empty and not p1_empty;
 }
 
+template <class place, class transition, class token, class state>
+bool mergible(graph<place, transition, token, state> &g, const path &p0, const path &p1) {
+	bool p0_empty = true;
+	bool p1_empty = true;
+	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
+		if (p0.hops[i] > p1.hops[i]) {
+			bool found = false;
+			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
+				found = (p1.hops[j] > 0 and g.is(choice, p0.iter(i), p1.iter(j)));
+			}
+
+			p0_empty = p0_empty and (found ? p0.hops[i] : p1.hops[i]) == 0;
+			p1_empty = p1_empty and p1.hops[i] == 0;
+		} else if (p0.hops[i] < p1.hops[i]) {
+			bool found = false;
+			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
+				found = (p0.hops[j] > 0 and g.is(choice, p0.iter(j), p1.iter(i)));
+			}
+
+			p0_empty = p0_empty and p0.hops[i] == 0;
+			p1_empty = p1_empty and (found ? p1.hops[i] : p0.hops[i]) == 0;
+		} else {
+			p0_empty = p0_empty and p0.hops[i] == 0;
+			p1_empty = p1_empty and p1.hops[i] == 0;
+		}
+	}
+
+	return not p0_empty and not p1_empty;
+}
+
 // A path set helps to manage multiple paths from one place or region to
 // another to ensure the state variable insertion algorithm is able to cut them
 // all with state transitions.
@@ -130,6 +160,8 @@ struct path_set
 
 	path_set coverage(petri::iterator i);
 	path_set avoidance(petri::iterator i);
+	bool covers(petri::iterator i);
+	bool covers(vector<petri::iterator> i);
 
 	path_set &operator=(const path_set &p);
 	path_set &operator+=(const path_set &p);
@@ -168,6 +200,20 @@ struct path_set
 	}
 };
 
+template <class place, class transition, class token, class state>
+bool mergible(graph<place, transition, token, state> &g, const path_set &p0, const path_set &p1)
+{
+	for (auto x = p0.paths.begin(); x != p0.paths.end(); x++) {
+		for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
+			if (not petri::mergible(g, *x, *y)) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 ostream &operator<<(ostream &os, const path &p);
 
 path operator+(path p0, path p1);
@@ -184,7 +230,7 @@ path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
 template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to) {
+path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
 	if (from.empty() or to.empty()) {
 		return path_set(g.places.size(), g.transitions.size());
 	}
@@ -342,6 +388,16 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 			}
 			if (curr.first.empty()) {
 				if (not curr.second.to.empty()) {
+					if (mark_from) {
+						for (auto i = curr.second.from.begin(); i != curr.second.from.end(); i++) {
+							curr.second.set(*i, 1);
+						}
+					}
+					if (mark_to) {
+						for (auto i = curr.second.to.begin(); i != curr.second.to.end(); i++) {
+							curr.second.set(*i, 1);
+						}
+					}
 					result.push(curr.second);
 				}
 			} else {
@@ -361,6 +417,16 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 				}
 				if (copy.first.empty()) {
 					if (not copy.second.to.empty()) {
+						if (mark_from) {
+							for (auto i = copy.second.from.begin(); i != copy.second.from.end(); i++) {
+								copy.second.set(*i, 1);
+							}
+						}
+						if (mark_to) {
+							for (auto i = copy.second.to.begin(); i != copy.second.to.end(); i++) {
+								copy.second.set(*i, 1);
+							}
+						}
 						result.push(copy.second);
 					}
 				} else {

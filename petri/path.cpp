@@ -351,6 +351,19 @@ path_set path_set::avoidance(petri::iterator i)
 	return result;
 }
 
+bool path_set::covers(petri::iterator i) {
+	return total[i] > 0;
+}
+
+bool path_set::covers(vector<petri::iterator> i) {
+	for (int j = 0; j < (int)i.size(); j++) {
+		if (total[i[j]] == 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
 path_set &path_set::operator=(const path_set &p)
 {
 	paths = p.paths;
