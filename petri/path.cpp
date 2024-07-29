@@ -394,6 +394,7 @@ bool path_set::touches(vector<petri::iterator> i) const {
 	return false;
 }
 
+// Find all transition groups that cut all of the paths in the path_set.
 vector<vector<petri::iterator> > path_set::enumerate() {
 	vector<vector<petri::iterator> > result(1, vector<petri::iterator>());
 	for (auto i = paths.begin(); i != paths.end(); i++) {

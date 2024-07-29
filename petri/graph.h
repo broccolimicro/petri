@@ -2530,6 +2530,48 @@ struct graph
 		}
 		return true;
 	}
+
+	virtual vector<vector<petri::iterator> > partials(int composition, vector<petri::iterator> init) {
+		sort(init.begin(), init.end());
+		init.erase(unique(init.begin(), init.end()), init.end());
+
+		vector<petri::iterator> other;
+		for (auto i = begin(place::type); i != end(base::type); i++) {
+			if (is(composition, vector<petri::iterator>(1, i), init)) {
+				other.push_back(i);
+			}
+		}
+		for (auto i = begin(transition::type); i != end(base::type); i++) {
+			if (is(composition, vector<petri::iterator>(1, i), init)) {
+				other.push_back(i);
+			}
+		}
+
+		// Given the set of nodes in "other" and the set of nodes in "init", we
+		// need to find all cliques (maximal or not) in the graph created by
+		// the requested composition relations.
+		vector<vector<petri::iterator> > result;
+		list<pair<vector<petri::iterator>, vector<petri::iterator> > > queue;
+		queue.push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(init, other));
+		while (not queue.empty()) {
+			auto curr = queue.front();
+			queue.pop_front();
+
+			auto k = lower_bound(result.begin(), result.end(), curr.first);
+			if (k == result.end() or *k != curr.first) {
+				result.insert(k, curr.first);
+				for (auto i = curr.second.begin(); i != curr.second.end(); i++) {
+					if (is(composition, vector<petri::iterator(1, *i), curr.first)) {
+						queue.push_back(curr.first);
+						auto j = lower_bound(queue.back().begin(), queue.back().end(), *i);
+						queue.back().insert(j, *i);
+					}
+				}
+			}
+		}
+
+		return result;
+	}
 };
 
 }
