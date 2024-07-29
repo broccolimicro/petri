@@ -62,6 +62,7 @@ struct path
 	path &operator/=(int n);
 
 	int &operator[](petri::iterator i);
+	int operator[](petri::iterator i) const;
 };
 
 template <class place, class transition, class token, class state>
@@ -161,9 +162,11 @@ struct path_set
 	path_set coverage(petri::iterator i);
 	path_set avoidance(petri::iterator i);
 	path_set avoidance(vector<petri::iterator> i);
-	bool covers(petri::iterator i);
-	bool covers(vector<petri::iterator> i);
-	bool touches(vector<petri::iterator> i);
+	bool covers(petri::iterator i) const;
+	bool covers(vector<petri::iterator> i) const;
+	bool touches(vector<petri::iterator> i) const;
+
+	vector<vector<petri::iterator> > enumerate();
 
 	path_set &operator=(const path_set &p);
 	path_set &operator+=(const path_set &p);

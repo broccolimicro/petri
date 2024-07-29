@@ -203,6 +203,11 @@ int &path::operator[](petri::iterator i)
 	return hops[idx(i)];
 }
 
+int path::operator[](petri::iterator i) const
+{
+	return hops[idx(i)];
+}
+
 path_set::path_set(int num_places, int num_transitions) : total(num_places, num_transitions)
 {
 
@@ -367,11 +372,11 @@ path_set path_set::avoidance(vector<petri::iterator> i)
 	return result;
 }
 
-bool path_set::covers(petri::iterator i) {
+bool path_set::covers(petri::iterator i) const {
 	return total[i] > 0;
 }
 
-bool path_set::covers(vector<petri::iterator> i) {
+bool path_set::covers(vector<petri::iterator> i) const {
 	for (int j = 0; j < (int)i.size(); j++) {
 		if (total[i[j]] == 0) {
 			return false;
@@ -380,13 +385,50 @@ bool path_set::covers(vector<petri::iterator> i) {
 	return true;
 }
 
-bool path_set::touches(vector<petri::iterator> i) {
+bool path_set::touches(vector<petri::iterator> i) const {
 	for (int j = 0; j < (int)i.size(); j++) {
 		if (total[i[j]] > 0) {
 			return true;
 		}
 	}
 	return false;
+}
+
+vector<vector<petri::iterator> > path_set::enumerate() {
+	vector<vector<petri::iterator> > result(1, vector<petri::iterator>());
+	for (auto i = paths.begin(); i != paths.end(); i++) {
+		vector<vector<petri::iterator> > found;
+		vector<petri::iterator> not_found;
+		for (int j = 0; j < (int)i->hops.size(); j++) {
+			if (i->hops[j] > 0) {
+				petri::iterator k = i->iter(j);
+				bool covered = false;
+				for (int l = (int)result.size()-1; l >= 0; l--) {
+					if (find(result[l].begin(), result[l].end(), k) != result[l].end()) {
+						found.push_back(result[l]);
+						result.erase(result.begin() + l);
+						covered = true;
+					}
+				}
+				for (auto l = found.begin(); not covered and l != found.end(); l++) {
+					covered = find(l->begin(), l->end(), k) != l->end();
+				}
+				if (not covered) {
+					not_found.push_back(k);
+				}
+			}
+		}
+
+		for (auto j = result.begin(); j != result.end(); j++) {
+			for (auto k = not_found.begin(); k != not_found.end(); k++) {
+				vector<petri::iterator> item = *j;
+				item.push_back(*k);
+				found.push_back(item);
+			}
+		}
+		result = found;
+	}
+	return result;
 }
 
 path_set &path_set::operator=(const path_set &p)
