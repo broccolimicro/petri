@@ -360,47 +360,39 @@ struct graph
 		split_groups_ready[1] = false;
 	}
 
-	virtual int size(int type=-1) {
+	virtual int size(int type=-1) const {
 		return type == -1 ? (int)(places.size()+transitions.size()) : (type == place::type ? (int)places.size() : (int)transitions.size());
 	}
 
-	virtual petri::iterator begin(int type)
-	{
+	virtual petri::iterator begin(int type) const {
 		return petri::iterator(type, 0);
 	}
 
-	virtual petri::iterator end(int type)
-	{
+	virtual petri::iterator end(int type) const {
 		return petri::iterator(type, size(type));
 	}
 
-	virtual petri::iterator rbegin(int type)
-	{
-		return petri::iterator(type, size(type));
+	virtual petri::iterator rbegin(int type) const {
+		return petri::iterator(type, size(type)-1);
 	}
 
-	virtual petri::iterator rend(int type)
-	{
+	virtual petri::iterator rend(int type) const {
 		return petri::iterator(type, -1);
 	}
 
-	virtual petri::iterator begin_arc(int type)
-	{
+	virtual petri::iterator begin_arc(int type) const {
 		return petri::iterator(type, 0);
 	}
 
-	virtual petri::iterator end_arc(int type)
-	{
+	virtual petri::iterator end_arc(int type) const {
 		return petri::iterator(type, (int)arcs[type].size());
 	}
 
-	virtual petri::iterator rbegin_arc(int type)
-	{
+	virtual petri::iterator rbegin_arc(int type) const {
 		return petri::iterator(type, (int)arcs[type].size()-1);
 	}
 
-	virtual petri::iterator rend_arc(int type)
-	{
+	virtual petri::iterator rend_arc(int type) const {
 		return petri::iterator(type, -1);
 	}
 
@@ -1071,65 +1063,21 @@ struct graph
 			return petri::iterator();
 	}
 
-	virtual petri::iterator insert_at(vector<petri::iterator> from, transition n) {
+	virtual petri::iterator insert_at(vector<petri::iterator> to, transition n) {
 		petri::iterator t = create(n);
-		vector<petri::iterator> to;
-		for (int i = 0; i < (int)from.size(); i++) {
-			to.push_back(create(from[i].type));
-			for (int j = (int)arcs[from[i].type].size()-1; j >= 0; j--) {
-				if (arcs[from[i].type][j].from.index == from[i].index) {
-					connect(to[i], arcs[from[i].type][j].to);
-					if (from[i].type == place::type) {
-						arcs[from[i].type][j].to.index = t.index;
-					} else {
-						petri::iterator p = create(place());
-						arcs[from[i].type][j].to.index = p.index;
-						connect(p, t);
-					}
-				}
-			}
-			connect(t, to[i]);
-		}
-
-		vector<vector<petri::iterator> > nto;
-		nto.reserve(to.size());
 		for (auto i = to.begin(); i != to.end(); i++) {
-			nto.push_back(next(*i));
-		}
-		
-		vector<vector<petri::iterator> > pfrom;
-		pfrom.reserve(from.size());
-		for (auto i = from.begin(); i != from.end(); i++) {
-			pfrom.push_back(prev(*i));
-		}
-
-		/*vector<petri::iterator> remove;
-		for (int i = (int)to.size()-1; i >= 1; i--) {
-			for (int j = i-1; j >= 0; j--) {
-				if (nto[i] == nto[j]) {
-					remove.push_back(to[i]);
-					break;
+			petri::iterator p = t;
+			if (i->type == place::type) {
+				p = create(place::type);
+				connect(p, t);
+			}
+			for (auto j = arcs[1-i->type].begin(); j != arcs[1-i->type].end(); j++) {
+				if (j->to.index == i->index) {
+					j->to.index = p.index;
 				}
 			}
+			connect(t, *i);
 		}
-		for (int i = (int)from.size()-1; i >= 1; i--) {
-			for (int j = i-1; j >= 0; j--) {
-				if (pfrom[i] == pfrom[j]) {
-					remove.push_back(from[i]);
-					break;
-				}
-			}
-		}
-
-		sort(remove.begin(), remove.end());
-		remove.erase(unique(remove.begin(), remove.end()), remove.end());
-		for (int i = (int)remove.size()-1; i >= 0; i--) {
-			erase(remove[i]);
-			if (remove[i].type == transition::type and remove[i].index < t.index) {
-				t.index--;
-			}
-		}*/
-
 		return t;
 	}
 
@@ -2317,21 +2265,7 @@ struct graph
 
 			for (petri::iterator i(place::type, 0); i < (int)places.size() && !change; )
 			{
-				bool i_is_reset = false;
-				if (reset.size() == 0)
-				{
-					for (int j = 0; j < (int)source.size() && !i_is_reset; j++)
-						for (int k = 0; k < (int)source[j].tokens.size() && !i_is_reset; k++)
-							if (source[j].tokens[k].index == i.index)
-								i_is_reset = true;
-				}
-				else
-				{
-					for (int j = 0; j < (int)reset.size() && !i_is_reset; j++)
-						for (int k = 0; k < (int)reset[j].tokens.size() && !i_is_reset; k++)
-							if (reset[j].tokens[k].index == i.index)
-								i_is_reset = true;
-				}
+				bool i_is_reset = is_reset(i);
 
 				vector<petri::iterator> n = next(i);
 				vector<petri::iterator> p = prev(i);
@@ -2353,21 +2287,7 @@ struct graph
 				// Check to see if there are any excess places whose existence doesn't affect the behavior of the circuit
 				for (petri::iterator j = i+1; j < (int)places.size(); )
 				{
-					bool j_is_reset = false;
-					if (reset.size() == 0)
-					{
-						for (int k = 0; k < (int)source.size() && !j_is_reset; k++)
-							for (int l = 0; l < (int)source[k].tokens.size() && !j_is_reset; l++)
-								if (source[k].tokens[l].index == j.index)
-									j_is_reset = true;
-					}
-					else
-					{
-						for (int k = 0; k < (int)reset.size() && !j_is_reset; k++)
-							for (int l = 0; l < (int)reset[k].tokens.size() && !j_is_reset; l++)
-								if (reset[k].tokens[l].index == j.index)
-									j_is_reset = true;
-					}
+					bool j_is_reset = is_reset(j);
 
 					vector<petri::iterator> n2 = next(j);
 					vector<petri::iterator> p2 = prev(j);
@@ -2536,12 +2456,12 @@ struct graph
 		init.erase(unique(init.begin(), init.end()), init.end());
 
 		vector<petri::iterator> other;
-		for (auto i = begin(place::type); i != end(base::type); i++) {
+		for (auto i = begin(place::type); i != end(place::type); i++) {
 			if (is(composition, vector<petri::iterator>(1, i), init)) {
 				other.push_back(i);
 			}
 		}
-		for (auto i = begin(transition::type); i != end(base::type); i++) {
+		for (auto i = begin(transition::type); i != end(transition::type); i++) {
 			if (is(composition, vector<petri::iterator>(1, i), init)) {
 				other.push_back(i);
 			}
@@ -2561,16 +2481,103 @@ struct graph
 			if (k == result.end() or *k != curr.first) {
 				result.insert(k, curr.first);
 				for (auto i = curr.second.begin(); i != curr.second.end(); i++) {
-					if (is(composition, vector<petri::iterator(1, *i), curr.first)) {
-						queue.push_back(curr.first);
-						auto j = lower_bound(queue.back().begin(), queue.back().end(), *i);
-						queue.back().insert(j, *i);
+					if (is(composition, vector<petri::iterator>(1, *i), curr.first)) {
+						queue.push_back(curr);
+						auto j = lower_bound(queue.back().first.begin(), queue.back().first.end(), *i);
+						queue.back().first.insert(j, *i);
+						queue.back().second.erase(queue.back().second.begin() + (i-curr.second.begin()));
 					}
 				}
 			}
 		}
 
 		return result;
+	}
+
+	virtual bool is_reset(petri::iterator i) const {
+		if (reset.size() == 0) {
+			for (int j = 0; j < (int)source.size(); j++) {
+				for (int k = 0; k < (int)source[j].tokens.size(); k++) {
+					if (source[j].tokens[k].index == i.index) {
+						return true;
+					}
+				}
+			}
+		} else {
+			for (int j = 0; j < (int)reset.size(); j++) {
+				for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+					if (reset[j].tokens[k].index == i.index) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	virtual bool is_redundant_to(petri::iterator p0, petri::iterator p1) {
+		if (p0 == p1 or not is(parallel, p0, p1)) {
+			return false;
+		}
+
+		vector<petri::iterator> n = neighbors(p0);
+		for (auto ni = n.begin(); ni != n.end(); ni++) {
+			if (is(parallel, *ni, p1)) {
+				return false;
+			}
+		}
+
+		if (not is_reset(p0)) {
+			if (is_reset(p1)) {
+				return false;
+			}
+			for (auto ri = reset.begin(); ri != reset.end(); ri++) {
+				for (auto rj = ri->tokens.begin(); rj != ri->tokens.end(); rj++) {
+					petri::iterator p(place::type, rj->index);
+					if (p != p0 and p != p1 and is(parallel, p0, p) and is(sequence, p1, p)) {
+						return false;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	virtual bool is_redundant_to(petri::iterator p0, vector<petri::iterator> p1) {
+		for (auto i = p1.begin(); i != p1.end(); i++) {
+			if (is_redundant_to(p0, *i)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	virtual bool is_redundant(petri::iterator p0) {
+		for (auto i = begin(place::type); i != end(place::type); i++) {
+			if (is_redundant_to(p0, i)) {
+				cout << p0 << " is redundant to " << i << endl;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	virtual vector<petri::iterator> add_redundant(vector<petri::iterator> p) {
+		for (auto i = begin(place::type); i != end(place::type); i++) {
+			if (is_redundant_to(i, p)) {
+				p.push_back(i);
+			}
+		}
+		return p;
+	}
+
+	virtual void erase_redundant() {
+		for (auto i = rbegin(place::type); i != rend(place::type); i--) {
+			if (is_redundant(i)) {
+				erase(i);
+			}
+		}
 	}
 };
 
