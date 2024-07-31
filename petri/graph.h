@@ -2569,15 +2569,51 @@ struct graph
 				p.push_back(i);
 			}
 		}
+		sort(p.begin(), p.end());
+		p.erase(unique(p.begin(), p.end()), p.end());
 		return p;
 	}
 
 	virtual void erase_redundant() {
 		for (auto i = rbegin(place::type); i != rend(place::type); i--) {
 			if (is_redundant(i)) {
-				erase(i);
+				//erase(i);
 			}
 		}
+	}
+
+	virtual bool crosses_reset(vector<petri::iterator> pos) {
+		bool before_reset = false;
+		bool after_reset = false;
+
+		for (auto i = pos.begin(); i != pos.end(); i++) {
+			if (i->type == transition::type) {
+				bool found = false;
+				for (auto group = transitions[i->index].groups[parallel].begin(); group != transitions[i->index].groups[parallel].end() and not found; group++) {
+					if (group->split < 0) {
+						found = true;
+					}
+				}
+				before_reset = before_reset or not found;
+				after_reset = after_reset or found;
+			} else {
+				bool found = false;
+				for (auto group = places[i->index].groups[parallel].begin(); group != places[i->index].groups[parallel].end(); group++) {
+					if (group->split < 0) {
+						found = true;
+						for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {
+							if (*branch == i->index) {
+								before_reset = true;
+							} else {
+								after_reset = true;
+							}
+						}
+					}
+				}
+				before_reset = before_reset or not found;
+			}
+		}
+		return before_reset and after_reset;
 	}
 };
 
