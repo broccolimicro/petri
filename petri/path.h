@@ -235,9 +235,28 @@ path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
 template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator> from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
+path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::iterator> > from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
 	if (from.empty() or to.empty()) {
 		return path_set(g.places.size(), g.transitions.size());
+	}
+
+	path_set result(g.places.size(), g.transitions.size());
+	// each item in the stack is a pair
+	// The first element in the pair represents the frontier of the
+	// trace. When the frontier is empty, we have completed the trace.
+	// The second element in the pair is the path we've traced. Any
+	// frontier node that encounters one of our targets gets placed
+	// into the path's "to" list. If the trace completes and there are
+	// no elements in the path's "to" list, then there was no path
+	// found.
+
+	vector<pair<vector<petri::iterator>, path> > stack;
+	// initialize the stack. To do this, we break the from list into conditional
+	// groups of parallel nodes. Nodes that are in sequence with eachother should
+	// be treated as conditional as well.
+	for (auto partial = from.begin(); partial != from.end(); partial++) {
+		stack.push_back(pair<vector<petri::iterator>, path>(*partial, path(g.places.size(), g.transitions.size())));
+		stack.back().second.from = *partial;
 	}
 
 	// precache "next" list for all nodes in graph to accelerate
@@ -310,67 +329,12 @@ path_set trace(graph<place, transition, token, state> &g, vector<petri::iterator
 	path fromCount(g.places.size(), g.transitions.size());
 	path toCount(g.places.size(), g.transitions.size());
 	for (auto i = from.begin(); i != from.end(); i++) {
-		fromCount.set(*i);
+		for (auto j = i->begin(); j != i->end(); j++) {
+			fromCount.set(*j);
+		}
 	}
 	for (auto i = to.begin(); i != to.end(); i++) {
 		toCount.set(*i);
-	}
-
-	path_set result(g.places.size(), g.transitions.size());
-	// each item in the stack is a pair
-	// The first element in the pair represents the frontier of the
-	// trace. When the frontier is empty, we have completed the trace.
-	// The second element in the pair is the path we've traced. Any
-	// frontier node that encounters one of our targets gets placed
-	// into the path's "to" list. If the trace completes and there are
-	// no elements in the path's "to" list, then there was no path
-	// found.
-	vector<pair<vector<petri::iterator>, path> > stack;
-	// initialize the stack. To do this, we break the from list into conditional
-	// groups of parallel nodes. Nodes that are in sequence with eachother should
-	// be treated as conditional as well.
-
-	// This is the problem of identifying all maximal cliques in the
-	// graph constructed using the nodes in "from" as vertices and
-	// creating edges between each pair of parallel nodes. This is an
-	// NP-complete problem and we are solving it using the Bron–Kerbosch
-	// algorithm.
-	struct BronKerboschFrame {
-		vector<petri::iterator> R, P, X;
-	};
-
-	vector<BronKerboschFrame> frames;
-	frames.push_back(BronKerboschFrame());
-	frames.back().P = from;
-
-	while (not frames.empty()) {
-		auto frame = frames.back();
-		frames.pop_back();
-
-		if (frame.P.empty() and frame.X.empty()) {
-			// Then we've found a maximal clique
-			stack.push_back(pair<vector<petri::iterator>, path>(frame.R, path(g.places.size(), g.transitions.size())));
-			stack.back().second.from = frame.R;
-		} else {
-			// Otherwise, we need to recurse
-			while (not frame.P.empty()) {
-				frames.push_back(frame);
-				frames.back().R.push_back(frame.P.back());
-				for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-					if (not g.is(parallel, frames.back().P[i], frame.P.back())) {
-						frames.back().P.erase(frames.back().P.begin() + i);
-					}
-				}
-				for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-					if (not g.is(parallel, frames.back().X[i], frame.P.back())) {
-						frames.back().X.erase(frames.back().X.begin() + i);
-					}
-				}
-
-				frame.X.push_back(frame.P.back());
-				frame.P.pop_back();
-			}
-		}
 	}
 
 	while (not stack.empty()) {

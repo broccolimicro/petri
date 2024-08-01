@@ -2406,13 +2406,22 @@ struct graph
 		return result;
 	}
 
-	virtual bool is_reachable(petri::iterator from, petri::iterator to)
-	{
+	virtual bool is_reachable(petri::iterator from, petri::iterator to) {
 		return (distance(from, to) < (int)(places.size() + transitions.size()));
 	}
 
-	virtual bool is(int type, petri::iterator a, petri::iterator b)
-	{
+	virtual bool is_reachable(vector<petri::iterator> from, vector<petri::iterator> to) {
+		for (auto i = from.begin(); i != from.end(); i++) {
+			for (auto j = to.begin(); j != to.end(); j++) {
+				if (distance(*i, *j) < (int)(places.size() + transitions.size())) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	virtual bool is(int type, petri::iterator a, petri::iterator b) {
 		if (a == b) {
 			return false;
 		}
@@ -2449,6 +2458,152 @@ struct graph
 			}
 		}
 		return true;
+	}
+
+	// Find all partial state pairs (for each node in v0 and v1 respectively) that are ordered (not in parallel).
+	virtual vector<array<vector<vector<petri::iterator> >, 2> > deinterfere_choice(vector<petri::iterator> v0, vector<petri::iterator> v1) {
+		vector<array<vector<vector<petri::iterator> >, 2> > stack;
+		vector<array<vector<vector<petri::iterator> >, 2> > next;
+
+		stack.resize(1);
+		for (int i = 0; i < (int)v0.size(); i++) {
+			stack.back()[0].push_back(vector<petri::iterator>(1, v0[i]));
+		}
+		for (int i = 0; i < (int)v1.size(); i++) {
+			stack.back()[1].push_back(vector<petri::iterator>(1, v1[i]));
+		}
+		for (int i = 0; i < (int)v0.size(); i++) {
+			while (not stack.empty()) {
+				auto curr = stack.back();
+				stack.pop_back();
+
+				for (int j = 0; j < (int)curr[1].size(); j++) {
+					auto n = deinterfere(curr[0][i], curr[1][j]);
+					for (int k = 0; k < (int)n.size(); k++) {
+						next.push_back(curr);
+						next.back()[0][i] = n[k][0];
+						next.back()[1][j] = n[k][1];
+					}
+				}
+			}
+			stack = next;
+			next.clear();
+		}
+
+		return stack;
+	}
+
+	// Find all partial state pairs (for v0 and v1 respectively) that are ordered (not in parallel).
+	virtual vector<array<vector<petri::iterator>, 2> > deinterfere(vector<petri::iterator> v0, vector<petri::iterator> v1) {
+		sort(v0.begin(), v0.end());
+		sort(v1.begin(), v1.end());
+		vector<petri::iterator> v0p, v1p;
+		for (int j = 0; j < 2; j++) {
+			for (auto i = begin(j); i != end(j); i++) {
+				if (find(v1.begin(), v1.end(), i) == v1.end() and is(parallel, vector<petri::iterator>(1, i), v0)) {
+					v0p.push_back(i);
+				}
+				if (find(v0.begin(), v0.end(), i) == v0.end() and is(parallel, vector<petri::iterator>(1, i), v1)) {
+					v1p.push_back(i);
+				}
+			}
+		}
+
+		vector<array<vector<petri::iterator>, 2> > result;
+		if (vector_intersects(v0, v1)) {
+			return result;
+		}
+		
+		if (not is(parallel, v0, v1)) {
+			result.push_back({v0, v1});
+			return result;
+		}
+
+		for (auto i = v0p.begin(); i != v0p.end(); i++) {
+			if (not is(parallel, vector<petri::iterator>(1, *i), v1)) {
+				result.push_back({v0, v1});
+				result.back()[0].push_back(*i);
+			}
+		}
+
+		for (auto i = v1p.begin(); i != v1p.end(); i++) {
+			if (not is(parallel, vector<petri::iterator>(1, *i), v0)) {
+				result.push_back({v0, v1});
+				result.back()[1].push_back(*i);
+			}
+		}
+		
+		for (auto i = v0p.begin(); i != v0p.end(); i++) {
+			for (auto j = v1p.begin(); j != v1p.end(); j++) {
+				if (*i != *j and not is(parallel, *i, *j)) {
+					result.push_back({v0, v1});
+					result.back()[0].push_back(*i);
+					result.back()[1].push_back(*j);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes) {
+		vector<vector<petri::iterator> > result;
+		// Break the nodes into conditional groups of parallel nodes. Nodes that
+		// are in sequence with eachother should be treated as conditional as well.
+
+		// This is the problem of identifying all maximal cliques in the
+		// graph constructed using the nodes in "from" as vertices and
+		// creating edges between each pair of parallel nodes. This is an
+		// NP-complete problem and we are solving it using the Bron–Kerbosch
+		// algorithm.
+		struct BronKerboschFrame {
+			vector<petri::iterator> R, P, X;
+		};
+
+		vector<BronKerboschFrame> frames;
+		frames.push_back(BronKerboschFrame());
+		frames.back().P = nodes;
+
+		while (not frames.empty()) {
+			auto frame = frames.back();
+			frames.pop_back();
+
+			if (frame.P.empty() and frame.X.empty()) {
+				// Then we've found a maximal clique
+				result.push_back(frame.R);
+			} else {
+				// Otherwise, we need to recurse
+				while (not frame.P.empty()) {
+					frames.push_back(frame);
+					frames.back().R.push_back(frame.P.back());
+					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
+						if (not is(composition, frames.back().P[i], frame.P.back())) {
+							frames.back().P.erase(frames.back().P.begin() + i);
+						}
+					}
+					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
+						if (not is(composition, frames.back().X[i], frame.P.back())) {
+							frames.back().X.erase(frames.back().X.begin() + i);
+						}
+					}
+
+					frame.X.push_back(frame.P.back());
+					frame.P.pop_back();
+				}
+			}
+		}
+
+		return result;
+	}
+
+	virtual vector<petri::iterator> deselect(const vector<vector<petri::iterator> > &nodes) {
+		vector<petri::iterator> result = nodes[0];
+		for (int i = 1; i < (int)nodes.size(); i++) {
+			result.insert(result.end(), nodes[i].begin(), nodes[i].end());
+		}
+		sort(result.begin(), result.end());
+		result.erase(unique(result.begin(), result.end()), result.end());
+		return result;
 	}
 
 	virtual vector<vector<petri::iterator> > partials(int composition, vector<petri::iterator> init) {
