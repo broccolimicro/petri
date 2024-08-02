@@ -2472,6 +2472,9 @@ struct graph
 		for (int i = 0; i < (int)v1.size(); i++) {
 			stack.back()[1].push_back(vector<petri::iterator>(1, v1[i]));
 		}
+		if (stack.back()[0].empty() or stack.back()[1].empty()) {
+			stack.pop_back();
+		}
 		for (int i = 0; i < (int)v0.size(); i++) {
 			while (not stack.empty()) {
 				auto curr = stack.back();
@@ -2480,9 +2483,11 @@ struct graph
 				for (int j = 0; j < (int)curr[1].size(); j++) {
 					auto n = deinterfere(curr[0][i], curr[1][j]);
 					for (int k = 0; k < (int)n.size(); k++) {
-						next.push_back(curr);
-						next.back()[0][i] = n[k][0];
-						next.back()[1][j] = n[k][1];
+						if (not n[k][0].empty() and not n[k][1].empty()) {
+							next.push_back(curr);
+							next.back()[0][i] = n[k][0];
+							next.back()[1][j] = n[k][1];
+						}
 					}
 				}
 			}
