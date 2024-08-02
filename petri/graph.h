@@ -2750,9 +2750,7 @@ struct graph
 			if (i->type == transition::type) {
 				bool found = false;
 				for (auto group = transitions[i->index].groups[parallel].begin(); group != transitions[i->index].groups[parallel].end() and not found; group++) {
-					if (group->split < 0) {
-						found = true;
-					}
+					found = group->split < 0;
 				}
 				before_reset = before_reset or not found;
 				after_reset = after_reset or found;
