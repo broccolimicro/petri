@@ -2716,7 +2716,7 @@ struct graph
 	virtual bool is_redundant(petri::iterator p0) {
 		for (auto i = begin(place::type); i != end(place::type); i++) {
 			if (is_redundant_to(p0, i)) {
-				cout << p0 << " is redundant to " << i << endl;
+				//cout << p0 << " is redundant to " << i << endl;
 				return true;
 			}
 		}
