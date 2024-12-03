@@ -335,7 +335,7 @@ bool overlap(vector<split_group> g0, vector<split_group> g1) {
 //   mutually exclusive branches in the group-intersected, branch-unioned
 //   parallel split groups of the nodes of each partial that aren't in the other?
 //   b. sometimes composed in choice? - Is there a shared conditional split
-//   with (mutually exclusive?, different?) branches in the group-unioned branch-intersected
+//   with exlusive branches in the group-unioned branch-intersected
 //   conditional split groups of the nodes of each partial? 
 //   c. always composed in parallel? - sometimes composed in parallel and not
 //   sometimes composed in choice
@@ -343,18 +343,20 @@ bool overlap(vector<split_group> g0, vector<split_group> g1) {
 //   sometimes composed in parallel
 //   e. sometimes composed in sequence? from A to B? from B to A?
 //   f. always composed in sequence? from A to B? from B to A?
-// 2. What are the choices that lead to any state in this partial?
-// 3. what are the choices that lead to any state in any partial that overlaps this partial?
-// 4. What are the choices that lead away from every state in this partial?
-// 5. What are the choices that lead away from any state in this partial?
-// 6. What are the choices that lead away from any state in this partial but lead to states in this other partial?
+// 2. What are the choices that lead to any state in this partial? - group-unioned branch-intersected
+// 3. what are the choices that lead to any state in any partial that overlaps this partial? - group-unioned branch-unioned
+// 4. What are the choices that lead away from every state in this partial? not group-unioned branch-intersected
+// 6. What are the choices that lead away from every state in this partial but lead to states in this other partial?
 
 // Is there a data-structure difference between the always-/every- and the
 // sometimes-/any- preconditioned questions? What kind of considerations do I
 // need for operations between those two types of split groups?
+vector<split_group> combine(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
+	// group_operation is one of:
+	// split_group::INTERSECT
+	// split_group::UNION
 
-vector<split_group> combine(int operation, vector<split_group> g0, vector<split_group> g1) {
-	// operation is one of:
+	// branch_operation is one of:
 	// split_group::INTERSECT
 	// split_group::UNION
 	// split_group::DIFFERENCE
@@ -369,18 +371,18 @@ vector<split_group> combine(int operation, vector<split_group> g0, vector<split_
 			int k = 0, l = 0;
 			while (k < (int)g0[i].branch.size() and l < (int)g1[j].branch.size()) {
 				if (g0[i].branch[k] == g1[j].branch[l]) {
-					if (operation != split_group::DIFFERENCE) {
+					if (branch_operation != split_group::DIFFERENCE) {
 						result.back().branch.push_back(g0[i].branch[k]);
 					}
 					k++;
 					l++;
 				} else if (g0[i].branch[k] < g1[j].branch[l]) {
-					if (operation != split_group::INTERSECT) {
+					if (branch_operation != split_group::INTERSECT) {
 						result.back().branch.push_back(g0[i].branch[k]);
 					}
 					k++;
 				} else {
-					if (operation == split_group::UNION) {
+					if (branch_operation == split_group::UNION) {
 						result.back().branch.push_back(g1[j].branch[l]);
 					}
 					l++;
@@ -392,8 +394,14 @@ vector<split_group> combine(int operation, vector<split_group> g0, vector<split_
 			i++;
 			j++;
 		} else if (g0[i].split < g1[j].split) {
+			if (group_operation != split_group::INTERSECT) {
+				result.push_back(g0[i]);
+			}
 			i++;
 		} else {
+			if (group_operation == split_group::UNION) {
+				result.push_back(g1[j]);
+			}
 			j++;
 		}
 	}

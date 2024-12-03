@@ -104,7 +104,7 @@ bool operator<(const split_group &g0, const split_group &g1);
 bool operator==(const split_group &g0, const split_group &g1);
 
 bool overlap(vector<split_group> g0, vector<split_group> g1);
-vector<split_group> combine(int operation, vector<split_group> g0, vector<split_group> g1);
+vector<split_group> combine(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
 
 struct place
 {
@@ -2450,18 +2450,14 @@ struct graph
 		return transitions[node.index].groups[composition];
 	}
 
-	virtual vector<split_group> split_groups_of(int composition, vector<petri::iterator> nodes) {
+	virtual vector<split_group> split_groups_of(int composition, int group_operation, int branch_operation, vector<petri::iterator> nodes) {
 		vector<split_group> groups;
-		for (int i = 0; i < (int)nodes.size(); i++) {
-			if (i == 0) {
-				groups = split_groups_of(nodes[i]);
-			} else {
-				groups = combine(split_group::UNION, groups, split_groups_of(nodes[i]));
-			}
-
-			if (groups.empty()) {
-				break;
-			}
+		if (nodes.empty()) {
+			return groups;
+		}
+		groups = split_groups_of(nodes[0]);
+		for (int i = 1; i < (int)nodes.size(); i++) {
+			groups = combine(group_operation, branch_operation, groups, split_groups_of(nodes[i]));
 		}
 		return groups;
 	}
@@ -2475,8 +2471,9 @@ struct graph
 			return not after and not is(parallel, a, b) and not is(choice, a, b);
 		}
 
-		if (!split_groups_ready[composition])
+		if (!split_groups_ready[composition]) {
 			compute_split_groups(composition);
+		}
 
 		vector<split_group> a_groups = split_groups_of(composition, a);
 		vector<split_group> b_groups = split_groups_of(composition, b);
@@ -2730,7 +2727,7 @@ struct graph
 		for (int i = 0; i < (int)nodes.size(); i++) {
 			for (int j = 0; j < (int)nodes.size(); j++) {
 				if (i != j and vector_is_subset_of(nodes[i], nodes[j])) {
-					vector<split_group> n = combine(split_group::DIFFERENCE, groups[i], groups[j]);
+					vector<split_group> n = combine(split_group::INTERSECT, split_group::DIFFERENCE, groups[i], groups[j]);
 					for (auto k = n.begin(); k != n.end(); k++) {
 						for (auto b = k->branch.begin(); b != k->branch.end(); b++) {
 							petri::iterator p(type, *b);
@@ -2920,6 +2917,21 @@ struct graph
 			}
 		}
 		return before_reset and after_reset;
+	}
+
+	vector<split_group> invert(int type, vector<split_group> groups) {
+		for (int i = 0; i < (int)groups.size(); i++) {
+			vector<petri::iterator> n = next(petri::iterator(type, groups[i].split));
+			vector<int> branches;
+			for (int j = 0; j < (int)n.size(); j++) {
+				if (find(groups[i].branch.begin(), groups[i].branch.end(), n[j].index) == groups[i].branch.end()) {
+					branches.push_back(n[j].index);
+				}
+			}
+			groups[i].branch.swap(branches);
+			branches.clear();
+		}
+		return groups;
 	}
 };
 
