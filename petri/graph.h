@@ -90,7 +90,8 @@ struct split_group
 	enum {
 		INTERSECT = 0,
 		UNION = 1,
-		DIFFERENCE = 2
+		DIFFERENCE = 2,
+		SUBSET = 3
 	};
 	
 	int split; // index of place/transition with split
@@ -103,7 +104,7 @@ struct split_group
 bool operator<(const split_group &g0, const split_group &g1);
 bool operator==(const split_group &g0, const split_group &g1);
 
-bool overlap(vector<split_group> g0, vector<split_group> g1);
+bool overlap(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
 vector<split_group> combine(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
 
 struct place
@@ -2444,6 +2445,10 @@ struct graph
 	}
 
 	virtual vector<split_group> split_groups_of(int composition, petri::iterator node) {
+		if (!split_groups_ready[composition]) {
+			compute_split_groups(composition);
+		}
+
 		if (node.type == place::type) {
 			return places[node.index].groups[composition];
 		}
@@ -2455,24 +2460,46 @@ struct graph
 		if (nodes.empty()) {
 			return groups;
 		}
-		groups = split_groups_of(nodes[0]);
+		groups = split_groups_of(composition, nodes[0]);
 		for (int i = 1; i < (int)nodes.size(); i++) {
-			groups = combine(group_operation, branch_operation, groups, split_groups_of(nodes[i]));
+			groups = combine(group_operation, branch_operation, groups, split_groups_of(composition, nodes[i]));
 		}
 		return groups;
 	}
 
 	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool after=false) {
+		// sometimes composed in parallel? - Is there a shared parallel split with
+		// mutually exclusive branches in the group-intersected, branch-unioned
+		// parallel split groups of the nodes of each partial that aren't in the other?
+
+		// sometimes composed in choice? - Is there a shared conditional split
+		// with exlusive branches in the group-unioned branch-intersected
+		// conditional split groups of the nodes of each partial?
+ 
+		// always composed in parallel? - sometimes composed in parallel and not
+		// sometimes composed in choice
+
+		// always composed in choice? - sometimes composed in choice and not
+		// sometimes composed in parallel
+
+		// e. sometimes composed in sequence? - sequencing direction is meaningless
+		// most of the time since all processes are cycles. It's even difficult to
+		// think about which direction crosses reset because the reset state could
+		// be on a separate conditional branch. A and B are sequenced if for both
+		// parallel and conditional split groups, branches in A are a superset of
+		// the branches in B for all shared groups (or visa versa) of the nodes of
+		// each partial that aren't in the other.
+
+		// f. always composed in sequence? - sometimes composed in sequence and not
+		// sometimes composed in choice
+		//   Is it possible to have nodes composed in sequence sometimes and
+		//   parallel others? If so, then also not composed in parallel sometimes.
 		if (a == b) {
 			return false;
 		}
 
 		if (composition == sequence) {
 			return not after and not is(parallel, a, b) and not is(choice, a, b);
-		}
-
-		if (!split_groups_ready[composition]) {
-			compute_split_groups(composition);
 		}
 
 		vector<split_group> a_groups = split_groups_of(composition, a);

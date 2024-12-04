@@ -294,34 +294,45 @@ bool operator==(const split_group &g0, const split_group &g1)
 	return true;
 }
 
-bool overlap(vector<split_group> g0, vector<split_group> g1) {
+bool overlap(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
 	for (int i = 0, j = 0; i < (int)g0.size() and j < (int)g1.size(); ) {
 		if (g0[i].split == g1[j].split) {
-			bool found0 = false;
-			bool found1 = false;
-			int k = 0, l = 0;
-			while (k < (int)g0[i].branch.size() and l < (int)g1[j].branch.size()) {
-				if (g0[i].branch[k] == g1[j].branch[l]) {
-					k++;
-					l++;
-				} else if (g0[i].branch[k] < g1[j].branch[l]) {
-					found0 = true;
-					k++;
-				} else {
-					found1 = true;
-					l++;
+			if (group_operation == split_group::INTERSECTION) {
+				bool found0 = false;
+				bool found1 = false;
+				bool found2 = false;
+				int k = 0, l = 0;
+				while (k < (int)g0[i].branch.size() and l < (int)g1[j].branch.size()) {
+					if (g0[i].branch[k] == g1[j].branch[l]) {
+						found2 = true;
+						k++;
+						l++;
+					} else if (g0[i].branch[k] < g1[j].branch[l]) {
+						found0 = true;
+						k++;
+					} else {
+						found1 = true;
+						l++;
+					}
 				}
-			}
-			found0 = found0 or (k < (int)g0[i].branch.size());
-			found1 = found1 or (l < (int)g1[j].branch.size());
-			if (found0 and found1) {
-				return true;
+				found0 = found0 or (k < (int)g0[i].branch.size());
+				found1 = found1 or (l < (int)g1[j].branch.size());
+				if ((branch_operation == split_group::DIFFERENCE and found0 and found1)
+					or (branch_operation == split_group::INTERSECT and found2)) {
+					return true;
+				}
 			}
 			i++;
 			j++;
 		} else if (g0[i].split < g1[j].split) {
+			if (group_operation == split_group::DIFFERENCE) {
+				return true;
+			}
 			i++;
 		} else {
+			if (group_operation == split_group::DIFFERENCE) {
+				return true;
+			}
 			j++;
 		}
 	}
@@ -330,19 +341,7 @@ bool overlap(vector<split_group> g0, vector<split_group> g1) {
 
 // What operations do I need to do?
 //
-// 1. are these two partials
-//   a. sometimes composed in parallel? - Is there a shared parallel split with
-//   mutually exclusive branches in the group-intersected, branch-unioned
-//   parallel split groups of the nodes of each partial that aren't in the other?
-//   b. sometimes composed in choice? - Is there a shared conditional split
-//   with exlusive branches in the group-unioned branch-intersected
-//   conditional split groups of the nodes of each partial? 
-//   c. always composed in parallel? - sometimes composed in parallel and not
-//   sometimes composed in choice
-//   d. always composed in choice? - sometimes composed in choice and not
-//   sometimes composed in parallel
-//   e. sometimes composed in sequence? from A to B? from B to A?
-//   f. always composed in sequence? from A to B? from B to A?
+// 1. Determine composition of partial states.
 // 2. What are the choices that lead to any state in this partial? - group-unioned branch-intersected
 // 3. what are the choices that lead to any state in any partial that overlaps this partial? - group-unioned branch-unioned
 // 4. What are the choices that lead away from every state in this partial? not group-unioned branch-intersected
