@@ -294,10 +294,23 @@ bool operator==(const split_group &g0, const split_group &g1)
 	return true;
 }
 
-bool overlap(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
+bool compare(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
+	// group_operation is one of:
+	// split_group::INTERSECT
+	// split_group::DIFFERENCE
+	// split_group::SUBSET
+
+	// branch_operation is one of:
+	// split_group::INTERSECT
+	// split_group::DIFFERENCE
+	// split_group::SUBSET
+
+	int branch_cmp = -1;
+	int group_cmp = -1;
+
 	for (int i = 0, j = 0; i < (int)g0.size() and j < (int)g1.size(); ) {
 		if (g0[i].split == g1[j].split) {
-			if (group_operation == split_group::INTERSECTION) {
+			if (group_operation == split_group::INTERSECT) {
 				bool found0 = false;
 				bool found1 = false;
 				bool found2 = false;
@@ -320,6 +333,16 @@ bool overlap(int group_operation, int branch_operation, vector<split_group> g0, 
 				if ((branch_operation == split_group::DIFFERENCE and found0 and found1)
 					or (branch_operation == split_group::INTERSECT and found2)) {
 					return true;
+				} else if (branch_operation == split_group::SUBSET and found0) {
+					if (branch_cmp == 1) {
+						return false;
+					}
+					branch_cmp = 0;
+				} else if (branch_operation == split_group::SUBSET and found1) {
+					if (branch_cmp == 0) {
+						return false;
+					}
+					branch_cmp = 1;
 				}
 			}
 			i++;
@@ -327,16 +350,28 @@ bool overlap(int group_operation, int branch_operation, vector<split_group> g0, 
 		} else if (g0[i].split < g1[j].split) {
 			if (group_operation == split_group::DIFFERENCE) {
 				return true;
+			} else if (group_operation == split_group::SUBSET) {
+				if (group_cmp == 1) {
+					return false;
+				}
+				group_cmp = 0;
 			}
 			i++;
 		} else {
 			if (group_operation == split_group::DIFFERENCE) {
 				return true;
+			} else if (group_operation == split_group::SUBSET) {
+				if (group_cmp == 0) {
+					return false;
+				}
+				group_cmp = 1;
 			}
 			j++;
 		}
 	}
-	return false;
+	return ((group_operation == split_group::SUBSET
+		or group_operation == split_group::INTERSECT)
+			and branch_operation == split_group::SUBSET);
 }
 
 // What operations do I need to do?
@@ -350,7 +385,7 @@ bool overlap(int group_operation, int branch_operation, vector<split_group> g0, 
 // Is there a data-structure difference between the always-/every- and the
 // sometimes-/any- preconditioned questions? What kind of considerations do I
 // need for operations between those two types of split groups?
-vector<split_group> combine(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
+vector<split_group> merge(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1) {
 	// group_operation is one of:
 	// split_group::INTERSECT
 	// split_group::UNION
@@ -386,9 +421,6 @@ vector<split_group> combine(int group_operation, int branch_operation, vector<sp
 					}
 					l++;
 				}
-			}
-			if (result.back().branch.empty()) {
-				result.pop_back();
 			}
 			i++;
 			j++;

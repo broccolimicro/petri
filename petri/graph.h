@@ -104,8 +104,8 @@ struct split_group
 bool operator<(const split_group &g0, const split_group &g1);
 bool operator==(const split_group &g0, const split_group &g1);
 
-bool overlap(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
-vector<split_group> combine(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
+bool compare(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
+vector<split_group> merge(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
 
 struct place
 {
@@ -287,7 +287,7 @@ struct graph
 						for (auto k = i->begin(); k != i->end() and found; k++) {
 							found = false;
 							for (auto l = places[k->index].groups[type].begin(); l != places[k->index].groups[type].end() and not found; l++) {
-								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and overlap(transitions[l->split].groups[type], transitions[group[j].split].groups[type]));
+								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and compare(split_group::INTERSECT, split_group::DIFFERENCE, transitions[l->split].groups[type], transitions[group[j].split].groups[type]));
 							}
 						}
 					}
@@ -330,7 +330,7 @@ struct graph
 						for (auto k = i->begin(); k != i->end() and found; k++) {
 							found = false;
 							for (auto l = transitions[k->index].groups[type].begin(); l != transitions[k->index].groups[type].end() and not found; l++) {
-								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and overlap(places[l->split].groups[type], places[group[j].split].groups[type]));
+								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and compare(split_group::INTERSECT, split_group::DIFFERENCE, places[l->split].groups[type], places[group[j].split].groups[type]));
 							}
 						}
 					}
@@ -2462,12 +2462,34 @@ struct graph
 		}
 		groups = split_groups_of(composition, nodes[0]);
 		for (int i = 1; i < (int)nodes.size(); i++) {
-			groups = combine(group_operation, branch_operation, groups, split_groups_of(composition, nodes[i]));
+			groups = petri::merge(group_operation, branch_operation, groups, split_groups_of(composition, nodes[i]));
 		}
 		return groups;
 	}
 
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool after=false) {
+	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false) {
+		if (always) {
+			if (composition == sequence) {
+				return is(sequence, a, b, false) and not is(choice, a, b, false);
+			}
+			return is(composition, a, b, false) and not is(1-composition, a, b, false);
+		}
+
+		if (a == b) {
+			return false;
+		}
+		if (composition == sequence) {
+			return (compare(split_group::INTERSECT, split_group::SUBSET,
+					split_groups_of(parallel, a),
+					split_groups_of(parallel, b))
+				and compare(split_group::INTERSECT, split_group::SUBSET,
+					split_groups_of(choice, a),
+					split_groups_of(choice, b)));
+		}
+		return compare(split_group::INTERSECT, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
+	}
+
+	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false) {
 		// sometimes composed in parallel? - Is there a shared parallel split with
 		// mutually exclusive branches in the group-intersected, branch-unioned
 		// parallel split groups of the nodes of each partial that aren't in the other?
@@ -2494,48 +2516,43 @@ struct graph
 		// sometimes composed in choice
 		//   Is it possible to have nodes composed in sequence sometimes and
 		//   parallel others? If so, then also not composed in parallel sometimes.
-		if (a == b) {
+
+		if (always) {
+			if (composition == sequence) {
+				return is(sequence, a, b, false) and not is(choice, a, b, false);
+			}
+			return is(composition, a, b, false) and not is(1-composition, a, b, false);
+		}
+
+		sort(a.begin(), a.end());
+		a.erase(unique(a.begin(), a.end()), a.end());
+		sort(b.begin(), b.end());
+		b.erase(unique(b.begin(), b.end()), b.end());
+		vector_symmetric_complement(a, b);
+
+		if (a.empty() or b.empty()) {
 			return false;
 		}
 
 		if (composition == sequence) {
-			return not after and not is(parallel, a, b) and not is(choice, a, b);
+			return (compare(split_group::INTERSECT, split_group::SUBSET,
+					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a),
+					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b))
+				and compare(split_group::INTERSECT, split_group::SUBSET,
+					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a),
+					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)));
 		}
 
-		vector<split_group> a_groups = split_groups_of(composition, a);
-		vector<split_group> b_groups = split_groups_of(composition, b);
-
-		// if two transitions are in sequence and we want to
-		// know if new output positions will be in parallel,
-		// or if two places are in sequence and we want to
-		// know if new output transitions will be in choice,
-		// then we should set after to true.
-		if (after and ((composition == parallel and a.type == transition::type and b.type == transition::type)
-			or (composition == choice and a.type == place::type and b.type == place::type))) {
-			for (auto t0 = a_groups.begin(); t0 != a_groups.end(); t0++) {
-				if (t0->split == b.index) {
-					return true;
-				}
-			}
-			for (auto t0 = b_groups.begin(); t0 != b_groups.end(); t0++) {
-				if (t0->split == a.index) {
-					return true;
-				}
-			}
+		vector<split_group> Ga, Gb;
+ 		if (composition == parallel) {
+			Ga = split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a);
+			Gb = split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b);
+		} else {
+			Ga = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a);
+			Gb = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b);
 		}
 
-		return overlap(a_groups, b_groups);
-	}
-
-	virtual bool is(int type, std::vector<petri::iterator> from, std::vector<petri::iterator> to, bool after=false) {
-		for (int i = 0; i < (int)from.size(); i++) {
-			for (int j = 0; j < (int)to.size(); j++) {
-				if (not is(type, from[i], to[j], after)) {
-					return false;
-				}
-			}
-		}
-		return true;
+		return compare(split_group::INTERSECT, split_group::DIFFERENCE, Ga, Gb);
 	}
 
 	// Find all partial state pairs (for each node in v0 and v1 respectively) that are ordered (not in parallel).
@@ -2637,7 +2654,14 @@ struct graph
 	// compared as desired and also composed as not desired. For example, strict
 	// will also separate nodes that are simultaneously composed in parallel and
 	// conditional.
-	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes, bool strict=false, bool after=false) {
+	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
+		// ~always & ~invert - separate nodes that aren't sometimes composed as requested
+		//  always & ~invert - separate nodes that aren't always composed as requested.
+		//                     For example if parallel requested, then this breaks sequence
+		//                     and choice relations.
+		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
+		//  always &  invert - separate nodes that are always composed as the opposite of requested
+
 		vector<vector<petri::iterator> > result;
 		if (composition != choice and composition != parallel) {
 			// This only works for parallel and conditional compositions
@@ -2670,12 +2694,14 @@ struct graph
 					frames.push_back(frame);
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if (not is(composition, frames.back().P[i], frame.P.back(), after) or (strict and is(1-composition, frames.back().P[i], frame.P.back(), after))) {
+						if ((not invert and not is(composition, frames.back().P[i], frame.P.back(), always))
+							or (invert and is(1-composition, frames.back().P[i], frame.P.back(), always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if (not is(composition, frames.back().X[i], frame.P.back(), after) or (strict and is(1-composition, frames.back().X[i], frame.P.back(), after))) {
+						if ((not invert and not is(composition, frames.back().X[i], frame.P.back(), always))
+							or (invert and is(1-composition, frames.back().X[i], frame.P.back(), always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}
@@ -2690,7 +2716,12 @@ struct graph
 	}
 
 	// Takes a strict selection of nodes (see graph::select() ) and regroups them into all non-strict selections
-	vector<vector<petri::iterator> > group(int composition, vector<vector<petri::iterator> > nodes, bool after=false) {
+	vector<vector<petri::iterator> > group(int composition, vector<vector<petri::iterator> > nodes, bool always=false, bool invert=false) {
+		// ~always & ~invert - group nodes that are sometimes composed as requested
+		//  always & ~invert - group nodes that are always composed as requested.
+		// ~always &  invert - group nodes that aren't sometimes composed as the opposite of requested
+		//  always &  invert - group nodes that aren't always composed as the opposite of requested
+
 		struct BronKerboschFrame {
 			vector<int> R, P, X;
 		};
@@ -2720,12 +2751,14 @@ struct graph
 					frames.push_back(frame);
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if (not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], after)) {
+						if ((not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
+							or (invert and is(1-composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if (not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], after)) {
+						if ((not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
+							or (invert and is(1-composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}
@@ -2754,7 +2787,7 @@ struct graph
 		for (int i = 0; i < (int)nodes.size(); i++) {
 			for (int j = 0; j < (int)nodes.size(); j++) {
 				if (i != j and vector_is_subset_of(nodes[i], nodes[j])) {
-					vector<split_group> n = combine(split_group::INTERSECT, split_group::DIFFERENCE, groups[i], groups[j]);
+					vector<split_group> n = petri::merge(split_group::INTERSECT, split_group::DIFFERENCE, groups[i], groups[j]);
 					for (auto k = n.begin(); k != n.end(); k++) {
 						for (auto b = k->branch.begin(); b != k->branch.end(); b++) {
 							petri::iterator p(type, *b);
