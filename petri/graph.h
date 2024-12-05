@@ -2486,6 +2486,21 @@ struct graph
 					split_groups_of(choice, a),
 					split_groups_of(choice, b)));
 		}
+		// TODO(edward.bingham) This doesn't work for non-properly nested
+		// conditional splits:
+		//   this
+		//    v
+		//   
+		//    |<-o<-|<-o<-|<     .
+		//   /     \        \    .
+		// o<       |<       o   .
+		//   \        \     /    .
+		//    |<-o<-|<-o<-|<     .
+		//
+		//                ^
+		//             and this
+		// should be "sometimes conditional, sometimes sequential"
+		// A recursive algorithm is likely necessary to determine this.
 		return compare(split_group::INTERSECT, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
 	}
 
@@ -2772,34 +2787,70 @@ struct graph
 		return nodes;
 	}
 
-	// look for groups that are strict subsets of other groups, then add nodes
-	// from the most recent parallel split to deconflict them.
 	vector<vector<petri::iterator> > complete(int composition, vector<vector<petri::iterator> > nodes) {
-		vector<vector<split_group> > groups;
-		for (auto i = nodes.begin(); i != nodes.end(); i++) {
-			groups.push_back(split_groups_of(composition, *i));
-		}
+		// In this function, we are given conditional groups of parallel
+		// nodes. In some cases, one group may entirely overlap another.
+		// We need to add nodes to differentiate them in the petri net
+		// when we insert transitions.
 
-		int type = place::type;
-		if (composition == parallel) {
-			type = transition::type;
-		}
-		for (int i = 0; i < (int)nodes.size(); i++) {
-			for (int j = 0; j < (int)nodes.size(); j++) {
+		// So, given A and B such that A is a subset of B, under which
+		// choices that lead to a state in A don't lead to a state in B?
+		// If a set of choices don't lead to a state in B & ~A, then they
+		// also won't lead to a state in B.
+
+		// If all choices that lead to states in A also lead to states in
+		// B, then we can safely delete A from the list of groups.
+
+		// 1. Find A and all groups [Bi] such that A is a subset of Bi
+		for (int i = (int)nodes.size()-1; i >= 0; i--) {
+			// 2. Find the conditional split groups of A union groups, intersect branches.
+			vector<split_group> A_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, nodes[i]);
+			vector<split_group> B_groups;
+
+			for (int j = 0; j < (int)nodes.size(); j++) {	
 				if (i != j and vector_is_subset_of(nodes[i], nodes[j])) {
-					vector<split_group> n = petri::merge(split_group::INTERSECT, split_group::DIFFERENCE, groups[i], groups[j]);
-					for (auto k = n.begin(); k != n.end(); k++) {
-						for (auto b = k->branch.begin(); b != k->branch.end(); b++) {
-							petri::iterator p(type, *b);
-							auto pos = lower_bound(nodes[i].begin(), nodes[i].end(), p);
-							if (pos == nodes[i].end() or *pos != p) {
-								nodes[i].insert(pos, p);
-							}
-						}
-					}
-					groups[i] = split_groups_of(composition, nodes[i]);
+					// 3. Find the conditional split groups of Bi & ~A union groups, intersect branches.
+					vector<petri::iterator> Bj = vector_difference(nodes[j], nodes[i]);
+
+					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
+					
+					// 4. merge, intersect groups, subtract branches A-Bi for each Bi
+					Bj_groups = merge(split_group::INTERSECT, split_group::DIFFERENCE, A_groups, Bj_groups);
+					// 5. merge, union groups, union branches across all [Bi]
+					B_groups = merge(split_group::UNION, split_group::UNION, B_groups, Bj_groups);
 				}
 			}
+			if (B_groups.empty()) {
+				continue;
+			}
+
+			// 5. Add these transitions to A
+			vector<petri::iterator> A = nodes[i];
+			for (auto group = B_groups.begin(); group != B_groups.end(); group++) {
+				for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {
+					A.push_back(petri::iterator(transition::type, *branch));
+				}
+			}
+			sort(A.begin(), A.end());
+			A.erase(unique(A.begin(), A.end()), A.end());
+
+			// 6. select conditional groups of parallel transitions from A (not sometimes conditional)
+			vector<vector<petri::iterator> > groups = select(parallel, A, false, true);
+
+			// 7. delete groups that don't include A
+			for (auto group = groups.begin(); group != groups.end(); group++) {
+				if (vector_is_subset_of(nodes[i], *group)) {
+					nodes.push_back(*group);
+				}
+			}
+
+			// TODO(edward.bingham) Do I need to group(parallel, groups, false,
+			// false) and then recurse looking for subsets? How does this interact
+			// with the conditional split bug? Are there other things that I'm
+			// missing here? How do I formally prove that this process creates a full
+			// graph cut of the behavior?
+
+			nodes.erase(nodes.begin() + i);
 		}
 
 		return nodes;
@@ -2979,9 +3030,10 @@ struct graph
 		return before_reset and after_reset;
 	}
 
-	vector<split_group> invert(int type, vector<split_group> groups) {
+	vector<split_group> invert(int composition, vector<split_group> groups) {
+		int split_type = (composition == choice ? place::type : transition::type);
 		for (int i = 0; i < (int)groups.size(); i++) {
-			vector<petri::iterator> n = next(petri::iterator(type, groups[i].split));
+			vector<petri::iterator> n = next(petri::iterator(split_type, groups[i].split));
 			vector<int> branches;
 			for (int j = 0; j < (int)n.size(); j++) {
 				if (find(groups[i].branch.begin(), groups[i].branch.end(), n[j].index) == groups[i].branch.end()) {
