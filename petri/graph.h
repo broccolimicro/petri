@@ -2164,33 +2164,43 @@ struct graph
 		}
 	}
 
-	virtual petri::iterator consolidate(vector<state> to, petri::iterator sm=petri::iterator(), bool out = false) {
-		if (sm.type < 0) {
-			sm = create(place::type);
+	virtual vector<state> consolidate(vector<state> to, vector<state> from=vector<state>(), bool out = false) {
+		if (from.empty()) {
+			from.push_back(state());
+			from.back().tokens.push_back(create(place::type).index);
 		}
 		vector<petri::iterator> rem;
-		for (auto i = to.begin(); i != to.end(); i++) {
-			if (i->tokens.size() > 1) {
-				petri::iterator t;
-				if (out) {
-					t = connect(create(transition::type), sm);
-				} else {
-					t = connect(sm, create(transition::type));
-				}
 
-				for (auto j = i->tokens.begin(); j != i->tokens.end(); j++) {
+		for (auto k = from.begin(); k != from.end(); k++) {
+			vector<petri::iterator> con;
+			for (auto i = k->tokens.begin(); i != k->tokens.end(); i++) {
+				con.push_back(petri::iterator(place::type, i->index));
+			}
+			for (auto i = to.begin(); i != to.end(); i++) {
+				if (i->tokens.size() > 1) {
+					vector<petri::iterator> t;
 					if (out) {
-						connect(petri::iterator(place::type, j->index), t);
+						t = connect(create(transition::type), con);
 					} else {
-						connect(t, petri::iterator(place::type, j->index));
+						t.push_back(connect(con, create(transition::type)));
 					}
+
+					for (auto j = i->tokens.begin(); j != i->tokens.end(); j++) {
+						if (out) {
+							connect(petri::iterator(place::type, j->index), t);
+						} else {
+							connect(t, petri::iterator(place::type, j->index));
+						}
+					}
+				} else if (i->tokens.size() == 1) {
+					petri::iterator loc(place::type, i->tokens[0].index);
+					connect(prev(loc), con);
+					connect(con, next(loc));
+					for (auto j = con.begin(); j != con.end(); j++) {
+						places[j->index] = place::merge(choice, places[j->index], places[loc.index]);
+					}
+					rem.push_back(loc);
 				}
-			} else if (i->tokens.size() == 1) {
-				petri::iterator loc(place::type, i->tokens[0].index);
-				connect(prev(loc), sm);
-				connect(sm, next(loc));
-				places[sm.index] = place::merge(choice, places[sm.index], places[loc.index]);
-				rem.push_back(loc);
 			}
 		}
 
@@ -2199,12 +2209,10 @@ struct graph
 
 		for (int i = (int)rem.size()-1; i >= 0; i--) {
 			erase(rem[i]);
-			if (sm.type == rem[i].type and sm.index > rem[i].index) {
-				sm.index--;
-			}
+			erase(rem[i], from);
 		}
 
-		return sm;
+		return from;
 	}
 
 	virtual vector<vector<petri::iterator> > cycles() const
