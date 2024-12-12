@@ -13,49 +13,11 @@
 
 #include <array>
 #include "state.h"
+#include "iterator.h"
+#include "node.h"
 
 namespace petri
 {
-
-struct iterator
-{
-	iterator();
-	iterator(int type, int index);
-	~iterator();
-
-	int type;
-	int index;
-
-	iterator &operator=(iterator i);
-	iterator &operator--();
-	iterator &operator++();
-	iterator &operator--(int);
-	iterator &operator++(int);
-
-	iterator &operator+=(int i);
-	iterator &operator-=(int i);
-
-	iterator operator+(int i);
-	iterator operator-(int i);
-
-	bool operator==(iterator i) const;
-	bool operator!=(iterator i) const;
-	bool operator<(iterator i) const;
-	bool operator>(iterator i) const;
-	bool operator<=(iterator i) const;
-	bool operator>=(iterator i) const;
-
-	bool operator==(int i) const;
-	bool operator!=(int i) const;
-	bool operator<(int i) const;
-	bool operator>(int i) const;
-	bool operator<=(int i) const;
-	bool operator>=(int i) const;
-
-	string to_string() const;
-};
-
-ostream &operator<<(ostream &os, iterator i);
 
 struct arc
 {
@@ -73,77 +35,6 @@ bool operator<=(arc a0, arc a1);
 bool operator>=(arc a0, arc a1);
 bool operator==(arc a0, arc a1);
 bool operator!=(arc a0, arc a1);
-
-enum composition
-{
-	choice = 0,
-	parallel = 1,
-	sequence = 2
-};
-
-struct split_group
-{
-	split_group();
-	split_group(int split, int branch, int count);
-	~split_group();
-
-	enum {
-		INTERSECT = 0,
-		UNION = 1,
-		DIFFERENCE = 2,
-		SUBSET = 3
-	};
-	
-	int split; // index of place/transition with split
-	std::vector<int> branch; // index of transitions/places coming out of split
-	int count; // total number of branches out of this split
-
-	string to_string() const;
-};
-
-bool operator<(const split_group &g0, const split_group &g1);
-bool operator==(const split_group &g0, const split_group &g1);
-
-bool compare(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
-vector<split_group> merge(int group_operation, int branch_operation, vector<split_group> g0, vector<split_group> g1);
-
-struct place
-{
-	place();
-	~place();
-	
-	static const int type = 0;
-
-	// sorted, transition index of parallel split -> place index of parallel branch
-	// index with place::type or transition::type
-	array<vector<split_group>, 2> groups;
-	
-	// Use this to determine if an arc crosses reset
-	int priority_index;
-
-	static place merge(int composition, const place &p0, const place &p1);
-};
-
-struct transition
-{
-	transition();
-	~transition();
-	
-	static const int type = 1;
-
-	// sorted, transition index of parallel split -> place index of parallel branch
-	// index with place::type or transition::type
-	array<vector<split_group>, 2> groups;
-
-	// Use this to determine if an arc crosses reset
-	int priority_index;
-
-	bool is_infeasible();
-	bool is_vacuous();
-
-	static transition merge(int composition, const transition &t0, const transition &t1);
-	static bool mergeable(int composition, const transition &t0, const transition &t1);
-};
 
 /**
  * Generic petri net graph representation.
@@ -213,25 +104,26 @@ struct graph
 	}
 
 	bool split_groups_ready[2];
+	bool merge_groups_ready[2];
 
-	virtual void compute_split_groups(int type)
+	virtual void compute_split_groups(int composition)
 	{
 		// clear previous executions of this function and cache previous places and
 		// transitions as an optimization.
 		array<vector<vector<petri::iterator> >, 2> p;
 		for (int i = 0; i < (int)places.size(); i++) {
-			places[i].groups[type].clear();
+			places[i].splits[composition].clear();
 			p[place::type].push_back(prev(petri::iterator(place::type, i)));
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
-			transitions[i].groups[type].clear();
+			transitions[i].splits[composition].clear();
 			p[transition::type].push_back(prev(petri::iterator(transition::type, i)));
 		}
 
 		// each place belongs to some set of parallel splits (init[place])
 		vector<vector<split_group> > init;
-		init.resize(size(1-type));
-		if (type == parallel) {
+		init.resize(size(1-composition));
+		if (composition == parallel) {
 			// add parallel splits from reset states
 			if (reset.size() > 0) {
 				for (int i = 0; i < (int)reset[0].tokens.size(); i++) {
@@ -240,8 +132,12 @@ struct graph
 			}
 		}
 
-		// add splits from graph structure
-		for (petri::iterator i = begin(type); i != end(type); i++) {
+		// A the moment, parallel == transition::type and choice == place::type,
+		// but that's not necessarily guaranteed.
+		int split_type = (composition == parallel ? transition::type : place::type);
+
+		// add splits from graph structure at the first branch nodes after each split
+		for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
 			vector<petri::iterator> n = next(i);
 			if (n.size() > 1) {
 				for (int j = 0; j < (int)n.size(); j++) {
@@ -250,11 +146,6 @@ struct graph
 			}
 		}
 
-		// TODO(edward.bingham) For a given split type, merges of that type
-		// shouldn't be able to proceed until there is a split group of that split
-		// from each input node. This will prevent completed split groups from
-		// incorrectly propagating out into the rest of the handshake.
-
 		bool done = false;
 		while (not done) {
 			done = true;
@@ -262,42 +153,65 @@ struct graph
 			// Transitions
 			for (auto i = p[transition::type].begin(); i != p[transition::type].end(); i++) {
 				int tid = i - p[transition::type].begin();
+				set<int> exclude;
+				if (composition != choice) {
+					exclude.insert(tid);
+				}
 				vector<split_group> group;
-				if (type == choice) {
+				if (composition == choice) {
 					group = init[tid];
 				}
+				// propagate split groups from the input places if the parallel split
+				// group hasn't wrapped all the way around the handshake or if its a
+				// conditional split group
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = places[j->index].groups[type].begin(); k != places[j->index].groups[type].end(); k++) {
-						if (type == choice or k->split != tid) {
-							auto loc = lower_bound(group.begin(), group.end(), *k);
-							if (loc == group.end() || loc->split != k->split) {
-								group.insert(loc, *k);
-							} else {
-								loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
-							}
-						}
-					}
+					merge_inplace(
+						split_group::UNION, split_group::UNION,
+						group, places[j->index].splits[composition],
+						exclude);
 				}
 
+				// For a given split composition, merges of that composition shouldn't
+				// be able to proceed until there is a split group of that split from
+				// each input node. This will prevent completed split groups from
+				// incorrectly propagating out into the rest of the handshake.
+
+				// This split group cancels out if we've found all of the branches of
+				// this split at this node suggesting that this merge closes out the
+				// split.
+				//   a. TODO(edward.bingham) I might need to recursively examine other
+				//   splits to check whether there is improper nesting at play.
 				for (int j = (int)group.size()-1; j >= 0; j--) {
-					sort(group[j].branch.begin(), group[j].branch.end());
-					group[j].branch.erase(unique(group[j].branch.begin(), group[j].branch.end()), group[j].branch.end());
-					bool found = true;
-					if (type == parallel) {
+					bool found = group[j].split != tid or composition == choice;
+					if (composition == parallel) {
 						for (auto k = i->begin(); k != i->end() and found; k++) {
 							found = false;
-							for (auto l = places[k->index].groups[type].begin(); l != places[k->index].groups[type].end() and not found; l++) {
-								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and compare(split_group::INTERSECT, split_group::DIFFERENCE, transitions[l->split].groups[type], transitions[group[j].split].groups[type]));
+							for (auto l = places[k->index].splits[composition].begin(); l != places[k->index].splits[composition].end() and not found; l++) {
+								// Allow the split group to pass this transition if for each input place:
+								//   1. The input place has that split group or
+								//   2. The input place is on a branch that exists in that
+								//   composition (parallel or choice) to that split group and
+								//   therefore does not participate in that split.
+								found = (l->split == group[j].split)
+									or (l->split >= 0
+									and group[j].split >= 0
+									and compare(split_group::INTERSECT, split_group::DIFFERENCE,
+										transitions[l->split].splits[composition],
+										transitions[group[j].split].splits[composition]));
 							}
 						}
 					}
+					// Remove this split group from the tranistion if the split group is
+					// not ready (see above) or is complete.
 					if (not found or (int)group[j].branch.size() == group[j].count) {
 						group.erase(group.begin() + j);
 					}
 				}
 
-				if (transitions[tid].groups[type] != group) {
-					transitions[tid].groups[type] = group;
+				// If there is a change to the recorded splits of any transition or
+				// place, then we still need to propagate those changes.
+				if (transitions[tid].splits[composition] != group) {
+					transitions[tid].splits[composition] = group;
 					done = false;
 				}
 			}
@@ -305,32 +219,38 @@ struct graph
 			// Places
 			for (auto i = p[place::type].begin(); i != p[place::type].end(); i++) {
 				int pid = i - p[place::type].begin();
+				set<int> exclude;
+				if (composition != parallel) {
+					exclude.insert(pid);
+				}
 				vector<split_group> group;
-				if (type == parallel) {
+				if (composition == parallel) {
 					group = init[pid];
 				}
+
+				// propagate split groups from the input transitions if the conditional
+				// split group hasn't wrapped all the way around the handshake or if
+				// its a parallel split group
 				for (auto j = i->begin(); j != i->end(); j++) {
-					for (auto k = transitions[j->index].groups[type].begin(); k != transitions[j->index].groups[type].end(); k++) {
-						if (type == parallel or k->split != pid) {
-							auto loc = lower_bound(group.begin(), group.end(), *k);
-							if (loc == group.end() || loc->split != k->split) {
-								group.insert(loc, *k);
-							} else {
-								loc->branch.insert(loc->branch.end(), k->branch.begin(), k->branch.end());
-							}
-						}
-					}
+					merge_inplace(
+						split_group::UNION, split_group::UNION,
+						group, transitions[j->index].splits[composition],
+						exclude);
 				}
 
 				for (int j = (int)group.size()-1; j >= 0; j--) {
-					sort(group[j].branch.begin(), group[j].branch.end());
-					group[j].branch.erase(unique(group[j].branch.begin(), group[j].branch.end()), group[j].branch.end());
+					
 					bool found = true;
-					if (type == choice) {
+					if (composition == choice) {
 						for (auto k = i->begin(); k != i->end() and found; k++) {
 							found = false;
-							for (auto l = transitions[k->index].groups[type].begin(); l != transitions[k->index].groups[type].end() and not found; l++) {
-								found = (l->split == group[j].split) or (l->split >= 0 and group[j].split >= 0 and compare(split_group::INTERSECT, split_group::DIFFERENCE, places[l->split].groups[type], places[group[j].split].groups[type]));
+							for (auto l = transitions[k->index].splits[composition].begin(); l != transitions[k->index].splits[composition].end() and not found; l++) {
+								found = (l->split == group[j].split)
+									or (l->split >= 0
+										and group[j].split >= 0
+										and compare(split_group::INTERSECT, split_group::DIFFERENCE,
+											places[l->split].splits[composition],
+											places[group[j].split].splits[composition]));
 							}
 						}
 					}
@@ -339,14 +259,14 @@ struct graph
 					}
 				}
 
-				if (places[pid].groups[type] != group) {
-					places[pid].groups[type] = group;
+				if (places[pid].splits[composition] != group) {
+					places[pid].splits[composition] = group;
 					done = false;
 				}
 			}
 		}
 
-		split_groups_ready[type] = true;
+		split_groups_ready[composition] = true;
 	}
 
 	graph()
@@ -354,6 +274,8 @@ struct graph
 		node_distances_ready = false;
 		split_groups_ready[0] = false;
 		split_groups_ready[1] = false;
+		merge_groups_ready[0] = false;
+		merge_groups_ready[1] = false;
 	}
 
 	virtual ~graph()
@@ -2501,9 +2423,9 @@ struct graph
 		}
 
 		if (node.type == place::type) {
-			return places[node.index].groups[composition];
+			return places[node.index].splits[composition];
 		}
-		return transitions[node.index].groups[composition];
+		return transitions[node.index].splits[composition];
 	}
 
 	virtual vector<split_group> split_groups_of(int composition, int group_operation, int branch_operation, vector<petri::iterator> nodes) {
@@ -2521,6 +2443,7 @@ struct graph
 	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false) {
 		if (always) {
 			if (composition == sequence) {
+				//cout << "is choice: " << is(choice, a, b, false) << endl;
 				return is(sequence, a, b, false) and not is(choice, a, b, false);
 			}
 			return is(composition, a, b, false) and not is(1-composition, a, b, false);
@@ -2530,10 +2453,20 @@ struct graph
 			return false;
 		}
 		if (composition == sequence) {
-			return (compare(split_group::INTERSECT, split_group::SUBSET,
+			/*cout << "parallel a: " << ::to_string(split_groups_of(parallel, a)) << endl;
+			cout << "parallel b: " << ::to_string(split_groups_of(parallel, b)) << endl;
+			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
+					split_groups_of(parallel, a),
+					split_groups_of(parallel, b)) << endl;
+			cout << "choice a: " << ::to_string(split_groups_of(choice, a)) << endl;
+			cout << "choice b: " << ::to_string(split_groups_of(choice, b)) << endl;
+			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
+					split_groups_of(choice, a),
+					split_groups_of(choice, b)) << endl;*/
+			return (compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
 					split_groups_of(parallel, a),
 					split_groups_of(parallel, b))
-				and compare(split_group::INTERSECT, split_group::SUBSET,
+				and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
 					split_groups_of(choice, a),
 					split_groups_of(choice, b)));
 		}
@@ -3056,14 +2989,14 @@ struct graph
 		for (auto i = pos.begin(); i != pos.end(); i++) {
 			if (i->type == transition::type) {
 				bool found = false;
-				for (auto group = transitions[i->index].groups[parallel].begin(); group != transitions[i->index].groups[parallel].end() and not found; group++) {
+				for (auto group = transitions[i->index].splits[parallel].begin(); group != transitions[i->index].splits[parallel].end() and not found; group++) {
 					found = group->split < 0;
 				}
 				before_reset = before_reset or not found;
 				after_reset = after_reset or found;
 			} else {
 				bool found = false;
-				for (auto group = places[i->index].groups[parallel].begin(); group != places[i->index].groups[parallel].end(); group++) {
+				for (auto group = places[i->index].splits[parallel].begin(); group != places[i->index].splits[parallel].end(); group++) {
 					if (group->split < 0) {
 						found = true;
 						for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {

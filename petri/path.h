@@ -276,9 +276,9 @@ path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::i
 		for (auto i = to.begin(); i != to.end(); i++) {
 			vector<split_group> group;
 			if (i->type == place::type) {
-				group = g.places[i->index].groups[type];
+				group = g.places[i->index].splits[type];
 			} else {
-				group = g.transitions[i->index].groups[type];
+				group = g.transitions[i->index].splits[type];
 			}
 			// only cut off a branch if it is cut off in all of the split groups
 			if (i == to.begin()) {

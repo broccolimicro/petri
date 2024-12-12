@@ -8,6 +8,8 @@
 #pragma once
 
 #include <common/standard.h>
+#include "iterator.h"
+#include "node.h"
 
 namespace petri
 {
@@ -59,9 +61,37 @@ struct state
 
 	vector<token> tokens;
 
-	//static state merge(const state &s0, const state &s1);
-	//static state collapse(int index, const state &s);
-	//state convert(map<petri::iterator, vector<petri::iterator> > translate);
+	static state<token> merge(const state<token> &s0, const state<token> &s1) {
+		state<token> result;
+
+		result.tokens.resize(s0.tokens.size() + s1.tokens.size());
+		::merge(s0.tokens.begin(), s0.tokens.end(), s1.tokens.begin(), s1.tokens.end(), result.tokens.begin());
+		result.tokens.resize(unique(result.tokens.begin(), result.tokens.end()) - result.tokens.begin());
+
+		return result;
+	}
+
+	static state<token> collapse(int index, const state<token> &s) {
+		state<token> result;
+		result.tokens.push_back(token(index));
+		return result;
+	}
+
+	state<token> convert(map<petri::iterator, vector<petri::iterator> > translate) const {
+		state<token> result;
+
+		for (int i = 0; i < (int)tokens.size(); i++)
+		{
+			map<petri::iterator, vector<petri::iterator> >::iterator loc = translate.find(petri::iterator(place::type, tokens[i].index));
+			if (loc != translate.end()) {
+				for (auto j = loc->second.begin(); j != loc->second.end(); j++) {
+					result.tokens.push_back(token(j->index));
+				}
+			}
+		}
+
+		return result;
+	}
 };
 
 template <class token>
