@@ -9,20 +9,34 @@
 using namespace petri;
 using namespace std;
 
+string print_splits(const graph<place, transition, token, state<token> > &g, petri::iterator node) {
+	return ::to_string(g.split_groups_of(parallel, node)) + ::to_string(g.split_groups_of(choice, node));
+}
+
+string should_be(const graph<place, transition, token, state<token> > &g, bool be, int composition, petri::iterator a, petri::iterator b) {
+	string comp = "sequence";
+	if (composition == parallel) {
+		comp = "parallel";
+	} else if (composition == choice) {
+		comp = "choice";
+	}
+	return a.to_string() + ":" + print_splits(g, a) + " should " + (not be ? "not " : "") + "be " + comp + " with " + b.to_string() + ":" + print_splits(g, b);
+}
+
 void test_parallel(const graph<place, transition, token, state<token> > &g, vector<petri::iterator> a, vector<petri::iterator> b) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = b.begin(); j != b.end(); j++) {
 			if (*i != *j) {
-				EXPECT_TRUE(g.is(parallel, *i, *j, true)) << *i << " should be parallel with " << *j;
-				EXPECT_TRUE(g.is(parallel, *j, *i, true)) << *j << " should be parallel with " << *i;
+				EXPECT_TRUE(g.is(parallel, *i, *j, true)) << should_be(g, true, parallel, *i, *j);
+				EXPECT_TRUE(g.is(parallel, *j, *i, true)) << should_be(g, true, parallel, *j, *i);
 			} else {
-				EXPECT_FALSE(g.is(parallel, *i, *j)) << *i << " should not be parallel with " << *j;
-				EXPECT_FALSE(g.is(parallel, *j, *i)) << *j << " should not be parallel with " << *i;
+				EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
+				EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
 			}
-			EXPECT_FALSE(g.is(choice, *i, *j)) << *i << " should not be choice with " << *j;
-			EXPECT_FALSE(g.is(choice, *j, *i)) << *j << " should not be choice with " << *i;
-			EXPECT_FALSE(g.is(sequence, *i, *j)) << *i << " should not be sequence with " << *j;
-			EXPECT_FALSE(g.is(sequence, *j, *i)) << *j << " should not be sequence with " << *i;
+			EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
+			EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
+			EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
+			EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
 		}
 	}
 }
@@ -31,16 +45,16 @@ void test_choice(const graph<place, transition, token, state<token> > &g, vector
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = b.begin(); j != b.end(); j++) {
 			if (*i != *j) {
-				EXPECT_TRUE(g.is(choice, *i, *j, true)) << *i << " should be choice with " << *j;
-				EXPECT_TRUE(g.is(choice, *j, *i, true)) << *j << " should be choice with " << *i;
+				EXPECT_TRUE(g.is(choice, *i, *j, true)) << should_be(g, true, choice, *i, *j);
+				EXPECT_TRUE(g.is(choice, *j, *i, true)) << should_be(g, true, choice, *j, *i);
 			} else {
-				EXPECT_FALSE(g.is(choice, *i, *j)) << *i << " should not be choice with " << *j;
-				EXPECT_FALSE(g.is(choice, *j, *i)) << *j << " should not be choice with " << *i;
+				EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
+				EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
 			}
-			EXPECT_FALSE(g.is(parallel, *i, *j)) << *i << " should not be parallel with " << *j;
-			EXPECT_FALSE(g.is(parallel, *j, *i)) << *j << " should not be parallel with " << *i;
-			EXPECT_FALSE(g.is(sequence, *i, *j)) << *i << " should not be sequence with " << *j;
-			EXPECT_FALSE(g.is(sequence, *j, *i)) << *j << " should not be sequence with " << *i;
+			EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
+			EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
+			EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
+			EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
 		}
 	}
 }
@@ -52,16 +66,16 @@ void test_sequence(const graph<place, transition, token, state<token> > &g, vect
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = b.begin(); j != b.end(); j++) {
 			if (*i != *j) {
-				EXPECT_TRUE(g.is(sequence, *i, *j, true)) << *i << " should be sequence with " << *j;
-				EXPECT_TRUE(g.is(sequence, *j, *i, true)) << *j << " should be sequence with " << *i;
+				EXPECT_TRUE(g.is(sequence, *i, *j, true)) << should_be(g, true, sequence, *i, *j);
+				EXPECT_TRUE(g.is(sequence, *j, *i, true)) << should_be(g, true, sequence, *j, *i);
 			} else {
-				EXPECT_FALSE(g.is(sequence, *i, *j)) << *i << " should not be sequence with " << *j;
-				EXPECT_FALSE(g.is(sequence, *j, *i)) << *j << " should not be sequence with " << *i;
+				EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
+				EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
 			}
-			EXPECT_FALSE(g.is(choice, *i, *j)) << *i << " should not be choice with " << *j;
-			EXPECT_FALSE(g.is(choice, *j, *i)) << *j << " should not be choice with " << *i;
-			EXPECT_FALSE(g.is(parallel, *i, *j)) << *i << " should not be parallel with " << *j;
-			EXPECT_FALSE(g.is(parallel, *j, *i)) << *j << " should not be parallel with " << *i;
+			EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
+			EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
+			EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
+			EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
 		}
 	}
 }
@@ -226,8 +240,6 @@ TEST(composition, parallel_choice) {
 	test_parallel(g, {p[4], t[5], p[5]}, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]});
 }
 
-/* TODO(edward.bingham) these tests fail.
-
 TEST(composition, nonproper_choice) {
 	//     ->t0-->p1-->t1-->p2-->t2-      .
 	//    /         \               \     .
@@ -285,4 +297,3 @@ TEST(composition, nonproper_parallel) {
 	test_sequence(g, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
 }
 
-*/
