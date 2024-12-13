@@ -103,10 +103,10 @@ struct graph
 		node_distances_ready = true;
 	}
 
-	bool split_groups_ready[2];
-	bool merge_groups_ready[2];
+	mutable bool split_groups_ready[2];
+	mutable bool merge_groups_ready[2];
 
-	virtual void compute_split_groups(int composition)
+	virtual void compute_split_groups(int composition) const
 	{
 		// clear previous executions of this function and cache previous places and
 		// transitions as an optimization.
@@ -2417,7 +2417,7 @@ struct graph
 		return false;
 	}
 
-	virtual vector<split_group> split_groups_of(int composition, petri::iterator node) {
+	virtual vector<split_group> split_groups_of(int composition, petri::iterator node) const {
 		if (!split_groups_ready[composition]) {
 			compute_split_groups(composition);
 		}
@@ -2428,7 +2428,7 @@ struct graph
 		return transitions[node.index].splits[composition];
 	}
 
-	virtual vector<split_group> split_groups_of(int composition, int group_operation, int branch_operation, vector<petri::iterator> nodes) {
+	virtual vector<split_group> split_groups_of(int composition, int group_operation, int branch_operation, vector<petri::iterator> nodes) const {
 		vector<split_group> groups;
 		if (nodes.empty()) {
 			return groups;
@@ -2440,7 +2440,7 @@ struct graph
 		return groups;
 	}
 
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false) {
+	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false) const {
 		if (always) {
 			if (composition == sequence) {
 				//cout << "is choice: " << is(choice, a, b, false) << endl;
@@ -2488,7 +2488,7 @@ struct graph
 		return compare(split_group::INTERSECT, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
 	}
 
-	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false) {
+	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false) const {
 		// sometimes composed in parallel? - Is there a shared parallel split with
 		// mutually exclusive branches in the group-intersected, branch-unioned
 		// parallel split groups of the nodes of each partial that aren't in the other?
@@ -2534,10 +2534,20 @@ struct graph
 		}
 
 		if (composition == sequence) {
-			return (compare(split_group::INTERSECT, split_group::SUBSET,
+			cout << "split a: " << ::to_string(split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a)) << endl;
+			cout << "split b: " << ::to_string(split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b)) << endl;
+			cout << "parallel: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
+					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a),
+					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b)) << endl;
+			cout << "split a: " << ::to_string(split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a)) << endl;
+			cout << "split b: " << ::to_string(split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)) << endl;
+			cout << "choice: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
+					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a),
+					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)) << endl;
+			return (compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
 					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a),
 					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b))
-				and compare(split_group::INTERSECT, split_group::SUBSET,
+				and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
 					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a),
 					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)));
 		}
