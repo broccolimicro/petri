@@ -10,7 +10,7 @@ using namespace petri;
 using namespace std;
 
 string print_splits(const graph<place, transition, token, state<token> > &g, petri::iterator node) {
-	return ::to_string(g.split_groups_of(parallel, node)) + ::to_string(g.split_groups_of(choice, node));
+	return "t" + ::to_string(g.split_groups_of(parallel, node)) + "p" + ::to_string(g.split_groups_of(choice, node));
 }
 
 string should_be(const graph<place, transition, token, state<token> > &g, bool be, int composition, petri::iterator a, petri::iterator b) {
@@ -23,59 +23,54 @@ string should_be(const graph<place, transition, token, state<token> > &g, bool b
 	return a.to_string() + ":" + print_splits(g, a) + " should " + (not be ? "not " : "") + "be " + comp + " with " + b.to_string() + ":" + print_splits(g, b);
 }
 
-void test_parallel(const graph<place, transition, token, state<token> > &g, vector<petri::iterator> a, vector<petri::iterator> b) {
-	for (auto i = a.begin(); i != a.end(); i++) {
-		for (auto j = b.begin(); j != b.end(); j++) {
-			if (*i != *j) {
-				EXPECT_TRUE(g.is(parallel, *i, *j, true)) << should_be(g, true, parallel, *i, *j);
-				EXPECT_TRUE(g.is(parallel, *j, *i, true)) << should_be(g, true, parallel, *j, *i);
-			} else {
-				EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
-				EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
-			}
-			EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
-			EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
-			EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
-			EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
-		}
-	}
-}
-
-void test_choice(const graph<place, transition, token, state<token> > &g, vector<petri::iterator> a, vector<petri::iterator> b) {
-	for (auto i = a.begin(); i != a.end(); i++) {
-		for (auto j = b.begin(); j != b.end(); j++) {
-			if (*i != *j) {
-				EXPECT_TRUE(g.is(choice, *i, *j, true)) << should_be(g, true, choice, *i, *j);
-				EXPECT_TRUE(g.is(choice, *j, *i, true)) << should_be(g, true, choice, *j, *i);
-			} else {
-				EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
-				EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
-			}
-			EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
-			EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
-			EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
-			EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
-		}
-	}
-}
-
-void test_sequence(const graph<place, transition, token, state<token> > &g, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>()) {
+void test_always(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>()) {
 	if (b.empty()) {
 		b = a;
 	}
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = b.begin(); j != b.end(); j++) {
 			if (*i != *j) {
-				EXPECT_TRUE(g.is(sequence, *i, *j, true)) << should_be(g, true, sequence, *i, *j);
-				EXPECT_TRUE(g.is(sequence, *j, *i, true)) << should_be(g, true, sequence, *j, *i);
+				EXPECT_TRUE(g.is(composition, *i, *j, true)) << should_be(g, true, composition, *i, *j);
+				EXPECT_TRUE(g.is(composition, *j, *i, true)) << should_be(g, true, composition, *j, *i);
 			} else {
-				EXPECT_FALSE(g.is(sequence, *i, *j)) << should_be(g, false, sequence, *i, *j);
-				EXPECT_FALSE(g.is(sequence, *j, *i)) << should_be(g, false, sequence, *j, *i);
+				EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
+				EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
 			}
-			EXPECT_FALSE(g.is(choice, *i, *j)) << should_be(g, false, choice, *i, *j);
-			EXPECT_FALSE(g.is(choice, *j, *i)) << should_be(g, false, choice, *j, *i);
-			EXPECT_FALSE(g.is(parallel, *i, *j)) << should_be(g, false, parallel, *i, *j);
-			EXPECT_FALSE(g.is(parallel, *j, *i)) << should_be(g, false, parallel, *j, *i);
+			for (int k = 0; k < 3; k++) {
+				if (k != composition) {
+					EXPECT_FALSE(g.is(k, *i, *j)) << should_be(g, false, k, *i, *j);
+					EXPECT_FALSE(g.is(k, *j, *i)) << should_be(g, false, k, *j, *i);
+				}
+			}
+		}
+	}
+}
+
+void test_sometimes(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>()) {
+	if (b.empty()) {
+		b = a;
+	}
+	for (auto i = a.begin(); i != a.end(); i++) {
+		for (auto j = b.begin(); j != b.end(); j++) {
+			if (*i != *j) {
+				EXPECT_TRUE(g.is(composition, *i, *j, false)) << should_be(g, true, composition, *i, *j);
+				EXPECT_TRUE(g.is(composition, *j, *i, false)) << should_be(g, true, composition, *j, *i);
+			} else {
+				EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
+				EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
+			}
+		}
+	}
+}
+
+void test_not(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>()) {
+	if (b.empty()) {
+		b = a;
+	}
+	for (auto i = a.begin(); i != a.end(); i++) {
+		for (auto j = b.begin(); j != b.end(); j++) {
+			EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
+			EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
 		}
 	}
 }
@@ -105,9 +100,9 @@ TEST(composition, always_choice) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_choice(g, {t[0], p[1], t[1]}, {t[2], p[2], t[3]});
-	test_sequence(g, {p[0], t[0], p[1], t[1], p[3]});
-	test_sequence(g, {p[0], t[2], p[2], t[3], p[3]});
+	test_always(g, choice, {t[0], p[1], t[1]}, {t[2], p[2], t[3]});
+	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[3]});
+	test_always(g, sequence, {p[0], t[2], p[2], t[3], p[3]});
 }
 
 TEST(composition, always_parallel) {
@@ -128,9 +123,9 @@ TEST(composition, always_parallel) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_parallel(g, {p[0], t[1], p[1]}, {p[2], t[2], p[3]});
-	test_sequence(g, {t[0], p[0], t[1], p[1], t[3]});
-	test_sequence(g, {t[0], p[2], t[2], p[3], t[3]});
+	test_always(g, parallel, {p[0], t[1], p[1]}, {p[2], t[2], p[3]});
+	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[3]});
+	test_always(g, sequence, {t[0], p[2], t[2], p[3], t[3]});
 }
 
 TEST(composition, compressed_proper_nesting) {
@@ -159,12 +154,12 @@ TEST(composition, compressed_proper_nesting) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_sequence(g, {p[0], t[0], p[1], t[1]});
-	test_sequence(g, {p[2], t[2], p[3], t[3]});
-	test_sequence(g, {p[0], p[1], t[1]}, {t[2]});
-	test_sequence(g, {p[2], p[3], t[3]}, {t[0]});
-	test_parallel(g, {p[1], t[1], p[0]}, {p[3], t[3], p[2]});
-	test_choice(g, {t[0]}, {t[2]});
+	test_always(g, sequence, {p[0], t[0], p[1], t[1]});
+	test_always(g, sequence, {p[2], t[2], p[3], t[3]});
+	test_always(g, sequence, {p[0], p[1], t[1]}, {t[2]});
+	test_always(g, sequence, {p[2], p[3], t[3]}, {t[0]});
+	test_always(g, parallel, {p[1], t[1], p[0]}, {p[3], t[3], p[2]});
+	test_always(g, choice, {t[0]}, {t[2]});
 }
 
 TEST(composition, choice_parallel) {
@@ -188,11 +183,11 @@ TEST(composition, choice_parallel) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_sequence(g, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]});
-	test_sequence(g, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]});
-	test_sequence(g, {p[0], t[4], p[5], t[5], p[6]});
-	test_parallel(g, {p[1], t[1], p[2]}, {p[3], t[2], p[4]});
-	test_choice(g, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]});
+	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]});
+	test_always(g, sequence, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]});
+	test_always(g, sequence, {p[0], t[4], p[5], t[5], p[6]});
+	test_always(g, parallel, {p[1], t[1], p[2]}, {p[3], t[2], p[4]});
+	test_always(g, choice, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]});
 
 	/* TODO(edward.bingham) write separate tests for this, and add index priority
   to understand not just sequencing, but order as well.
@@ -233,11 +228,11 @@ TEST(composition, parallel_choice) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_sequence(g, {t[0], p[0], t[1], p[1], t[2], p[3], t[6]});
-	test_sequence(g, {t[0], p[0], t[3], p[2], t[4], p[3], t[6]});
-	test_sequence(g, {t[0], p[4], t[5], p[5], t[6]});
-	test_choice(g, {t[1], p[1], t[2]}, {t[3], p[2], t[4]});
-	test_parallel(g, {p[4], t[5], p[5]}, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]});
+	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[2], p[3], t[6]});
+	test_always(g, sequence, {t[0], p[0], t[3], p[2], t[4], p[3], t[6]});
+	test_always(g, sequence, {t[0], p[4], t[5], p[5], t[6]});
+	test_always(g, choice, {t[1], p[1], t[2]}, {t[3], p[2], t[4]});
+	test_always(g, parallel, {p[4], t[5], p[5]}, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]});
 }
 
 TEST(composition, nonproper_choice) {
@@ -261,12 +256,17 @@ TEST(composition, nonproper_choice) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_choice(g, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4], p[4], t[5]});
-	test_choice(g, {t[0], p[1], t[1], p[2], t[2]}, {t[6]});
-	test_choice(g, {t[6]}, {t[3], p[3], t[4], p[4], t[5]});
-	test_sequence(g, {p[0], t[0], p[1], t[1], p[2], t[2], p[5]});
-	test_sequence(g, {p[0], t[3], p[3], t[4], p[4], t[5], p[5]});
-	test_sequence(g, {p[0], t[0], p[1], t[6], p[4], t[5], p[5]});
+	
+	test_always(g, choice, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]});
+	test_always(g, choice, {t[1], p[2], t[2]}, {t[6], p[4], t[5]});
+	test_sometimes(g, choice, {t[0], p[1]}, {p[4], t[5]});
+	test_not(g, parallel, {t[0], p[1]}, {p[4], t[5]});
+	test_sometimes(g, choice, {t[6]}, {t[0], p[1], p[4], t[5]});
+	test_not(g, parallel, {t[6]}, {t[0], p[1], p[4], t[5]});
+
+	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[2], p[5]});
+	test_always(g, sequence, {p[0], t[3], p[3], t[4], p[4], t[5], p[5]});
+	test_always(g, sequence, {p[0], t[0], p[1], t[6], p[4], t[5], p[5]});
 }
 
 TEST(composition, nonproper_parallel) {
@@ -290,10 +290,10 @@ TEST(composition, nonproper_parallel) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_parallel(g, {p[0], t[1], p[1], t[2], p[2], p[6]}, {p[3], t[3], p[4]});
-	test_parallel(g, {p[1], t[2], p[2]}, {p[6], t[4], p[5]});
-	test_sequence(g, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
-	test_sequence(g, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
-	test_sequence(g, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
+	test_always(g, parallel, {p[0], t[1], p[1], t[2], p[2], p[6]}, {p[3], t[3], p[4]});
+	test_always(g, parallel, {p[1], t[2], p[2]}, {p[6], t[4], p[5]});
+	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
+	test_always(g, sequence, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
+	test_always(g, sequence, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
 }
 
