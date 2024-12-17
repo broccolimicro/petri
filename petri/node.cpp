@@ -67,7 +67,7 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 	int i = 0, j = 0;
 	while (i < (int)g0.size() or j < (int)g1.size()) {
 		if (i < (int)g0.size() and j < (int)g1.size() and g0[i].split == g1[j].split) {
-			if (group_operation == split_group::INTERSECT) {
+			if (group_operation == split_group::INTERSECT or group_operation == split_group::DIFFERENCE) {
 				bool found0 = false;
 				bool found1 = false;
 				bool found2 = false;
@@ -87,8 +87,15 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 				}
 				found0 = found0 or (k < (int)g0[i].branch.size());
 				found1 = found1 or (l < (int)g1[j].branch.size());
-				if ((branch_operation == split_group::DIFFERENCE and found0 and found1)
+				if ((branch_operation == split_group::SYMMETRIC_DIFFERENCE and found0 and found1)
 					or (branch_operation == split_group::INTERSECT and found2)) {
+					return true;
+				}
+
+				if (branch_operation == split_group::DIFFERENCE and found0) {
+					return true;
+				}
+				if (branch_operation == split_group::NEGATIVE_DIFFERENCE and found1) {
 					return true;
 				}
 
@@ -111,7 +118,8 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 			i++;
 			j++;
 		} else if (i < (int)g0.size() and (j >= (int)g1.size() or g0[i].split < g1[j].split)) {
-			if (group_operation == split_group::DIFFERENCE) {
+			if (group_operation == split_group::DIFFERENCE
+				or group_operation == split_group::SYMMETRIC_DIFFERENCE) {
 				return true;
 			} else if (group_operation == split_group::SUBSET
 				or group_operation == split_group::SUBSET_EQUAL) {
@@ -122,7 +130,8 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 			}
 			i++;
 		} else if (j < (int)g1.size()) {
-			if (group_operation == split_group::DIFFERENCE) {
+			if (group_operation == split_group::NEGATIVE_DIFFERENCE
+				or group_operation == split_group::SYMMETRIC_DIFFERENCE) {
 				return true;
 			} else if (group_operation == split_group::SUBSET
 				or group_operation == split_group::SUBSET_EQUAL) {

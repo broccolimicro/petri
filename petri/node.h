@@ -26,8 +26,10 @@ struct split_group
 		INTERSECT = 0,
 		UNION = 1,
 		DIFFERENCE = 2,
-		SUBSET = 3,
-		SUBSET_EQUAL = 4
+		NEGATIVE_DIFFERENCE = 3,
+		SYMMETRIC_DIFFERENCE = 4,
+		SUBSET = 5,
+		SUBSET_EQUAL = 6
 	};
 	
 	int split; // index of place/transition with split
@@ -58,9 +60,6 @@ struct place
 	mutable array<vector<split_group>, 2> splits;
 	mutable array<vector<split_group>, 2> merges;
 
-	// Use this to determine if an arc crosses reset
-	mutable int priority_index;
-
 	static place merge(int composition, const place &p0, const place &p1);
 };
 
@@ -75,9 +74,6 @@ struct transition
 	// index with place::type or transition::type
 	mutable array<vector<split_group>, 2> splits;
 	mutable array<vector<split_group>, 2> merges;
-
-	// Use this to determine if an arc crosses reset
-	mutable int priority_index;
 
 	bool is_infeasible();
 	bool is_vacuous();
