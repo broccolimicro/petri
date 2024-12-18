@@ -78,13 +78,6 @@ void test_not(const graph<place, transition, token, state<token> > &g, int compo
 	}
 }
 
-void connect_sequence(graph<place, transition, token, state<token> > &g, vector<petri::iterator> a) {
-	for (auto i0 = a.begin(); next(i0) != a.end(); i0++) {
-		auto i1 = next(i0);
-		g.connect(*i0, *i1);
-	}
-}
-
 TEST(composition, always_choice) {
 	//          ->t0-->p1-->t1-           .
 	//         /               \          .
@@ -97,8 +90,8 @@ TEST(composition, always_choice) {
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 6);
 
-	connect_sequence(g, {t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
-	connect_sequence(g, {p[0], t[2], p[2], t[3], p[3]});
+	g.connect({t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
+	g.connect({p[0], t[2], p[2], t[3], p[3]});
 
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
@@ -139,8 +132,8 @@ TEST(composition, always_parallel) {
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 4);
 
-	connect_sequence(g, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
-	connect_sequence(g, {t[0], p[2], t[2], p[3], t[3]});
+	g.connect({p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
+	g.connect({t[0], p[2], t[2], p[3], t[3]});
 
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
@@ -162,8 +155,8 @@ TEST(composition, compressed_proper_nesting) {
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
 
-	connect_sequence(g, {p[0], t[0], p[1], t[1], p[0]});
-	connect_sequence(g, {p[2], t[2], p[3], t[3], p[2]});
+	g.connect({p[0], t[0], p[1], t[1], p[0]});
+	g.connect({p[2], t[2], p[3], t[3], p[2]});
 
 	g.connect(p[0], t[2]);
 	g.connect(p[2], t[0]);
@@ -200,9 +193,9 @@ TEST(composition, choice_parallel) {
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
 
-	connect_sequence(g, {p[0], t[0], p[1], t[1], p[2], t[3]});
-	connect_sequence(g, {t[0], p[3], t[2], p[4], t[3], p[6]});
-	connect_sequence(g, {p[0], t[4], p[5], t[5], p[6]});
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[3]});
+	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
+	g.connect({p[0], t[4], p[5], t[5], p[6]});
 
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
@@ -255,9 +248,9 @@ TEST(composition, parallel_choice) {
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
 
-	connect_sequence(g, {t[0], p[0], t[1], p[1], t[2], p[3]});
-	connect_sequence(g, {p[0], t[3], p[2], t[4], p[3], t[6]});
-	connect_sequence(g, {t[0], p[4], t[5], p[5], t[6]});
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[3]});
+	g.connect({p[0], t[3], p[2], t[4], p[3], t[6]});
+	g.connect({t[0], p[4], t[5], p[5], t[6]});
 
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
@@ -295,8 +288,8 @@ TEST(composition, nonproper_choice) {
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
 
-	connect_sequence(g, {p[0], t[0], p[1], t[1], p[2], t[2], p[5]});
-	connect_sequence(g, {p[0], t[3], p[3], t[4], p[4], t[5], p[5]});
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[2], p[5]});
+	g.connect({p[0], t[3], p[3], t[4], p[4], t[5], p[5]});
 
 	g.connect(p[1], t[6]);
 	g.connect(t[6], p[4]);
@@ -351,8 +344,8 @@ TEST(composition, nonproper_parallel) {
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
 
-	connect_sequence(g, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
-	connect_sequence(g, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
+	g.connect({t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
 
 	g.connect(t[1], p[6]);
 	g.connect(p[6], t[4]);

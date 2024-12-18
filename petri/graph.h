@@ -105,36 +105,57 @@ struct graph
 		node_distances_ready = false;
 	}
 
-	virtual void update_node_distances() const {
-		// clear the current set of distances
+	virtual void update_node_distances(petri::iterator pos) const {
+		set<petri::iterator> seen;
+
+		array<vector<vector<petri::iterator> >, 2> p;
+		p[place::type].resize(places.size());
+		p[transition::type].resize(transitions.size());
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
+			}
+		}
+
 		int nodes = (int)(places.size() + transitions.size());
 		int offset = (int)places.size();
+		int posIdx = offset*pos.type + pos.index;
+
+		vector<petri::iterator> stack;
+		stack.push_back(pos);
+		seen.insert(pos);
+		while (not stack.empty()) {
+			petri::iterator curr = stack.back();
+			stack.pop_back();
+
+			int toIdx = offset*curr.type + curr.index;
+			for (auto i = p[curr.type][curr.index].begin(); i != p[curr.type][curr.index].end(); i++) {
+				int fromIdx = offset*i->type + i->index;
+				if (seen.insert(*i).second) {
+					node_distances[posIdx*nodes + fromIdx] = max(node_distances[posIdx*nodes + fromIdx], node_distances[posIdx*nodes + toIdx] + 1);
+					stack.push_back(*i);
+				}
+			}
+		}
+	}
+
+	virtual void update_node_distances() const {
+		// TODO(edward.bingham) This needs to take the max of the node distances
+		// for all of the pre-set nodes. However, doing so triggers an infinite
+		// loop around loops with splits and merges
+
+		// clear the current set of distances
+		int nodes = (int)(places.size() + transitions.size());
 		if (node_distances.size() != nodes*nodes) {
 			reset_node_distances();
 		}
 
-		// generate new distances
-		bool change = true;
-		while (change) {
-			change = false;
-			for (int i = 0; i < 2; i++) {
-				for (int j = 0; j < (int)arcs[i].size(); j++) {
-					petri::iterator from = arcs[i][j].from;
-					petri::iterator to = arcs[i][j].to;
-					int toIdx = offset*to.type + to.index;
-					int fromIdx = offset*from.type + from.index;
+		for (int i = 0; i < (int)places.size(); i++) {
+			update_node_distances(petri::iterator(place::type, i));
+		}
 
-					for (int k = 0; k < nodes; k++) {
-						if (k != toIdx and node_distances[fromIdx*nodes + k] >= 0) {
-							int dist = node_distances[fromIdx*nodes + k] + 1;
-							if (dist > node_distances[toIdx*nodes + k]) {
-								node_distances[toIdx*nodes + k] = dist;
-								change = true;
-							}
-						}
-					}
-				}
-			}
+		for (int i = 0; i < (int)transitions.size(); i++) {
+			update_node_distances(petri::iterator(transition::type, i));
 		}
 
 		node_distances_ready = true;
@@ -175,6 +196,61 @@ struct graph
 			}
 		}
 		return false;
+	}
+
+	virtual bool precedes(petri::iterator from, petri::iterator to, set<petri::iterator> excl=set<petri::iterator>()) const {
+		array<vector<vector<petri::iterator> >, 2> n;
+		n[place::type].resize(places.size());
+		n[transition::type].resize(transitions.size());
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				n[type][arcs[type][i].from.index].push_back(arcs[type][i].to);
+			}
+		}
+
+		bool fwd = false;
+		bool rev = false;
+
+		set<petri::iterator> seen = excl;
+		seen.insert(from);
+
+		vector<petri::iterator> stack;
+		stack.push_back(from);
+		while (not stack.empty()) {
+			petri::iterator curr = stack.back();
+			stack.pop_back();
+
+			for (auto i = n[curr.type][curr.index].begin(); i != n[curr.type][curr.index].end(); i++) {
+				if (*i == to) {
+					fwd = true;
+					break;
+				}
+				if (seen.insert(*i).second) {
+					stack.push_back(*i);
+				}
+			}
+		}
+
+		stack.clear();
+		seen = excl;
+		seen.insert(to);
+		stack.push_back(to);
+		while (not stack.empty()) {
+			petri::iterator curr = stack.back();
+			stack.pop_back();
+
+			for (auto i = n[curr.type][curr.index].begin(); i != n[curr.type][curr.index].end(); i++) {
+				if (*i == from) {
+					rev = true;
+					break;
+				}
+				if (seen.insert(*i).second) {
+					stack.push_back(*i);
+				}
+			}
+		}
+
+		return fwd and not rev;
 	}
 
 	virtual void compute_split_group(int composition, int split, vector<petri::iterator> init) const {
@@ -243,7 +319,6 @@ struct graph
 		while (not todo.empty()) {
 			bool progress = false;
 			int minidx = -1;
-			int mindist = std::numeric_limits<int>::max();
 			for (int i = (int)todo.size()-1; i >= 0; i--) {
 				bool ready = true;
 				split_group group;
@@ -289,11 +364,19 @@ struct graph
 					}
 					todo.erase(todo.begin()+i);
 				} else {
+					// This is just to determine which merge is "first". A merge might
+					// lead to another inside the split if there is a sequence of arcs
+					// from one to the next. Any merge without any input arcs from other
+					// merges is a valid "first" merge. Maybe I can just directly search
+					// for that relationship rather than try to derive it from distance
+					// calculations... Then I can reset the distance calculations to be
+					// based on the minimum distance rather than maximum and fix the
+					// cyclic dependency. This is similar to the problem of finding a
+					// trace from one node to the next.
+
 					// otherwise, we need to remember which merge is closest to the split
-					int dist = distance(init, vector<petri::iterator>(1, todo[i]));
-					if (dist >= 0 and dist < mindist) {
+					if (minidx < 0 or precedes(todo[i], todo[minidx], seen)) {
 						minidx = i;
-						mindist = dist;
 					}
 				}
 			}
@@ -739,6 +822,14 @@ struct graph
 		for (int i = 0; i < (int)a.size(); i++)
 			result.push_back(connect(a[i].from, a[i].to));
 		return result;
+	}
+
+	virtual petri::iterator connect(vector<petri::iterator> a) {
+		for (auto i0 = a.begin(); ::next(i0) != a.end(); i0++) {
+			auto i1 = ::next(i0);
+			connect(*i0, *i1);
+		}
+		return a.back();
 	}
 
 	virtual void disconnect(petri::iterator a)
