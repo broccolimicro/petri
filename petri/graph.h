@@ -1,10 +1,3 @@
-/*
- * graph.h
- *
- *  Created on: Feb 1, 2015
- *      Author: nbingham
- */
-
 #pragma once
 
 #include <common/standard.h>
@@ -2618,15 +2611,15 @@ struct graph
 	//   a is always in choice with b if firing a implies b will not fire
 	//   a is sometimes in sequence/parallel with b if firing a sometimes implies a firing on b
 	//   a is always in sequence/parallel with b if firing a always implies a firing on b
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false) const {
+	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false) const {
 		if (always) {
 			if (composition == sequence) {
 				//cout << "is choice: " << is(choice, a, b, false) << endl;
-				return is(sequence, a, b, false) and not is(choice, a, b, false);
+				return is(sequence, a, b, false, bidir) and not is(choice, a, b, false, bidir);
 			} else if (composition == parallel) {
-				return is(parallel, a, b, false) and not is(choice, a, b, false);
+				return is(parallel, a, b, false, bidir) and not is(choice, a, b, false, bidir);
 			} else {
-				//return is(choice, a, b, false) and not is(parallel, a, b, false);
+				//return is(choice, a, b, false, bidir) and not is(parallel, a, b, false, bidir);
 				return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
 			}
 		}
@@ -2652,7 +2645,8 @@ struct graph
 					split_groups_of(choice, a),
 					split_groups_of(choice, b)));
 		} else if (composition == choice) {
-			return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
+			return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b))
+				or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, b), split_groups_of(composition, a)));
 		}
 		// TODO(edward.bingham) This doesn't work for non-properly nested
 		// conditional splits:
@@ -2849,10 +2843,10 @@ struct graph
 	// conditional.
 	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
 		// ~always & ~invert - separate nodes that aren't sometimes composed as requested
+		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
 		//  always & ~invert - separate nodes that aren't always composed as requested.
 		//                     For example if parallel requested, then this breaks sequence
 		//                     and choice relations.
-		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
 		//  always &  invert - separate nodes that are always composed as the opposite of requested
 
 		vector<vector<petri::iterator> > result;
@@ -2880,6 +2874,7 @@ struct graph
 
 			if (frame.P.empty() and frame.X.empty()) {
 				// Then we've found a maximal clique
+				sort(frame.R.begin(), frame.R.end());
 				result.push_back(frame.R);
 			} else {
 				// Otherwise, we need to recurse
@@ -2887,14 +2882,16 @@ struct graph
 					frames.push_back(frame);
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if ((not invert and not is(composition, frames.back().P[i], frame.P.back(), always))
-							or (invert and is(1-composition, frames.back().P[i], frame.P.back(), always))) {
+						if (frames.back().P[i] == frame.P.back()
+							or (not invert and not is(composition, frames.back().P[i], frame.P.back(), always, true))
+							or (invert and is(1-composition, frames.back().P[i], frame.P.back(), always, true))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if ((not invert and not is(composition, frames.back().X[i], frame.P.back(), always))
-							or (invert and is(1-composition, frames.back().X[i], frame.P.back(), always))) {
+						if (frames.back().X[i] == frame.P.back()
+							or (not invert and not is(composition, frames.back().X[i], frame.P.back(), always, true))
+							or (invert and is(1-composition, frames.back().X[i], frame.P.back(), always, true))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}

@@ -67,7 +67,9 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 	int i = 0, j = 0;
 	while (i < (int)g0.size() or j < (int)g1.size()) {
 		if (i < (int)g0.size() and j < (int)g1.size() and g0[i].split == g1[j].split) {
-			if (group_operation == split_group::INTERSECT or group_operation == split_group::DIFFERENCE) {
+			if (group_operation == split_group::INTERSECT
+				or group_operation == split_group::DIFFERENCE
+				or group_operation == split_group::NEGATIVE_DIFFERENCE) {
 				bool found0 = false;
 				bool found1 = false;
 				bool found2 = false;

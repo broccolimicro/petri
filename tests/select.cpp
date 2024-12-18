@@ -9,80 +9,53 @@
 using namespace petri;
 using namespace std;
 
-string print_splits(const graph<place, transition, token, state<token> > &g, petri::iterator node) {
-	return "t" + ::to_string(g.split_groups_of(parallel, node)) + "p" + ::to_string(g.split_groups_of(choice, node));
+TEST(select, sequence) {
+	//  =-t0-->p0-->t1-->p1-->t2-->p2-=  .
+
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 3);
+	auto t = g.create(transition(), 4);
+
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[2], t[0]});
+
+	g.compute_split_groups(parallel);
+	g.compute_split_groups(choice);
+
+	vector<vector<petri::iterator> > g0;
+	g0.resize(1);
+	g0[0].push_back(p[0]);
+
+	EXPECT_EQ(g0, g.select(parallel, {p[0]}, false, false));
+	EXPECT_EQ(g0, g.select(parallel, {p[0]}, false, true));
+	EXPECT_EQ(g0, g.select(parallel, {p[0]}, true, false));
+	EXPECT_EQ(g0, g.select(parallel, {p[0]}, true, true));
+	EXPECT_EQ(g0, g.select(choice, {p[0]}, false, false));
+	EXPECT_EQ(g0, g.select(choice, {p[0]}, false, true));
+	EXPECT_EQ(g0, g.select(choice, {p[0]}, true, false));
+	EXPECT_EQ(g0, g.select(choice, {p[0]}, true, true));
+
+	vector<vector<petri::iterator> > g1;
+	g1.resize(2);
+	g1[0].push_back(p[0]);
+	g1[1].push_back(p[2]);
+
+	vector<vector<petri::iterator> > g2;
+	g2.resize(1);
+	g2[0].push_back(p[0]);
+	g2[0].push_back(p[2]);
+
+	EXPECT_EQ(g1, g.select(parallel, {p[0], p[2]}, false, false));
+	EXPECT_EQ(g2, g.select(parallel, {p[0], p[2]}, false, true));
+	EXPECT_EQ(g1, g.select(parallel, {p[0], p[2]}, true, false));
+	EXPECT_EQ(g2, g.select(parallel, {p[0], p[2]}, true, true));
+	EXPECT_EQ(g1, g.select(choice, {p[0], p[2]}, false, false));
+	EXPECT_EQ(g2, g.select(choice, {p[0], p[2]}, false, true));
+	EXPECT_EQ(g1, g.select(choice, {p[0], p[2]}, true, false));
+	EXPECT_EQ(g2, g.select(choice, {p[0], p[2]}, true, true));
 }
 
-string should_be(const graph<place, transition, token, state<token> > &g, bool be, int composition, petri::iterator a, petri::iterator b) {
-	string comp = "sequence";
-	if (composition == parallel) {
-		comp = "parallel";
-	} else if (composition == choice) {
-		comp = "choice";
-	}
-	return a.to_string() + ":" + print_splits(g, a) + " should " + (not be ? "not " : "") + "be " + comp + " with " + b.to_string() + ":" + print_splits(g, b);
-}
-
-void test_always(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
-	for (auto i = a.begin(); i != a.end(); i++) {
-		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
-			if (*i != *j) {
-				EXPECT_TRUE(g.is(composition, *i, *j, true)) << should_be(g, true, composition, *i, *j);
-				if (bidir) {
-					EXPECT_TRUE(g.is(composition, *j, *i, true)) << should_be(g, true, composition, *j, *i);
-				}
-				EXPECT_TRUE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
-				if (bidir) {
-					EXPECT_TRUE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
-				}
-			} else {
-				EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
-				if (bidir) {
-					EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
-				}
-			}
-			for (int k = 0; k < 3; k++) {
-				if (k != composition) {
-					EXPECT_FALSE(g.is(k, *i, *j)) << should_be(g, false, k, *i, *j);
-					if (bidir) {
-						EXPECT_FALSE(g.is(k, *j, *i)) << should_be(g, false, k, *j, *i);
-					}
-				}
-			}
-		}
-	}
-}
-
-void test_sometimes(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
-	for (auto i = a.begin(); i != a.end(); i++) {
-		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
-			if (*i != *j) {
-				EXPECT_TRUE(g.is(composition, *i, *j, false)) << should_be(g, true, composition, *i, *j);
-				if (bidir) {
-					EXPECT_TRUE(g.is(composition, *j, *i, false)) << should_be(g, true, composition, *j, *i);
-				}
-			} else {
-				EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
-				if (bidir) {
-					EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
-				}
-			}
-		}
-	}
-}
-
-void test_not(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
-	for (auto i = a.begin(); i != a.end(); i++) {
-		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
-			EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
-			if (bidir) {
-				EXPECT_FALSE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
-			}
-		}
-	}
-}
-
-TEST(composition, always_choice) {
+TEST(select, always_choice) {
 	//          ->t0-->p1-->t1-           .
 	//         /               \          .
 	//  t5-->p0                 >p3-->t4  .
@@ -100,31 +73,65 @@ TEST(composition, always_choice) {
 	g.compute_split_groups(parallel);
 	g.compute_split_groups(choice);
 
-	test_always(g, choice, {t[0], p[1], t[1]}, {t[2], p[2], t[3]}, true);
-	test_always(g, sequence, {t[0], p[1], t[1], p[3], t[4]});
-	test_always(g, sequence, {t[2], p[2], t[3], p[3], t[4]});
-	test_always(g, sequence, {t[5], p[0]});
-	test_always(g, sequence, {t[1], p[1], t[0], p[0], t[5]});
-	test_always(g, sequence, {t[3], p[2], t[2], p[0], t[5]});
-	test_always(g, sequence, {t[4], p[3]});
-	test_sometimes(g, choice, {t[5], p[0]}, {t[0], p[1], t[1]});
-	test_sometimes(g, choice, {t[5], p[0]}, {t[2], p[2], t[3]});
-	test_sometimes(g, choice, {t[4], p[3]}, {t[1], p[1], t[0]});
-	test_sometimes(g, choice, {t[4], p[3]}, {t[3], p[2], t[2]});
-	
-	test_sometimes(g, sequence, {t[5], p[0]}, {t[0], p[1], t[1]});
-	test_sometimes(g, sequence, {t[5], p[0]}, {t[2], p[2], t[3]});
-	test_sometimes(g, sequence, {t[4], p[3]}, {t[1], p[1], t[0]});
-	test_sometimes(g, sequence, {t[4], p[3]}, {t[3], p[2], t[2]});
+	vector<vector<petri::iterator> > g1;
+	g1.resize(2);
+	g1[0].push_back(p[1]);
+	g1[1].push_back(p[2]);
 
-	test_not(g, parallel, {t[5], p[0]}, {t[0], p[1], t[1]});
-	test_not(g, parallel, {t[5], p[0]}, {t[2], p[2], t[3]});
-	test_not(g, parallel, {t[4], p[3]}, {t[1], p[1], t[0]});
-	test_not(g, parallel, {t[4], p[3]}, {t[3], p[2], t[2]});
+	vector<vector<petri::iterator> > g2;
+	g2.resize(1);
+	g2[0].push_back(p[1]);
+	g2[0].push_back(p[2]);
 
+	EXPECT_EQ(g1, g.select(parallel, {p[1], p[2]}, false, false));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], p[2]}, false, true));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], p[2]}, true, false));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], p[2]}, true, true));
+	EXPECT_EQ(g2, g.select(choice, {p[1], p[2]}, false, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], p[2]}, false, true));
+	EXPECT_EQ(g2, g.select(choice, {p[1], p[2]}, true, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], p[2]}, true, true));
+
+	g1.clear();
+	g1.resize(2);
+	g1[0].push_back(p[1]);
+	g1[1].push_back(t[5]);
+
+	g2.clear();
+	g2.resize(1);
+	g2[0].push_back(p[1]);
+	g2[0].push_back(t[5]);
+
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[5]}, false, false));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[5]}, false, true));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[5]}, true, false));
+	EXPECT_EQ(g2, g.select(parallel, {p[1], t[5]}, true, true));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[5]}, false, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[5]}, false, true));
+	EXPECT_EQ(g1, g.select(choice, {p[1], t[5]}, true, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[5]}, true, true));
+
+	g1.clear();
+	g1.resize(2);
+	g1[0].push_back(p[1]);
+	g1[1].push_back(t[4]);
+
+	g2.clear();
+	g2.resize(1);
+	g2[0].push_back(p[1]);
+	g2[0].push_back(t[4]);
+
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[4]}, false, false));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[4]}, false, true));
+	EXPECT_EQ(g1, g.select(parallel, {p[1], t[4]}, true, false));
+	EXPECT_EQ(g2, g.select(parallel, {p[1], t[4]}, true, true));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[4]}, false, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[4]}, false, true));
+	EXPECT_EQ(g1, g.select(choice, {p[1], t[4]}, true, false));
+	EXPECT_EQ(g2, g.select(choice, {p[1], t[4]}, true, true));
 }
 
-TEST(composition, always_parallel) {
+/*TEST(select, always_parallel) {
 	//          ->p0-->t1-->p1-           .
 	//         /               \          .
 	//  p5-->t0                 >t3-->p4  .
@@ -147,7 +154,7 @@ TEST(composition, always_parallel) {
 	test_always(g, sequence, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
 }
 
-TEST(composition, compressed_proper_nesting) {
+TEST(select, compressed_proper_nesting) {
 	//  =->*p0-->t0-->p1-->t1-=  .
 	//       \ /  \ /            .
 	//        X    X             .
@@ -183,7 +190,7 @@ TEST(composition, compressed_proper_nesting) {
 	test_always(g, choice, {t[0]}, {t[2]}, true);
 }
 
-TEST(composition, choice_parallel) {
+TEST(select, choice_parallel) {
 	//          -->p1-->t1-->p2           .
 	//         /               \          .
 	//     ->t0-->p3-->t2-->p4-->t3-      .
@@ -238,7 +245,7 @@ TEST(composition, choice_parallel) {
 	// EXPECT_FALSE(g.is(parallel, {p[1], p[4]}, {p[2], p[3]}));
 }
 
-TEST(composition, parallel_choice) {
+TEST(select, parallel_choice) {
 	//          -->t1-->p1-->t2           .
 	//         /               \          .
 	//     ->p0-->t3-->p2-->t4-->p3-      .
@@ -280,7 +287,7 @@ TEST(composition, parallel_choice) {
 	test_not(g, parallel, {p[0], p[3]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
 }
 
-TEST(composition, nonproper_choice) {
+TEST(select, nonproper_choice) {
 	//     ->t0-->p1-->t1-->p2-->t2-      .
 	//    /         \               \     .
 	//  p0           ->t6-           >p5  .
@@ -336,7 +343,7 @@ TEST(composition, nonproper_choice) {
 	test_not(g, parallel, {t[0], p[1], p[4], t[5]}, {t[6]});
 }
 
-TEST(composition, nonproper_parallel) {
+TEST(select, nonproper_parallel) {
 	//     ->p0-->t1-->p1-->t2-->p2-      .
 	//    /         \               \     .
 	//  t0           ->p6-           >t5  .
@@ -362,5 +369,5 @@ TEST(composition, nonproper_parallel) {
 	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
 	test_always(g, sequence, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
 	test_always(g, sequence, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
-}
+}*/
 
