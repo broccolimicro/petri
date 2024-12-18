@@ -2993,9 +2993,9 @@ struct graph
 					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
 					
 					// 4. merge, intersect groups, subtract branches A-Bi for each Bi
-					Bj_groups = merge(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, A_groups, Bj_groups);
+					Bj_groups = petri::merge(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, A_groups, Bj_groups);
 					// 5. merge, union groups, union branches across all [Bi]
-					B_groups = merge(split_group::UNION, split_group::UNION, B_groups, Bj_groups);
+					B_groups = petri::merge(split_group::UNION, split_group::UNION, B_groups, Bj_groups);
 				}
 			}
 			if (B_groups.empty()) {
