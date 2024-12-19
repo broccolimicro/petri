@@ -2666,6 +2666,9 @@ struct graph
 		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
 	}
 
+	// This assumes that a and b represent partial states. IE, there exists a set
+	// of states which each contain all nodes in a and a set of states which each
+	// contain all nodes in b.
 	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false) const {
 		// sometimes composed in parallel? - Is there a shared parallel split with
 		// mutually exclusive branches in the group-intersected, branch-unioned
