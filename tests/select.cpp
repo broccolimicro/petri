@@ -450,7 +450,6 @@ TEST(select, compressed_choice_parallel) {
 	EXPECT_EQ(lst({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, false, true));
 	EXPECT_EQ(lst({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, false));
 	EXPECT_EQ(lst({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, true));
-
 }
 
 /* This structure violates liveness
