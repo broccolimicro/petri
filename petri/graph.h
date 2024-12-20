@@ -2943,8 +2943,8 @@ struct graph
 	// Takes a strict selection of nodes (see graph::select() ) and regroups them into all non-strict selections
 	vector<vector<petri::iterator> > group(int composition, vector<vector<petri::iterator> > nodes, bool always=false, bool invert=false) {
 		// ~always & ~invert - group nodes that are sometimes composed as requested
-		//  always & ~invert - group nodes that are always composed as requested.
 		// ~always &  invert - group nodes that aren't sometimes composed as the opposite of requested
+		//  always & ~invert - group nodes that are always composed as requested.
 		//  always &  invert - group nodes that aren't always composed as the opposite of requested
 
 		struct BronKerboschFrame {

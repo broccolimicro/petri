@@ -39,5 +39,65 @@ TEST(group, parallel_choice) {
 	g.compute_split_groups(choice);
 
 	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), true, true));
+	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), true, true));
+
+	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), true, true));
+	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), true, true));
 }
 
+TEST(group, choice_parallel) {
+	//          ->p1-->t1-->p2-           .
+	//         /               \          .
+	//     ->t0                 >t3       .
+	//    /    \               /   \      .
+	//   /      ->p3-->t2-->p4-     \     .
+	// p0                            >p9  .
+	//   \      ->p5-->t5-->p6-     /     .
+	//    \    /               \   /      .
+	//     ->t4                 >t7       .
+	//         \               /          .
+	//          ->p7-->t6-->p8-           .
+
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 10);
+	auto t = g.create(transition(), 8);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[3], p[9]});
+	g.connect({t[0], p[3], t[2], p[4], t[3]});
+	g.connect({p[0], t[4], p[5], t[5], p[6], t[7], p[9]});
+	g.connect({t[4], p[7], t[6], p[8], t[7]});
+
+	g.compute_split_groups(parallel);
+	g.compute_split_groups(choice);
+
+	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), true, true));
+	EXPECT_EQ(mark({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, mark({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(mark({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, mark({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(mark({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, mark({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(mark({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, mark({{t[1]},{t[5]}}), true, true));
+
+	EXPECT_EQ(mark({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, mark({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(mark({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, mark({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(mark({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, mark({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(mark({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, mark({{t[1]},{t[2]}}), true, true));
+	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), true, true));
+}
