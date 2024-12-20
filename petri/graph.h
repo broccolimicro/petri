@@ -2669,7 +2669,7 @@ struct graph
 	// This assumes that a and b represent partial states. IE, there exists a set
 	// of states which each contain all nodes in a and a set of states which each
 	// contain all nodes in b.
-	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false) const {
+	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false, bool bidir=false) const {
 		// sometimes composed in parallel? - Is there a shared parallel split with
 		// mutually exclusive branches in the group-intersected, branch-unioned
 		// parallel split groups of the nodes of each partial that aren't in the other?
@@ -2697,7 +2697,39 @@ struct graph
 		//   Is it possible to have nodes composed in sequence sometimes and
 		//   parallel others? If so, then also not composed in parallel sometimes.
 
-		if (always) {
+		if (composition == parallel) {
+			for (auto i = a.begin(); i != a.end(); i++) {
+				for (auto j = b.begin(); j != b.end(); j++) {
+					if (*i != *j and not is(parallel, *i, *j, always, bidir)) {
+						return false;
+					}
+				}
+			}
+			return true;
+		} else if (composition == choice) {
+			for (auto i = a.begin(); i != a.end(); i++) {
+				for (auto j = b.begin(); j != b.end(); j++) {
+					if (*i != *j and is(choice, *i, *j, always, bidir)) {
+						return true;
+					}
+				}
+			}
+			return false;
+		} else if (composition == sequence) {
+			for (auto i = a.begin(); i != a.end(); i++) {
+				for (auto j = b.begin(); j != b.end(); j++) {
+					if (*i != *j and is(sequence, *i, *j, always, bidir)) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+		return false;
+
+
+
+		/*if (always) {
 			if (composition == sequence) {
 				return is(sequence, a, b, false) and not is(choice, a, b, false);
 			}
@@ -2742,7 +2774,7 @@ struct graph
 			Gb = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b);
 		}
 
-		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, Ga, Gb);
+		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, Ga, Gb);*/
 	}
 
 	// Find all partial state pairs (for each node in v0 and v1 respectively) that are ordered (not in parallel).
