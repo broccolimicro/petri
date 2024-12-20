@@ -43,6 +43,9 @@ struct iterator
 	bool operator>=(int i) const;
 
 	string to_string() const;
+
+	static vector<iterator> mark(initializer_list<iterator> n);
+	static vector<vector<iterator> > mark(initializer_list<initializer_list<iterator> > n);
 };
 
 ostream &operator<<(ostream &os, iterator i);

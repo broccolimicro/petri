@@ -149,6 +149,18 @@ string iterator::to_string() const
 	return (type == place::type ? "P" : "T") + ::to_string(index);
 }
 
+vector<iterator> iterator::mark(initializer_list<iterator> n) {
+	return vector<iterator>(n);
+}
+
+vector<vector<iterator> > iterator::mark(initializer_list<initializer_list<iterator> > n) {
+	vector<vector<iterator> > result;
+	for (auto i = n.begin(); i != n.end(); i++) {
+		result.push_back(mark(*i));
+	}
+	return result;
+}
+
 ostream &operator<<(ostream &os, iterator i)
 {
 	if (i.type == place::type)

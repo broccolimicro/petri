@@ -2976,13 +2976,15 @@ struct graph
 					frames.push_back(frame);
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if ((not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
+						if (frames.back().P[i] == frame.P.back()
+							or (not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
 							or (invert and is(1-composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if ((not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
+						if (frames.back().X[i] == frame.P.back()
+							or (not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
 							or (invert and is(1-composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
