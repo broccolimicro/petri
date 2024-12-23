@@ -367,13 +367,6 @@ struct graph
 			set_split_group(composition, *i, split_group(split, init.size(), {i->index}));
 		}
 
-		// TODO(edward.bingham) I'm not correctly figuring out the frontier. It
-		// needs to be the nodes just outside the already explored nodes. Except,
-		// if I set "next" as "seen" nd then end on that, the frontier stacks up.
-		// I suspect this is the last thing before the shared_parallel test works.
-
-		
-
 		// I need to be able to do two things:
 		// 1. continue through a merge
 		// 2. stop when we encounter a node we've already seen
@@ -2738,65 +2731,62 @@ struct graph
 		return groups;
 	}
 
-	// choice is directional
-	// sequence and parallel are symmetric
-	//   a is sometimes in choice with b if firing a does not imply a firing on b.
-	//   a is always in choice with b if firing a implies b will not fire
-	//   a is sometimes in sequence/parallel with b if firing a sometimes implies a firing on b
-	//   a is always in sequence/parallel with b if firing a always implies a firing on b
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
-		if (always) {
-			if (composition == sequence) {
-				//cout << "is choice: " << is(choice, a, b, false) << endl;
-				return is(sequence, a, b, false, bidir, update) and not is(choice, a, b, false, bidir, update);
-			} else if (composition == parallel) {
-				return is(parallel, a, b, false, bidir, update) and not is(choice, a, b, false, bidir, update);
-			} else {
-				//return is(choice, a, b, false, bidir, update) and not is(parallel, a, b, false, bidir, update);
-				return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update));
-			}
-		}
-
+	// a is sometimes in choice with b if firing a does not imply a firing on b
+	// a is always in choice with b if firing a implies b will not fire
+	// a and b are sometimes in bidirectional choice if firing a does not imply a
+	// firing on b **or** visa-versa.
+	virtual bool is_choice(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
 		if (a == b) {
 			return false;
 		}
-		if (composition == sequence) {
-			/*cout << "parallel a: " << ::to_string(split_groups_of(parallel, a, update)) << endl;
-			cout << "parallel b: " << ::to_string(split_groups_of(parallel, b, update)) << endl;
-			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, a, update),
-					split_groups_of(parallel, b, update)) << endl;
-			cout << "choice a: " << ::to_string(split_groups_of(choice, a, update)) << endl;
-			cout << "choice b: " << ::to_string(split_groups_of(choice, b, update)) << endl;
-			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, a, update),
-					split_groups_of(choice, b, update)) << endl;*/
-			return (compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, a, update),
-					split_groups_of(parallel, b, update))
-				and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, a, update),
-					split_groups_of(choice, b, update)));
-		} else if (composition == choice) {
-			return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update))
-				or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, b, update), split_groups_of(composition, a, update)));
+
+		auto ac = split_groups_of(choice, a, update);
+		auto bc = split_groups_of(choice, b, update);
+		if (always) {
+			return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc);
 		}
-		// TODO(edward.bingham) This doesn't work for non-properly nested
-		// conditional splits:
-		//   this
-		//    v
-		//   
-		//    |<-o<-|<-o<-|<     .
-		//   /     \        \    .
-		// o<       |<       o   .
-		//   \        \     /    .
-		//    |<-o<-|<-o<-|<     .
-		//
-		//                ^
-		//             and this
-		// should be "sometimes conditional, sometimes sequential"
-		// A recursive algorithm is likely necessary to determine this.
-		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update));
+
+		return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, ac, bc)
+			or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, bc, ac));
+	}
+
+	// a is sometimes in parallel if there exists a state with both a and b.
+	// This does not imply that all states with one also have the other. This
+	// relationship is bidirectional.
+	virtual bool is_parallel(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+		if (a == b) {
+			return false;
+		}
+
+		auto ap = split_groups_of(parallel, a, update);
+		auto bp = split_groups_of(parallel, b, update);
+		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ap, bp)
+			 and (not always or not is_choice(a, b, false, bidir, update));
+	}
+
+	virtual bool is_sequence(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+		if (a == b) {
+			return false;
+		}
+
+		auto ap = split_groups_of(parallel, a, update);
+		auto bp = split_groups_of(parallel, b, update);
+		auto ac = split_groups_of(choice, a, update);
+		auto bc = split_groups_of(choice, b, update);
+
+		return compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ap, bp)
+			and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ac, bc)
+			and (not always or not is_choice(a, b, false, bidir, update));
+	}
+
+	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+		if (composition == sequence) {
+			return is_sequence(a, b, always, bidir, update);
+		} else if (composition == choice) {
+			//return is_choice(a, b, false, bidir, update) and not is_parallel(a, b, update);
+			return is_choice(a, b, always, bidir, update);
+		}
+		return is_parallel(a, b, always, bidir, update);
 	}
 
 	// This assumes that a and b represent partial states. IE, there exists a set

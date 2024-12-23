@@ -357,9 +357,6 @@ TEST(composition, nonproper_parallel) {
 	test_always(g, sequence, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
 }
 
-// TODO(edward.bingham) this breaks the flat split group comparison method, may
-// require recursive algorithms.
-
 TEST(composition, shared_parallel) {
 	//          ->p1-->t1-->p2-->t2-->p3             .
 	//         /                        \            .
