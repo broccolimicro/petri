@@ -401,7 +401,7 @@ TEST(composition, shared_parallel) {
 	test_always(g, parallel, {p[1], t[1], p[2], t[2], p[3]}, {p[4], t[3], p[5], t[4], p[6]});
 }
 
-/*TEST(composition, shared_choice) {
+TEST(composition, shared_choice) {
 	//          ->t1-->p1-->t2-->p2-->t3             .
 	//         /                        \            .
 	//     ->p0                          ->p5        .
@@ -429,10 +429,13 @@ TEST(composition, shared_parallel) {
 	test_always(g, sequence, {t[4], p[3], t[5], p[4], t[6]});
 	test_always(g, sequence, {t[7], p[7], t[8], p[8], t[9]});
 	
-	test_always(g, parallel, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
-	test_always(g, parallel, {p[0], p[5]}, {p[6], p[9]}, true);
+	// TODO(edward.bingham) I think this may require recursive logic... which
+	// parallel branches is this node a part of in which conditions?
+	//test_always(g, parallel, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
+	//test_always(g, parallel, {p[0]}, {p[6]}, true);
+	//test_always(g, parallel, {p[5]}, {p[9]}, true);
 	test_always(g, choice, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
-}*/
+}
 
 TEST(composition, compressed_choice_parallel) {
 	//           ->p1-->t1--          .
