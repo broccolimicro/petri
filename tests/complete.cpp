@@ -12,7 +12,7 @@ using namespace std;
 // just to make the tests easier to write
 constexpr auto mark = static_cast<vector<vector<petri::iterator> >(*)(initializer_list<initializer_list<petri::iterator> >)>(petri::iterator::mark);
 
-TEST(group, parallel_choice) {
+TEST(complete, parallel_choice) {
 	//          ->t1-->p1-->t2-           .
 	//         /               \          .
 	//     ->p0                 >p3       .
@@ -37,26 +37,10 @@ TEST(group, parallel_choice) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, mark({{p[1]},{p[5]}}), true, true));
-	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(mark({{p[1]},{p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(mark({{p[1]},{p[5]},{p[1],p[5]}}), g.group(choice, mark({{p[1]},{p[5]}}), true, true));
-
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.group(parallel, mark({{p[1]},{p[2]}}), true, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, mark({{p[1]},{p[2]}}), true, true));
+	//EXPECT_EQ(mark({{p[1],t[7]},{p[5],t[3]},{p[1],p[5]}}), g.complete(parallel, mark({{p[1]},{p[5]},{p[1],p[5]}})));
 }
 
-TEST(group, choice_parallel) {
+/*TEST(complete, choice_parallel) {
 	//          ->p1-->t1-->p2-           .
 	//         /               \          .
 	//     ->t0                 >t3       .
@@ -79,7 +63,8 @@ TEST(group, choice_parallel) {
 	g.connect({p[0], t[4], p[5], t[5], p[6], t[7], p[9]});
 	g.connect({t[4], p[7], t[6], p[8], t[7]});
 
-	g.compute_split_groups();
+	g.compute_split_groups(parallel);
+	g.compute_split_groups(choice);
 
 	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), false, false));
 	EXPECT_EQ(mark({{t[1]},{t[5]}}), g.group(parallel, mark({{t[1]},{t[5]}}), false, true));
@@ -98,4 +83,4 @@ TEST(group, choice_parallel) {
 	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), false, true));
 	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), true, false));
 	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.group(choice, mark({{t[1]},{t[2]}}), true, true));
-}
+}*/

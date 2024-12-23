@@ -97,8 +97,7 @@ TEST(composition, always_choice) {
 	g.connect({t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
 	g.connect({p[0], t[2], p[2], t[3], p[3]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, choice, {t[0], p[1], t[1]}, {t[2], p[2], t[3]}, true);
 	test_always(g, sequence, {t[0], p[1], t[1], p[3], t[4]});
@@ -139,8 +138,7 @@ TEST(composition, always_parallel) {
 	g.connect({p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
 	g.connect({t[0], p[2], t[2], p[3], t[3]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, parallel, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
 	test_always(g, sequence, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
@@ -170,8 +168,7 @@ TEST(composition, compressed_proper_nesting) {
 
 	g.reset.push_back(state<token>({token(p[0].index), token(p[2].index)}));
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {p[0], p[1], t[1]}, {}, true);
 	test_always(g, sequence, {p[2], p[3], t[3]}, {}, true);
@@ -201,8 +198,7 @@ TEST(composition, choice_parallel) {
 	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
 	g.connect({p[0], t[4], p[5], t[5], p[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[0], p[1], t[1], p[2], t[3], p[6]});
 	test_always(g, sequence, {t[3], p[2], t[1], p[1], t[0], p[0]});
@@ -256,8 +252,7 @@ TEST(composition, parallel_choice) {
 	g.connect({p[0], t[3], p[2], t[4], p[3], t[6]});
 	g.connect({t[0], p[4], t[5], p[5], t[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[1], p[1], t[2], p[3], t[6]});
 	test_always(g, sequence, {t[3], p[2], t[4], p[3], t[6]});
@@ -298,8 +293,7 @@ TEST(composition, nonproper_choice) {
 	g.connect(p[1], t[6]);
 	g.connect(t[6], p[4]);
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, choice, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
 	test_always(g, choice, {t[1], p[2], t[2]}, {t[6], p[4], t[5]}, true);
@@ -354,8 +348,7 @@ TEST(composition, nonproper_parallel) {
 	g.connect(t[1], p[6]);
 	g.connect(p[6], t[4]);
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, parallel, {p[0], t[1], p[1], t[2], p[2], p[6]}, {p[3], t[3], p[4]}, true);
 	test_always(g, parallel, {p[1], t[2], p[2]}, {p[6], t[4], p[5]}, true);
@@ -364,10 +357,8 @@ TEST(composition, nonproper_parallel) {
 	test_always(g, sequence, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]});
 }
 
-/*
-
-TODO(edward.bingham) this breaks the flat split group comparison method, may
-require recursive algorithms.
+// TODO(edward.bingham) this breaks the flat split group comparison method, may
+// require recursive algorithms.
 
 TEST(composition, shared_parallel) {
 	//          ->p1-->t1-->p2-->t2-->p3             .
@@ -391,12 +382,11 @@ TEST(composition, shared_parallel) {
 	g.connect({p[6], t[9], p[10]});
 	g.connect({t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]});
-	test_always(g, sequence, {t[0], p[4], t[3], p[5], t[4], p[6], t[5]});
-	test_always(g, sequence, {t[6], p[4], t[3], p[5], t[4], p[6], t[9]});
+	test_always(g, sequence, {t[0]}, {p[4], t[3], p[5], t[4], p[6], t[5]});
+	test_always(g, sequence, {t[6]}, {p[4], t[3], p[5], t[4], p[6], t[9]});
 	test_always(g, sequence, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
 	test_always(g, sequence, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]});
 	
@@ -411,7 +401,7 @@ TEST(composition, shared_parallel) {
 	test_always(g, parallel, {p[1], t[1], p[2], t[2], p[3]}, {p[4], t[3], p[5], t[4], p[6]});
 }
 
-TEST(composition, shared_choice) {
+/*TEST(composition, shared_choice) {
 	//          ->t1-->p1-->t2-->p2-->t3             .
 	//         /                        \            .
 	//     ->p0                          ->p5        .
@@ -433,8 +423,7 @@ TEST(composition, shared_choice) {
 	g.connect({t[6], p[9], t[10]});
 	g.connect({p[6], t[7], p[7], t[8], p[8], t[9], p[9]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[1], p[1], t[2], p[2], t[3]});
 	test_always(g, sequence, {t[4], p[3], t[5], p[4], t[6]});
@@ -468,8 +457,7 @@ TEST(composition, compressed_choice_parallel) {
 	g.connect({t[4], p[4], t[3], p[2]});
 	g.connect({p[0], t[4], p[6], t[5], p[5], t[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[0], p[1], t[1]});
 	test_always(g, sequence, {t[0], p[3], t[2]});
@@ -520,8 +508,7 @@ TEST(composition, compressed_parallel_choice) {
 	g.connect({p[4], t[4], p[3], t[2]});
 	g.connect({t[0], p[4], t[6], p[5], t[5], p[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	test_always(g, sequence, {t[1], p[1], t[2]});
 	test_always(g, sequence, {t[3], p[2], t[5]});

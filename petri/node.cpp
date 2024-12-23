@@ -6,14 +6,14 @@ namespace petri
 {
 
 split_group::split_group() {
-	split = 0;
+	split = -1;
 	count = 0;
 }
 
-split_group::split_group(int split, int branch, int count) {
+split_group::split_group(int split, int count, vector<int> branch) {
 	this->split = split;
-	this->branch.push_back(branch);
 	this->count = count;
+	this->branch = branch;
 }
 
 split_group::~split_group() {}
@@ -43,6 +43,14 @@ bool operator==(const split_group &g0, const split_group &g1)
 		}
 	}
 	return true;
+}
+
+bool operator<(const split_group &g0, int split) {
+	return g0.split < split;
+}
+
+bool operator==(const split_group &g0, int split) {
+	return g0.split == split;
 }
 
 ostream &operator<<(ostream &os, const split_group &g0) {
@@ -120,8 +128,9 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 			i++;
 			j++;
 		} else if (i < (int)g0.size() and (j >= (int)g1.size() or g0[i].split < g1[j].split)) {
-			if (group_operation == split_group::DIFFERENCE
-				or group_operation == split_group::SYMMETRIC_DIFFERENCE) {
+			if ((int)g0[i].branch.size() < g0[i].count
+				and (group_operation == split_group::DIFFERENCE
+					or group_operation == split_group::SYMMETRIC_DIFFERENCE)) {
 				return true;
 			} else if (group_operation == split_group::SUBSET
 				or group_operation == split_group::SUBSET_EQUAL) {
@@ -132,8 +141,9 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 			}
 			i++;
 		} else if (j < (int)g1.size()) {
-			if (group_operation == split_group::NEGATIVE_DIFFERENCE
-				or group_operation == split_group::SYMMETRIC_DIFFERENCE) {
+			if ((int)g1[j].branch.size() < g1[j].count
+				and (group_operation == split_group::NEGATIVE_DIFFERENCE
+					or group_operation == split_group::SYMMETRIC_DIFFERENCE)) {
 				return true;
 			} else if (group_operation == split_group::SUBSET
 				or group_operation == split_group::SUBSET_EQUAL) {

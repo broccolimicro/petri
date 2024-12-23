@@ -32,8 +32,7 @@ TEST(partial_composition, parallel_choice) {
 	g.connect({t[0], p[4], t[5], p[5], t[6], p[7], t[9]});
 	g.connect({p[4], t[7], p[6], t[8], p[7]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_TRUE(g.is(choice, {p[1], p[5]}, {p[2], p[6]}));
 	EXPECT_TRUE(g.is(choice, {p[1], p[5]}, {p[2], p[5]}));
@@ -69,8 +68,7 @@ TEST(partial_composition, parallel_parallel) {
 	g.connect({t[0], p[6], t[5], p[7], t[6], p[8], t[8], p[11], t[9]});
 	g.connect({t[5], p[9], t[7], p[10], t[8]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_TRUE (g.is(parallel, {t[2], t[3]}, {t[6], t[7]}, true, true));
 	EXPECT_FALSE(g.is(choice,   {t[2], t[3]}, {t[6], t[7]}, true, true));

@@ -36,7 +36,7 @@ struct graph
 	mutable vector<int> node_distances;
 	mutable bool node_distances_ready;
 
-	mutable bool split_groups_ready[2];
+	mutable bool split_groups_ready;
 	mutable bool merge_groups_ready[2];
 
 	vector<place> places;
@@ -49,8 +49,8 @@ struct graph
 	graph()
 	{
 		reset_node_distances();
-		split_groups_ready[0] = false;
-		split_groups_ready[1] = false;
+		split_groups_ready = false;
+		split_groups_ready = false;
 		merge_groups_ready[0] = false;
 		merge_groups_ready[1] = false;
 	}
@@ -138,8 +138,7 @@ struct graph
 		// loop around loops with splits and merges
 
 		// clear the current set of distances
-		int nodes = (int)(places.size() + transitions.size());
-		if (node_distances.size() != nodes*nodes) {
+		if (not node_distances_ready) {
 			reset_node_distances();
 		}
 
@@ -155,15 +154,18 @@ struct graph
 	}
 
 	virtual int &distance(petri::iterator from, petri::iterator to, bool update = true) const {
-		if (update and !node_distances_ready) {
+		if (update and not node_distances_ready) {
 			update_node_distances();
 		}
 
 		int nodes = places.size() + transitions.size();
 		int fromIdx = places.size()*from.type + from.index;
 		int toIdx = places.size()*to.type + to.index;
-
-		return node_distances[toIdx*nodes + fromIdx];
+		int idx = toIdx*nodes + fromIdx;
+		if (idx >= (int)node_distances.size()) {
+			node_distances.resize(nodes*nodes, std::numeric_limits<int>::min());
+		}
+		return node_distances[idx];
 	}
 
 	virtual int distance(vector<petri::iterator> from, vector<petri::iterator> to) const {
@@ -246,6 +248,94 @@ struct graph
 		return fwd and not rev;
 	}
 
+	// DESIGN(edward.bingham) In the following structure, p6 and p4 are not real
+	// conditional splits. The real conditional split is where the reset
+	// tokens are placed. If they are placed on p0 and p4, then only the top
+	// two branches will ever be executed, and they will always be executed
+	// in sequence. If they are placed on p4 and p8, then only the bottom two
+	// branches will be executed.
+	// 
+	// =->t0-->p0      ->p1-->t1-->p2      ->p3--=   .
+	//           \    /              \    /          .
+	//            ->t2                ->t3           .
+	//           /    \              /    \          .
+	// =->t4-->p4      ->p5-->t5-->p6      ->p7--=   .
+	//           \    /              \    /          .
+	//            ->t6                ->t7           .
+	//           /    \              /    \          .
+	// =->t8-->p8      ->p9-->t9-->p10     ->p11-=   .
+	//
+	// The same effect happens for non-reset splits as well. If we take the
+	// t0 branch on the p0 split, then we are _guaranteed_ to execute t3, and
+	// if we take the t4 branch on the p0 split, then we are _guaranteed_ to
+	// execute t6. This means that p4 is not a real conditional split. The
+	// choice has already been made.
+	//
+	//          ->p1-->t1-->p2             .
+	//         /              \            .
+	//     ->t0                ->t3        .
+	//    /    \              /    \       .
+	//  p0      ->p3-->t2-->p4      ->p7   .
+	//    \    /              \    /       .
+	//     ->t4                ->t6        .
+	//         \              /            .
+	//          ->p5-->t5-->p6             .
+	//
+	// If each output transition of that split is on a
+	// different branch of another conditional split group found at that split,
+	// then that split is "covered". If a parent split only partially covers
+	// the child split or if there are multiple parent splits that together
+	// cover the child split, then it doesn't count because there still exists
+	// a choice between the ones that are covered and the ones that aren't, or
+	// the ones that are covered by one split and the ones that are covered by
+	// the other. If there are two output transitions that have the same parent
+	// branch, and then another parent branch that covers those two, then it
+	// counts. So, I need to identify a set of parents that hierarchically
+	// break apart the transitions into selection groups. This is like a tree
+	// of splits. Technically each sub split has to also have the parent split
+	// as a parent. otherwise, it's just compressed properly nested choice
+	// split followed by parallel merge.
+	virtual bool split_is_covered(petri::iterator p, vector<petri::iterator> n) const {
+		if (n.size() <= 1) {
+			return true;
+		}
+
+		const vector<split_group> &groups = split_groups_of(choice, p, false);
+		for (auto group = groups.begin(); group != groups.end(); group++) {
+			bool found = true;
+			vector<vector<petri::iterator> > clusters;
+			clusters.resize(group->count);
+			for (auto j = n.begin(); j != n.end() and found; j++) {
+				vector<split_group> &subs = split_groups_of(choice, *j, false);
+				auto pos = find(subs.begin(), subs.end(), group->split);
+				if (pos != subs.end()) {
+					for (auto i = pos->branch.begin(); i != pos->branch.end() and found; i++) {
+						auto idx = find(group->branch.begin(), group->branch.end(), *i);
+						if (idx != group->branch.end()) {
+							clusters[idx-group->branch.begin()].push_back(*j);
+						} else {
+							found = false;
+						}
+					}
+				} else {
+					found = false;
+				}
+			}
+
+			for (auto cluster = clusters.begin(); cluster != clusters.end() and found; cluster++) {
+				if (cluster->size() == n.size() or not split_is_covered(p, *cluster)) {
+					found = false;
+				}
+			}
+
+			if (found) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+
 	virtual void compute_split_group(int composition, int split, vector<petri::iterator> init) const {
 		if (init.size() <= 1) {
 			// there is no split here
@@ -269,37 +359,20 @@ struct graph
 				composition == parallel ? transition::type : place::type,
 				split);
 
-		vector<petri::iterator> todo;
 		vector<petri::iterator> frontier;
+		// TODO(edward.bingham) maybe want to use a "path" here
 		set<petri::iterator> seen;
-		if (splitNode.index >= 0) {
-			seen.insert(splitNode);
-		}
-
+		seen.insert(init.begin(), init.end());
 		for (auto i = init.begin(); i != init.end(); i++) {
-			vector<split_group> &groups = split_groups_of(composition, *i, false);
-			for (int k = (int)groups.size()-1; k >= 0; k--) {
-				if (groups[k].split == split) {
-					groups.erase(groups.begin()+k);
-				}
-			}
-			groups.push_back(split_group(split, i->index, init.size()));
-			if (not seen.insert(*i).second) {
-				if (splitNode.index >= 0) {
-					frontier.push_back(splitNode);
-				}
-			}
-
-			for (auto j = n[i->type][i->index].begin(); j != n[i->type][i->index].end(); j++) {
-				if (seen.insert(*j).second) {
-					todo.push_back(*j);
-				} else {
-					frontier.push_back(*i);
-				}
-			}
+			set_split_group(composition, *i, split_group(split, init.size(), {i->index}));
 		}
-		sort(todo.begin(), todo.end());
-		todo.erase(unique(todo.begin(), todo.end()), todo.end());
+
+		// TODO(edward.bingham) I'm not correctly figuring out the frontier. It
+		// needs to be the nodes just outside the already explored nodes. Except,
+		// if I set "next" as "seen" nd then end on that, the frontier stacks up.
+		// I suspect this is the last thing before the shared_parallel test works.
+
+		
 
 		// I need to be able to do two things:
 		// 1. continue through a merge
@@ -309,101 +382,122 @@ struct graph
 		// unblock the merge that is closest to the split
 
 		// Forward iteration step
-		while (not todo.empty()) {
-			bool progress = false;
-			int minidx = -1;
-			for (int i = (int)todo.size()-1; i >= 0; i--) {
-				bool ready = true;
-				split_group group;
-				group.split = split;
-				group.count = (int)init.size();
-				// look for this split group at every input place and build the combined split group
-				for (auto j = p[todo[i].type][todo[i].index].begin(); j != p[todo[i].type][todo[i].index].end(); j++) {
-					bool branchReady = false;
-					vector<split_group> &groups = split_groups_of(composition, *j, false);
-					for (auto k = groups.begin(); k != groups.end(); k++) {
-						if (k->split == split) {
-							branchReady = true;
-							group.branch.insert(group.branch.end(), k->branch.begin(), k->branch.end());
+		//cout << "start loop" << endl;
+		map<petri::iterator, split_group> enabled;
+		do {
+			enabled.clear();
+			//cout << "step " << ::to_string(seen) << endl;
+
+			map<petri::iterator, split_group> blocked;
+			for (int type = 0; type < 2; type++) {
+				for (petri::iterator to = begin(type); to != end(type); to++) {
+					bool isDisabled = false;
+					bool isEnabled = false;
+					split_group toSplit = get_split_group(composition, to, split);
+					// Ensure that we haven't encountered this split yet.
+					if (toSplit.split != split) {
+						toSplit.split = split;
+						toSplit.count = init.size();
+
+						// Check to make sure we've visited all of the input nodes and
+						// derive the split group for this node.
+						for (auto from = p[to.type][to.index].begin(); from != p[to.type][to.index].end(); from++) {
+							split_group fromSplit = get_split_group(composition, *from, split);
+							if (fromSplit.split != split) {
+								isDisabled = true;
+								if (type == transition::type
+									and (composition == choice
+										or (composition == parallel
+											and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE,
+												split_groups_of(choice, splitNode, false),
+												split_groups_of(choice, *from, false))))) {
+									toSplit.branch.clear();
+									break;
+								}
+								continue;
+							}
+							isEnabled = true;
+
+							if (from == p[to.type][to.index].begin()
+								or not (to.type == transition::type and composition == choice)) {
+								toSplit.branch.insert(
+									toSplit.branch.end(),
+									fromSplit.branch.begin(),
+									fromSplit.branch.end());
+							} else {
+								toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
+							}
+						}
+
+						// If we've visited at least one of the input nodes, then this
+						// might be a blocked merge. If we've visited all of the input
+						// nodes, then we can make forward progress.
+						if (isEnabled and isDisabled) {
+							blocked.insert({to, toSplit});
+						} else if (isEnabled) {
+							enabled.insert({to, toSplit});
 						}
 					}
-					ready = (ready and branchReady);
 				}
-				sort(group.branch.begin(), group.branch.end());
-				group.branch.erase(unique(group.branch.begin(), group.branch.end()), group.branch.end());
+			}
 
+			//cout << "enabled: " << ::to_string(enabled) << endl;
+			//cout << "blocked: " << ::to_string(blocked) << endl;
+
+			if (enabled.empty() and not blocked.empty()) {
+				// We are stuck at a non-properly nested merge somewhere. We need to
+				// figure out where and then force progression through that merge. We
+				// may be stuck at multiple merges, we need to find the one that
+				// precedes all of the others.
+
+				auto first = blocked.begin();
+				for (auto i = ::next(blocked.begin()); i != blocked.end(); i++) {
+					if (precedes(i->first, first->first, seen)) {
+						first = i;
+					}
+				}
+				//cout << "forcing " << first->first << endl;
+				enabled.insert(*first);
+			}
+
+			for (auto i = enabled.begin(); i != enabled.end(); i++) {
+				sort(i->second.branch.begin(), i->second.branch.end());
+				i->second.branch.erase(
+					unique(i->second.branch.begin(), i->second.branch.end()),
+					i->second.branch.end());
+				if (n[i->first.type][i->first.index].empty()) {
+					//cout << "ready frontier end adding " << i->first << endl;
+					frontier.push_back(i->first);
+				}
+				for (auto j = n[i->first.type][i->first.index].begin(); j != n[i->first.type][i->first.index].end(); j++) {
+					if (get_split_group(composition, *j, split).split == split) {
+						//cout << "ready frontier loop adding " << i->first << endl;
+						frontier.push_back(i->first);
+					}
+				}
+			}
+
+			for (auto i = enabled.begin(); i != enabled.end(); i++) {
 				// replace the set of groups that exist at this location
-				vector<split_group> &groups = split_groups_of(composition, todo[i], false);
-				for (int k = (int)groups.size()-1; k >= 0; k--) {
-					if (groups[k].split == split) {
-						groups.erase(groups.begin()+k);
-					}
-				}
-				groups.push_back(group);
-
-				if (ready) {
-					// if one of the todo's can continue
-					progress = true;
-					// then step forward to the post-set
-					for (auto j = n[todo[i].type][todo[i].index].begin(); j != n[todo[i].type][todo[i].index].end(); j++) {
-						if (seen.insert(*j).second) {
-							todo.push_back(*j);
-						} else {
-							frontier.push_back(todo[i]);
-						}
-					}
-					if (n[todo[i].type][todo[i].index].empty()) {
-						frontier.push_back(todo[i]);
-					}
-					todo.erase(todo.begin()+i);
-				} else {
-					// This is just to determine which merge is "first". A merge might
-					// lead to another inside the split if there is a sequence of arcs
-					// from one to the next. Any merge without any input arcs from other
-					// merges is a valid "first" merge. Maybe I can just directly search
-					// for that relationship rather than try to derive it from distance
-					// calculations... Then I can reset the distance calculations to be
-					// based on the minimum distance rather than maximum and fix the
-					// cyclic dependency. This is similar to the problem of finding a
-					// trace from one node to the next.
-
-					// otherwise, we need to remember which merge is closest to the split
-					if (minidx < 0 or precedes(todo[i], todo[minidx], seen)) {
-						minidx = i;
-					}
-				}
+				set_split_group(composition, i->first, i->second);
+				seen.insert(i->first);
 			}
-
-			if (not progress) {
-				if (minidx < 0) {
-					// This should never happen. We should unblock one at random
-					minidx = (int)todo.size()-1;
-				}
-
-				// If we couldn't make forward progress, then we need to unblock the closest merge
-				for (auto j = n[todo[minidx].type][todo[minidx].index].begin(); j != n[todo[minidx].type][todo[minidx].index].end(); j++) {
-					if (seen.insert(*j).second) {
-						todo.push_back(*j);
-					} else {
-						frontier.push_back(todo[minidx]);
-					}
-				}
-				if (n[todo[minidx].type][todo[minidx].index].empty()) {
-					frontier.push_back(todo[minidx]);
-				}
-				todo.erase(todo.begin()+minidx);
-			}
-
-			sort(todo.begin(), todo.end());
-			todo.erase(unique(todo.begin(), todo.end()), todo.end());
-		}
+		} while (not enabled.empty());
+		//cout << "done loop" << endl;
 
 		sort(frontier.begin(), frontier.end());
 		frontier.erase(unique(frontier.begin(), frontier.end()), frontier.end());
-		
-		// reverse iteration step
-		// walk backward from the identified recursion points and delete back to the last encountered merge
-		todo = frontier;
+	
+		//cout << ::to_string(frontier) << endl;
+		//print();
+		//cout << endl << endl;
+	
+		// reverse iteration step: walk backward from the identified recursion
+		// points and delete back to the last encountered merge
+
+		// TODO(edward.bingham) I think this needs to be a breadth-first-search
+		// rather than depth-first-search
+		vector<petri::iterator> todo = frontier;
 		while (not todo.empty()) {
 			petri::iterator curr = todo.back();
 			todo.pop_back();
@@ -411,7 +505,7 @@ struct graph
 			bool found = false;	
 			vector<split_group> &cgroups = split_groups_of(composition, curr, false);
 			for (int j = (int)cgroups.size()-1; j >= 0; j--) {
-				if (cgroups[j].split == split and (int)cgroups[j].branch.size() >= cgroups[j].count) {
+				if (cgroups[j].split == split and (cgroups[j].branch.empty() or (int)cgroups[j].branch.size() >= cgroups[j].count)) {
 					cgroups.erase(cgroups.begin() + j);
 					found = true;
 					break;
@@ -425,7 +519,7 @@ struct graph
 			for (auto i = p[curr.type][curr.index].begin(); i != p[curr.type][curr.index].end() and closed; i++) {
 				vector<split_group> &groups = split_groups_of(composition, *i, false);
 				for (auto j = groups.begin(); j != groups.end() and closed; j++) {
-					closed = (j->split != split or (int)j->branch.size() >= j->count);
+					closed = (j->split != split or j->branch.empty() or (int)j->branch.size() >= j->count);
 				}
 			}
 
@@ -437,56 +531,77 @@ struct graph
 		}
 	}
 
-	virtual void compute_split_groups(int composition) const
-	{
-		// clear previous executions of this function and cache previous places and
-		// transitions as an optimization.
-		for (int i = 0; i < (int)places.size(); i++) {
-			places[i].splits[composition].clear();
-		}
-		for (int i = 0; i < (int)transitions.size(); i++) {
-			transitions[i].splits[composition].clear();
-		}
+	virtual void compute_split_groups() const {
+		// DESIGN(edward.bingham) Choice must go first, because we use that to determine whether we're dealing with non-properly nested parallelism or shared conditional parallel branches. It just so happens that "choice" = 0 and "parallel" = 1
+		for (int composition = 0; composition < 2; composition++) {
+			// clear previous executions of this function and cache previous places and
+			// transitions as an optimization.
+			for (int i = 0; i < (int)places.size(); i++) {
+				places[i].splits[composition].clear();
+			}
+			for (int i = 0; i < (int)transitions.size(); i++) {
+				transitions[i].splits[composition].clear();
+			}
 
-		// each place belongs to some set of parallel splits (init[place])
-		if (composition == parallel) {
-			// add parallel splits from reset states
-			if (not reset.empty()) {
-				for (int i = 0; i < (int)reset.size(); i++) {
-					vector<petri::iterator> branches;
-					for (auto j = reset[i].tokens.begin(); j != reset[i].tokens.end(); j++) {
-						branches.push_back(petri::iterator(place::type, j->index));
+			// each place belongs to some set of parallel splits (init[place])
+			if (composition == parallel) {
+				// add parallel splits from reset states
+				if (not reset.empty()) {
+					for (int i = 0; i < (int)reset.size(); i++) {
+						vector<petri::iterator> branches;
+						for (auto j = reset[i].tokens.begin(); j != reset[i].tokens.end(); j++) {
+							branches.push_back(petri::iterator(place::type, j->index));
+						}
+						compute_split_group(composition, -i-1, branches);
 					}
-					compute_split_group(composition, -i-1, branches);
+				}
+			} else if (composition == choice) {
+				if (reset.size() > 1) {
+					vector<petri::iterator> branches;
+					for (int i = 0; i < (int)reset.size(); i++) {
+						branches.push_back(petri::iterator(transition::type, -i-1));
+					}
+					compute_split_group(composition, -1, branches);
 				}
 			}
-		} else if (composition == choice) {
-			if (reset.size() > 1) {
-				vector<petri::iterator> branches;
-				for (int i = 0; i < (int)reset.size(); i++) {
-					branches.push_back(petri::iterator(transition::type, -i-1));
+
+			// A the moment, parallel == transition::type and choice == place::type,
+			// but that's not necessarily guaranteed.
+			int split_type = (composition == parallel ? transition::type : place::type);
+
+			// add splits from graph structure at the first branch nodes after each split
+			for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
+				compute_split_group(composition, i.index, next(i));
+			}
+
+			// See split_is_covered() for documentation. Remove "covered" conditional splits.
+			if (composition == choice) {
+				set<int> covered;
+				for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
+					if (split_is_covered(i, next(i))) {
+						covered.insert(i.index);
+					}
 				}
-				compute_split_group(composition, -1, branches);
+
+				for (int type = 0; type < 2; type++) {
+					for (petri::iterator i = begin(type); i != end(type); i++) {
+						vector<split_group> &groups = split_groups_of(choice, i, false);
+						for (int j = (int)groups.size()-1; j >= 0; j--) {
+							if (covered.find(groups[j].split) != covered.end()) {
+								groups.erase(groups.begin()+j);
+							}
+						}
+					}
+				}
 			}
 		}
-
-		// A the moment, parallel == transition::type and choice == place::type,
-		// but that's not necessarily guaranteed.
-		int split_type = (composition == parallel ? transition::type : place::type);
-
-		// add splits from graph structure at the first branch nodes after each split
-		for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
-			compute_split_group(composition, i.index, next(i));
-		}
-
-		split_groups_ready[composition] = true;
+		split_groups_ready = true;
 	}
 
 	virtual void mark_modified()
 	{
 		node_distances_ready = false;
-		split_groups_ready[0] = false;
-		split_groups_ready[1] = false;
+		split_groups_ready = false;
 	}
 
 	virtual int size(int type=-1) const {
@@ -1725,8 +1840,7 @@ struct graph
 			reset = g.reset;
 			node_distances = g.node_distances;
 			node_distances_ready = g.node_distances_ready;
-			split_groups_ready[0] = g.split_groups_ready[0];
-			split_groups_ready[1] = g.split_groups_ready[1];
+			split_groups_ready = g.split_groups_ready;
 
 			map<petri::iterator, vector<petri::iterator> > result;
 			for (int i = 0; i < (int)places.size(); i++)
@@ -2582,9 +2696,28 @@ struct graph
 		return true;
 	}
 
+	virtual void set_split_group(int composition, petri::iterator node, split_group g) const {
+		vector<split_group> &groups = split_groups_of(composition, node, false);
+		auto pos = lower_bound(groups.begin(), groups.end(), g.split);
+		if (pos != groups.end() and pos->split == g.split) {
+			*pos = g;
+		} else {
+			groups.insert(pos, g);
+		}
+	}
+
+	virtual split_group get_split_group(int composition, petri::iterator node, int split) const {
+		vector<split_group> &groups = split_groups_of(composition, node, false);
+		auto pos = lower_bound(groups.begin(), groups.end(), split);
+		if (pos != groups.end() and pos->split == split) {
+			return *pos;
+		}
+		return split_group();
+	}
+
 	virtual vector<split_group> &split_groups_of(int composition, petri::iterator node, bool update = true) const {
-		if (update and !split_groups_ready[composition]) {
-			compute_split_groups(composition);
+		if (update and !split_groups_ready) {
+			compute_split_groups();
 		}
 
 		if (node.type == place::type) {
@@ -2611,16 +2744,16 @@ struct graph
 	//   a is always in choice with b if firing a implies b will not fire
 	//   a is sometimes in sequence/parallel with b if firing a sometimes implies a firing on b
 	//   a is always in sequence/parallel with b if firing a always implies a firing on b
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false) const {
+	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
 		if (always) {
 			if (composition == sequence) {
 				//cout << "is choice: " << is(choice, a, b, false) << endl;
-				return is(sequence, a, b, false, bidir) and not is(choice, a, b, false, bidir);
+				return is(sequence, a, b, false, bidir, update) and not is(choice, a, b, false, bidir, update);
 			} else if (composition == parallel) {
-				return is(parallel, a, b, false, bidir) and not is(choice, a, b, false, bidir);
+				return is(parallel, a, b, false, bidir, update) and not is(choice, a, b, false, bidir, update);
 			} else {
-				//return is(choice, a, b, false, bidir) and not is(parallel, a, b, false, bidir);
-				return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
+				//return is(choice, a, b, false, bidir, update) and not is(parallel, a, b, false, bidir, update);
+				return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update));
 			}
 		}
 
@@ -2628,25 +2761,25 @@ struct graph
 			return false;
 		}
 		if (composition == sequence) {
-			/*cout << "parallel a: " << ::to_string(split_groups_of(parallel, a)) << endl;
-			cout << "parallel b: " << ::to_string(split_groups_of(parallel, b)) << endl;
+			/*cout << "parallel a: " << ::to_string(split_groups_of(parallel, a, update)) << endl;
+			cout << "parallel b: " << ::to_string(split_groups_of(parallel, b, update)) << endl;
 			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, a),
-					split_groups_of(parallel, b)) << endl;
-			cout << "choice a: " << ::to_string(split_groups_of(choice, a)) << endl;
-			cout << "choice b: " << ::to_string(split_groups_of(choice, b)) << endl;
+					split_groups_of(parallel, a, update),
+					split_groups_of(parallel, b, update)) << endl;
+			cout << "choice a: " << ::to_string(split_groups_of(choice, a, update)) << endl;
+			cout << "choice b: " << ::to_string(split_groups_of(choice, b, update)) << endl;
 			cout << "compare: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, a),
-					split_groups_of(choice, b)) << endl;*/
+					split_groups_of(choice, a, update),
+					split_groups_of(choice, b, update)) << endl;*/
 			return (compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, a),
-					split_groups_of(parallel, b))
+					split_groups_of(parallel, a, update),
+					split_groups_of(parallel, b, update))
 				and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, a),
-					split_groups_of(choice, b)));
+					split_groups_of(choice, a, update),
+					split_groups_of(choice, b, update)));
 		} else if (composition == choice) {
-			return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b))
-				or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, b), split_groups_of(composition, a)));
+			return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update))
+				or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, split_groups_of(composition, b, update), split_groups_of(composition, a, update)));
 		}
 		// TODO(edward.bingham) This doesn't work for non-properly nested
 		// conditional splits:
@@ -2663,7 +2796,7 @@ struct graph
 		//             and this
 		// should be "sometimes conditional, sometimes sequential"
 		// A recursive algorithm is likely necessary to determine this.
-		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a), split_groups_of(composition, b));
+		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, split_groups_of(composition, a, update), split_groups_of(composition, b, update));
 	}
 
 	// This assumes that a and b represent partial states. IE, there exists a set
@@ -3019,19 +3152,29 @@ struct graph
 			vector<split_group> A_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, nodes[i]);
 			vector<split_group> B_groups;
 
-			for (int j = 0; j < (int)nodes.size(); j++) {	
+			cout << "starting search " << ::to_string(nodes[i]) << " " << ::to_string(A_groups) << endl;
+			for (int j = 0; j < (int)nodes.size(); j++) {
+				cout << "checking i=" << i << ":" << ::to_string(nodes[i]) << " and j=" << j << ":" << ::to_string(nodes[j]) << endl;	
 				if (i != j and vector_is_subset_of(nodes[i], nodes[j])) {
+					cout << "found subset" << endl;
 					// 3. Find the conditional split groups of Bi & ~A union groups, intersect branches.
 					vector<petri::iterator> Bj = vector_difference(nodes[j], nodes[i]);
+					cout << "j-i" << ::to_string(Bj) << endl;
 
 					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
+					cout << "groups:" << ::to_string(Bj_groups) << endl;
 					
-					// 4. merge, intersect groups, subtract branches A-Bi for each Bi
-					Bj_groups = petri::merge(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, A_groups, Bj_groups);
+					// 4. Find the conditional branches that B belongs to that A does
+					// not. Merge, intersect groups, subtract branches A-Bi for each Bi
+					Bj_groups = petri::merge(split_group::INTERSECT, split_group::DIFFERENCE, A_groups, Bj_groups);
+					cout << "after intersect:" << ::to_string(Bj_groups) << endl;
+
 					// 5. merge, union groups, union branches across all [Bi]
 					B_groups = petri::merge(split_group::UNION, split_group::UNION, B_groups, Bj_groups);
+					cout << "after union:" << ::to_string(B_groups) << endl;
 				}
 			}
+			cout << "done search:" << ::to_string(B_groups) << endl;
 			if (B_groups.empty()) {
 				continue;
 			}
@@ -3046,7 +3189,7 @@ struct graph
 			sort(A.begin(), A.end());
 			A.erase(unique(A.begin(), A.end()), A.end());
 
-			// 6. select conditional groups of parallel transitions from A (not sometimes conditional)
+			/*// 6. select conditional groups of parallel transitions from A (not sometimes conditional)
 			vector<vector<petri::iterator> > groups = select(parallel, A, false, true);
 
 			// 7. delete groups that don't include A
@@ -3054,7 +3197,8 @@ struct graph
 				if (vector_is_subset_of(nodes[i], *group)) {
 					nodes.push_back(*group);
 				}
-			}
+			}*/
+			nodes.push_back(A);
 
 			// TODO(edward.bingham) Do I need to group(parallel, groups, false,
 			// false) and then recurse looking for subsets? How does this interact
@@ -3258,24 +3402,24 @@ struct graph
 		return groups;
 	}
 
-	virtual void print() {
+	virtual void print() const {
 		for (int i = 0; i < (int)places.size(); i++) {
 			cout << "p" << i << ": p" << ::to_string(places[i].splits[place::type]) << " t" << ::to_string(places[i].splits[transition::type]) << "{";
 			for (int j = 0; j < (int)places.size(); j++) {
-				if (distance(petri::iterator(place::type, i), petri::iterator(place::type, j)) >= 0) {
-					cout << "->p" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(place::type, j)) << " ";
+				if (distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) >= 0) {
+					cout << "->p" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) << " ";
 				}
-				if (distance(petri::iterator(place::type, j), petri::iterator(place::type, i)) >= 0) {
-					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(place::type, i)) << " ";
+				if (distance(petri::iterator(place::type, j), petri::iterator(place::type, i), false) >= 0) {
+					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(place::type, i), false) << " ";
 				}
 			}
 
 			for (int j = 0; j < (int)transitions.size(); j++) {
-				if (distance(petri::iterator(place::type, i), petri::iterator(transition::type, j)) >= 0) {
-					cout << "->t" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(transition::type, j)) << " ";
+				if (distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) >= 0) {
+					cout << "->t" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) << " ";
 				}
-				if (distance(petri::iterator(transition::type, j), petri::iterator(place::type, i)) >= 0) {
-					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(place::type, i)) << " ";
+				if (distance(petri::iterator(transition::type, j), petri::iterator(place::type, i), false) >= 0) {
+					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(place::type, i), false) << " ";
 				}
 			}
 			cout << "}" << endl;
@@ -3284,20 +3428,20 @@ struct graph
 			cout << "t" << i << ": p" << ::to_string(transitions[i].splits[place::type]) << " t" << ::to_string(transitions[i].splits[transition::type]) << "{";
 
 			for (int j = 0; j < (int)places.size(); j++) {
-				if (distance(petri::iterator(transition::type, i), petri::iterator(place::type, j)) >= 0) {
-					cout << "->p" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(place::type, j)) << " ";
+				if (distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) >= 0) {
+					cout << "->p" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) << " ";
 				}
-				if (distance(petri::iterator(place::type, j), petri::iterator(transition::type, i)) >= 0) {
-					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(transition::type, i)) << " ";
+				if (distance(petri::iterator(place::type, j), petri::iterator(transition::type, i), false) >= 0) {
+					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(transition::type, i), false) << " ";
 				}
 			}
 
 			for (int j = 0; j < (int)transitions.size(); j++) {
-				if (distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j)) >= 0) {
+				if (distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j), false) >= 0) {
 					cout << "->t" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j)) << " ";
 				}
-				if (distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i)) >= 0) {
-					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i)) << " ";
+				if (distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i), false) >= 0) {
+					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i), false) << " ";
 				}
 			}
 			cout << "}" << endl;

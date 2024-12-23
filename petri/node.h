@@ -19,7 +19,7 @@ enum composition
 struct split_group
 {
 	split_group();
-	split_group(int split, int branch, int count);
+	split_group(int split, int count, vector<int> branch=vector<int>());
 	~split_group();
 
 	enum {
@@ -41,6 +41,9 @@ struct split_group
 
 bool operator<(const split_group &g0, const split_group &g1);
 bool operator==(const split_group &g0, const split_group &g1);
+
+bool operator<(const split_group &g0, int split);
+bool operator==(const split_group &g0, int split);
 
 ostream &operator<<(ostream &os, const split_group &g0);
 

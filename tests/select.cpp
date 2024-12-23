@@ -24,8 +24,7 @@ TEST(select, sequence) {
 
 	g.connect({t[0], p[0], t[1], p[1], t[2], p[2], t[0]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, false, false));
 	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, false, true));
@@ -61,8 +60,7 @@ TEST(select, always_choice) {
 	g.connect({t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
 	g.connect({p[0], t[2], p[2], t[3], p[3]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, false));
 	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, true));
@@ -107,8 +105,7 @@ TEST(select, always_parallel) {
 	g.connect({p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
 	g.connect({t[0], p[2], t[2], p[3], t[3]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, false));
 	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, true));
@@ -161,8 +158,7 @@ TEST(select, compressed_proper_nesting) {
 
 	g.reset.push_back(state<token>({token(p[0].index), token(p[2].index)}));
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, false));
 	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, true));
@@ -219,8 +215,7 @@ TEST(select, choice_parallel) {
 	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
 	g.connect({p[0], t[4], p[5], t[5], p[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, false));
 	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, true));
@@ -259,8 +254,7 @@ TEST(select, parallel_choice) {
 	g.connect({p[0], t[3], p[2], t[4], p[3], t[6]});
 	g.connect({t[0], p[4], t[5], p[5], t[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, false));
 	EXPECT_EQ(mark({{p[1]},{p[2]},{p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, true));
@@ -290,8 +284,7 @@ TEST(select, nonproper_choice) {
 	g.connect(p[1], t[6]);
 	g.connect(t[6], p[4]);
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, false));
 	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, true));
@@ -330,8 +323,7 @@ TEST(select, nonproper_parallel) {
 	g.connect(t[1], p[6]);
 	g.connect(p[6], t[4]);
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, false));
 	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, true));
@@ -379,8 +371,7 @@ TEST(select, shared_parallel) {
 	g.connect({p[6], t[9], p[10]});
 	g.connect({t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 }
 
@@ -406,8 +397,7 @@ TEST(select, shared_choice) {
 	g.connect({t[6], p[9], t[10]});
 	g.connect({p[6], t[7], p[7], t[8], p[8], t[9], p[9]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 }*/
 
@@ -434,8 +424,7 @@ TEST(select, compressed_choice_parallel) {
 	g.connect({t[4], p[4], t[3], p[2]});
 	g.connect({p[0], t[4], p[6], t[5], p[5], t[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, false));
 	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, true));
@@ -474,7 +463,6 @@ TEST(select, compressed_parallel_choice) {
 	g.connect({p[4], t[4], p[3], t[2]});
 	g.connect({t[0], p[4], t[6], p[5], t[5], p[6]});
 
-	g.compute_split_groups(parallel);
-	g.compute_split_groups(choice);
+	g.compute_split_groups();
 
 }*/
