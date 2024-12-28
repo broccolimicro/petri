@@ -31,9 +31,9 @@ void test_always(const graph<place, transition, token, state<token> > &g, int co
 				if (bidir) {
 					EXPECT_TRUE(g.is(composition, *j, *i, true)) << should_be(g, true, composition, *j, *i);
 				}
-				EXPECT_TRUE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
+				EXPECT_TRUE(g.is(composition, *i, *j, false)) << should_be(g, true, composition, *i, *j);
 				if (bidir) {
-					EXPECT_TRUE(g.is(composition, *j, *i, false)) << should_be(g, false, composition, *j, *i);
+					EXPECT_TRUE(g.is(composition, *j, *i, false)) << should_be(g, true, composition, *j, *i);
 				}
 			} else {
 				EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
