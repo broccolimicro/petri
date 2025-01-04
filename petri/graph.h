@@ -276,13 +276,13 @@ struct graph
 			return true;
 		}
 
-		const vector<split_group> &groups = split_groups_of(choice, p, false);
+		vector<split_group> groups = split_groups_of(choice, p, false);
 		for (auto group = groups.begin(); group != groups.end(); group++) {
 			bool found = true;
 			vector<vector<petri::iterator> > clusters;
 			clusters.resize(group->count);
 			for (auto j = n.begin(); j != n.end() and found; j++) {
-				vector<split_group> &subs = split_groups_of(choice, *j, false);
+				vector<split_group> subs = split_groups_of(choice, *j, false);
 				auto pos = find(subs.begin(), subs.end(), group->split);
 				if (pos != subs.end()) {
 					for (auto i = pos->branch.begin(); i != pos->branch.end() and found; i++) {
@@ -494,12 +494,15 @@ struct graph
 			todo.pop_back();
 		
 			bool found = false;	
-			vector<split_group> &cgroups = split_groups_of(composition, curr, false);
-			for (int j = (int)cgroups.size()-1; j >= 0; j--) {
-				if (cgroups[j].split == split and (cgroups[j].branch.empty() or (int)cgroups[j].branch.size() >= cgroups[j].count)) {
-					cgroups.erase(cgroups.begin() + j);
-					found = true;
-					break;
+			vector<split_group> *cgroups = split_groups_iter(composition, curr);
+			if (cgroups != nullptr) {
+				for (int j = (int)cgroups->size()-1; j >= 0; j--) {
+					auto pos = cgroups->begin()+j;
+					if (pos->split == split and (pos->branch.empty() or (int)pos->branch.size() >= pos->count)) {
+						cgroups->erase(pos);
+						found = true;
+						break;
+					}
 				}
 			}
 			if (not found) {
@@ -508,7 +511,7 @@ struct graph
 
 			bool closed = true;
 			for (auto i = p[curr.type][curr.index].begin(); i != p[curr.type][curr.index].end() and closed; i++) {
-				vector<split_group> &groups = split_groups_of(composition, *i, false);
+				vector<split_group> groups = split_groups_of(composition, *i, false);
 				for (auto j = groups.begin(); j != groups.end() and closed; j++) {
 					closed = (j->split != split or j->branch.empty() or (int)j->branch.size() >= j->count);
 				}
@@ -580,10 +583,11 @@ struct graph
 
 				for (int type = 0; type < 2; type++) {
 					for (petri::iterator i = begin(type); i != end(type); i++) {
-						vector<split_group> &groups = split_groups_of(choice, i, false);
-						for (int j = (int)groups.size()-1; j >= 0; j--) {
-							if (covered.find(groups[j].split) != covered.end()) {
-								groups.erase(groups.begin()+j);
+						vector<split_group> *groups = split_groups_iter(choice, i);
+						for (int j = (int)groups->size()-1; j >= 0; j--) {
+							auto pos = groups->begin()+j;
+							if (covered.find(pos->split) != covered.end()) {
+								groups->erase(pos);
 							}
 						}
 					}
@@ -2692,17 +2696,17 @@ struct graph
 	}
 
 	virtual void set_split_group(int composition, petri::iterator node, split_group g) const {
-		vector<split_group> &groups = split_groups_of(composition, node, false);
-		auto pos = lower_bound(groups.begin(), groups.end(), g.split);
-		if (pos != groups.end() and pos->split == g.split) {
+		vector<split_group> *groups = split_groups_iter(composition, node);
+		auto pos = lower_bound(groups->begin(), groups->end(), g.split);
+		if (pos != groups->end() and pos->split == g.split) {
 			*pos = g;
 		} else {
-			groups.insert(pos, g);
+			groups->insert(pos, g);
 		}
 	}
 
 	virtual split_group get_split_group(int composition, petri::iterator node, int split) const {
-		vector<split_group> &groups = split_groups_of(composition, node, false);
+		vector<split_group> groups = split_groups_of(composition, node, false);
 		auto pos = lower_bound(groups.begin(), groups.end(), split);
 		if (pos != groups.end() and pos->split == split) {
 			return *pos;
@@ -2710,11 +2714,29 @@ struct graph
 		return split_group();
 	}
 
-	virtual vector<split_group> &split_groups_of(int composition, petri::iterator node, bool update = true) const {
+	virtual vector<split_group> *split_groups_iter(int composition, petri::iterator node) const {
+		if (node.index < 0) {
+			return nullptr;
+		}
+
+		if (node.type == place::type) {
+			return &places[node.index].splits[composition];
+		}
+		return &transitions[node.index].splits[composition];
+	}
+
+	virtual vector<split_group> split_groups_of(int composition, petri::iterator node, bool update = true) const {
+		if (node.index < 0) {
+			if (node.type == transition::type and composition == choice and (int)reset.size() > 1) {
+				return vector<split_group>(1, split_group(-1, (int)reset.size(), vector<int>(1, node.index)));
+			}
+			return vector<split_group>();
+		}
+
 		if (update and !split_groups_ready) {
 			compute_split_groups();
 		}
-
+ 
 		if (node.type == place::type) {
 			return places[node.index].splits[composition];
 		}
