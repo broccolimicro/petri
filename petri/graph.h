@@ -340,7 +340,9 @@ struct graph
 		set<petri::iterator> seen;
 		seen.insert(init.begin(), init.end());
 		for (auto i = init.begin(); i != init.end(); i++) {
-			set_split_group(composition, *i, split_group(split, init.size(), {i->index}));
+			if (i->index >= 0) {
+				set_split_group(composition, *i, split_group(split, init.size(), {i->index}));
+			}
 		}
 
 		// I need to be able to do two things:
@@ -2697,6 +2699,10 @@ struct graph
 
 	virtual void set_split_group(int composition, petri::iterator node, split_group g) const {
 		vector<split_group> *groups = split_groups_iter(composition, node);
+		if (groups == nullptr) {
+			return;
+		}
+
 		auto pos = lower_bound(groups->begin(), groups->end(), g.split);
 		if (pos != groups->end() and pos->split == g.split) {
 			*pos = g;

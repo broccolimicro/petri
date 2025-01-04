@@ -145,7 +145,7 @@ TEST(composition, always_parallel) {
 	test_always(g, sequence, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
 }
 
-TEST(composition, compressed_proper_nesting) {
+TEST(composition, regular_interleaved) {
 	//  =->*p0-->t0-->p1-->t1-=  .
 	//       \ /  \ /            .
 	//        X    X             .
@@ -180,7 +180,7 @@ TEST(composition, compressed_proper_nesting) {
 	test_always(g, choice, {t[0]}, {t[2]}, true);
 }
 
-TEST(composition, compressed_proper_nesting2) {
+TEST(composition, regular_parallel) {
 	//  =>t0-->p0-->t1-->*p1-->=  .
 	//     \      /  \       /    .
 	//      ->p2 /    ->*p3 /     .
@@ -217,6 +217,52 @@ TEST(composition, compressed_proper_nesting2) {
 	test_always(g, parallel, {t[0]}, {p[3], p[7], t[2], p[4], p[6]}, true);
 	test_always(g, parallel, {p[0], p[4], t[1], p[1], p[3]}, {t[3]}, true);
 	test_always(g, parallel, {t[1]}, {p[2], p[6], t[3], p[5], p[7]}, true);
+}
+
+TEST(composition, regular_choice) {
+	//  =>p0*->t0-->p1-->t1-->=  .
+	//     \      /  \      /    .
+	//      ->t2 /    ->t3 /     .
+	//          X         X      .
+	//      ->t4 \    ->t5 \     .
+	//     /      \  /      \    .
+	//  =>p2-->t6-->p3-->t7-->=  .
+
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 8);
+
+	g.connect({p[0], t[0], p[1], t[1], p[0]});
+	g.connect({p[2], t[6], p[3], t[7], p[2]});
+
+	g.connect({p[0], t[2], p[3], t[5], p[0]});
+	g.connect({p[2], t[4], p[1], t[3], p[2]});
+
+	g.reset.push_back(state<token>({token(p[0].index)}));
+	g.reset.push_back(state<token>({token(p[2].index)}));
+
+	g.compute_split_groups();
+
+	test_sometimes(g, choice, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
+	test_sometimes(g, choice, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
+	test_sometimes(g, sequence, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
+	test_sometimes(g, sequence, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
+
+	// TODO(edward.bingham) these don't work correctly
+		//test_always(g, sequence, {t[0], t[4]}, {p[1]});
+		//test_always(g, sequence, {t[1], t[5]}, {p[0]});
+		//test_always(g, sequence, {t[2], t[6]}, {p[3]});
+		//test_always(g, sequence, {t[3], t[7]}, {p[2]});
+
+	test_always(g, choice, {p[0]}, {p[2]}, true);
+	test_always(g, choice, {p[1]}, {p[3]}, true);
+	test_always(g, choice, {t[0], t[2], t[4], t[6]}, {}, true);
+	test_always(g, choice, {t[1], t[3], t[5], t[7]}, {}, true);
+	test_always(g, choice, {t[5], t[1], p[0], t[0], t[2]}, {p[2]}, true);
+	test_always(g, choice, {p[0]}, {t[3], t[7], p[2], t[4], t[6]}, true);
+	test_always(g, choice, {t[0], t[4], p[1], t[1], t[3]}, {p[3]}, true);
+	test_always(g, choice, {p[1]}, {t[2], t[6], p[3], t[5], t[7]}, true);
 }
 
 TEST(composition, choice_parallel) {
@@ -473,7 +519,7 @@ TEST(composition, shared_choice) {
 	test_always(g, choice, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
 }
 
-TEST(composition, compressed_choice_parallel) {
+TEST(composition, regular_choice_parallel) {
 	//           ->p1-->t1--          .
 	//          /           \         .
 	//      ->t0             p2       .
@@ -522,7 +568,7 @@ TEST(composition, compressed_choice_parallel) {
 
 /* This structure violates liveness
 
-TEST(composition, compressed_parallel_choice) {
+TEST(composition, regular_parallel_choice) {
 	// Without guards, this would deadlock when t3 and t4 or t1 and t6 are
 	// executed in parallel.
 	//           ->t1-->p1--          .
