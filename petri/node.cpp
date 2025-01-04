@@ -1,12 +1,13 @@
 #include "node.h"
 #include <common/message.h>
 #include <common/text.h>
+#include <limits>
 
 namespace petri
 {
 
 split_group::split_group() {
-	split = -1;
+	split = std::numeric_limits<int>::min();
 	count = 0;
 }
 

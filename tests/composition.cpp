@@ -180,6 +180,45 @@ TEST(composition, compressed_proper_nesting) {
 	test_always(g, choice, {t[0]}, {t[2]}, true);
 }
 
+TEST(composition, compressed_proper_nesting2) {
+	//  =>t0-->p0-->t1-->*p1-->=  .
+	//     \      /  \       /    .
+	//      ->p2 /    ->*p3 /     .
+	//          X          X      .
+	//      ->p4 \    ->*p5 \     .
+	//     /      \  /       \    .
+	//  =>t2-->p6-->t3-->*p7-->=  .
+
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 8);
+	auto t = g.create(transition(), 4);
+
+	g.connect({t[0], p[0], t[1], p[1], t[0]});
+	g.connect({t[2], p[6], t[3], p[7], t[2]});
+
+	g.connect({t[0], p[2], t[3], p[5], t[0]});
+	g.connect({t[2], p[4], t[1], p[3], t[2]});
+
+	g.reset.push_back(state<token>({token(p[1].index), token(p[3].index), token(p[5].index), token(p[7].index)}));
+
+	g.compute_split_groups();
+
+	test_always(g, sequence, {t[0], p[0], t[1], p[1]}, {}, true);
+	test_always(g, sequence, {t[2], p[6], t[3], p[7]}, {}, true);
+	test_always(g, sequence, {t[0], p[2], t[3], p[5]}, {}, true);
+	test_always(g, sequence, {t[2], p[4], t[1], p[3]}, {}, true);
+
+	test_always(g, parallel, {t[0]}, {t[2]}, true);
+	test_always(g, parallel, {t[1]}, {t[3]}, true);
+	test_always(g, parallel, {p[0], p[2], p[4], p[6]}, {}, true);
+	test_always(g, parallel, {p[1], p[3], p[5], p[7]}, {}, true);
+	test_always(g, parallel, {p[5], p[1], t[0], p[0], p[2]}, {t[2]}, true);
+	test_always(g, parallel, {t[0]}, {p[3], p[7], t[2], p[4], p[6]}, true);
+	test_always(g, parallel, {p[0], p[4], t[1], p[1], p[3]}, {t[3]}, true);
+	test_always(g, parallel, {t[1]}, {p[2], p[6], t[3], p[5], p[7]}, true);
+}
+
 TEST(composition, choice_parallel) {
 	//          -->p1-->t1-->p2           .
 	//         /               \          .

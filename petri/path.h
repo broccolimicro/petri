@@ -269,8 +269,8 @@ path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::i
 		// "to" vector by ignoring those branches. The split groups
 		// stored in the graph structure tell us which of those branches
 		// lead to our target node.
-		if (!g.split_groups_ready[type])
-			g.compute_split_groups(type);
+		if (!g.split_groups_ready)
+			g.compute_split_groups();
 
 		vector<split_group> groups;
 		for (auto i = to.begin(); i != to.end(); i++) {

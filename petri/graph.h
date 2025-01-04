@@ -203,9 +203,6 @@ struct graph
 			}
 		}
 
-		bool fwd = false;
-		bool rev = false;
-
 		set<petri::iterator> seen = excl;
 		seen.insert(from);
 
@@ -217,35 +214,14 @@ struct graph
 
 			for (auto i = n[curr.type][curr.index].begin(); i != n[curr.type][curr.index].end(); i++) {
 				if (*i == to) {
-					fwd = true;
-					break;
+					return true;
 				}
 				if (seen.insert(*i).second) {
 					stack.push_back(*i);
 				}
 			}
 		}
-
-		stack.clear();
-		seen = excl;
-		seen.insert(to);
-		stack.push_back(to);
-		while (not stack.empty()) {
-			petri::iterator curr = stack.back();
-			stack.pop_back();
-
-			for (auto i = n[curr.type][curr.index].begin(); i != n[curr.type][curr.index].end(); i++) {
-				if (*i == from) {
-					rev = true;
-					break;
-				}
-				if (seen.insert(*i).second) {
-					stack.push_back(*i);
-				}
-			}
-		}
-
-		return fwd and not rev;
+		return false;
 	}
 
 	// DESIGN(edward.bingham) In the following structure, p6 and p4 are not real
@@ -375,8 +351,10 @@ struct graph
 		// unblock the merge that is closest to the split
 
 		// Forward iteration step
-		//cout << "start loop" << endl;
+		//cout << "start loop " << split << endl;
 		map<petri::iterator, split_group> enabled;
+		map<petri::iterator, int> order;
+		int orderLevel = 0;
 		do {
 			enabled.clear();
 			//cout << "step " << ::to_string(seen) << endl;
@@ -417,6 +395,8 @@ struct graph
 									toSplit.branch.end(),
 									fromSplit.branch.begin(),
 									fromSplit.branch.end());
+								sort(toSplit.branch.begin(), toSplit.branch.end());
+								toSplit.branch.erase(unique(toSplit.branch.begin(), toSplit.branch.end()), toSplit.branch.end());
 							} else {
 								toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
 							}
@@ -443,9 +423,27 @@ struct graph
 				// may be stuck at multiple merges, we need to find the one that
 				// precedes all of the others.
 
+				for (auto i = blocked.begin(); i != blocked.end(); i++) {
+					auto pos = order.find(i->first);
+					if (pos == order.end()) {
+						order.insert({i->first, orderLevel});
+					}
+				}
+				orderLevel++;
+
+				//cout << ::to_string(order) << " " << to_string(seen) << endl;
 				auto first = blocked.begin();
 				for (auto i = ::next(blocked.begin()); i != blocked.end(); i++) {
-					if (precedes(i->first, first->first, seen)) {
+					bool AtoB = precedes(i->first, first->first, seen);
+					bool BtoA = precedes(first->first, i->first, seen);
+					if (AtoB and BtoA) {
+						auto orderA = order.find(i->first);
+						auto orderB = order.find(first->first);
+						if (orderB == order.end()
+							or (orderA != order.end() and orderA->second < orderB->second)) {
+							first = i;
+						}
+					} else if (AtoB) {
 						first = i;
 					}
 				}
@@ -522,6 +520,10 @@ struct graph
 				todo.erase(unique(todo.begin(), todo.end()), todo.end());
 			}
 		}
+
+		//cout << "done backtrack" << endl;
+		//print();
+		//cout << endl << endl;
 	}
 
 	virtual void compute_split_groups() const {
