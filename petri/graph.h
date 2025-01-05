@@ -2765,25 +2765,55 @@ struct graph
 	// a is always in choice with b if firing a implies b will not fire
 	// a and b are sometimes in bidirectional choice if firing a does not imply a
 	// firing on b **or** visa-versa.
-	virtual bool is_choice(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+	virtual bool is_excludes(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
+		if (a == b) {
+			return true;
+		}
+
+		auto ac = split_groups_of(choice, a, update);
+		auto bc = split_groups_of(choice, b, update);
+
+		return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, ac, bc)
+			and (not always or not is_implies(a, b, false, update));
+	}
+
+
+	// a is sometimes in choice with b if firing a does not imply a firing on b
+	// a is always in choice with b if firing a implies b will not fire
+	// a and b are sometimes in bidirectional choice if firing a does not imply a
+	// firing on b **or** visa-versa.
+	virtual bool is_implies(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
+		if (a == b) {
+			return true;
+		}
+
+		auto ac = split_groups_of(choice, a, update);
+		auto bc = split_groups_of(choice, b, update);
+
+		return not compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc)
+			and (not always or not is_excludes(a, b, false, update));
+	}
+
+	// a is sometimes in choice with b if firing a does not imply a firing on b
+	// a is always in choice with b if firing a implies b will not fire
+	// a and b are sometimes in bidirectional choice if firing a does not imply a
+	// firing on b **or** visa-versa.
+	virtual bool is_choice(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
 		if (a == b) {
 			return false;
 		}
 
 		auto ac = split_groups_of(choice, a, update);
 		auto bc = split_groups_of(choice, b, update);
-		if (always) {
-			return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc);
-		}
-
-		return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, ac, bc)
-			or (bidir and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, bc, ac));
+		return (not always and compare(split_group::INTERSECT, split_group::NOT_EQUAL, ac, bc))
+			or (always and compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc)
+				and not is_parallel(a, b, false, update));
 	}
 
 	// a is sometimes in parallel if there exists a state with both a and b.
 	// This does not imply that all states with one also have the other. This
 	// relationship is bidirectional.
-	virtual bool is_parallel(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+	virtual bool is_parallel(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
 		if (a == b) {
 			return false;
 		}
@@ -2791,10 +2821,10 @@ struct graph
 		auto ap = split_groups_of(parallel, a, update);
 		auto bp = split_groups_of(parallel, b, update);
 		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ap, bp)
-			 and (not always or not is_choice(a, b, false, bidir, update));
+			 and (not always or not is_choice(a, b, false, update));
 	}
 
-	virtual bool is_sequence(petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
+	virtual bool is_sequence(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
 		if (a == b) {
 			return false;
 		}
@@ -2806,17 +2836,20 @@ struct graph
 
 		return compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ap, bp)
 			and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ac, bc)
-			and (not always or not is_choice(a, b, false, bidir, update));
+			and (not always or not is_choice(a, b, false, update));
 	}
 
 	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
 		if (composition == sequence) {
-			return is_sequence(a, b, always, bidir, update);
+			return is_sequence(a, b, always, update) and (not bidir or is_sequence(b, a, always, update));
 		} else if (composition == choice) {
-			//return is_choice(a, b, false, bidir, update) and not is_parallel(a, b, update);
-			return is_choice(a, b, always, bidir, update);
+			return is_choice(a, b, always, update);
+		} else if (composition == implies) {
+			return is_implies(a, b, always, update) and (not bidir or is_implies(b, a, always, update));
+		} else if (composition == excludes) {
+			return is_excludes(a, b, always, update) or (bidir and is_excludes(b, a, always, update));
 		}
-		return is_parallel(a, b, always, bidir, update);
+		return is_parallel(a, b, always, update);
 	}
 
 	// This assumes that a and b represent partial states. IE, there exists a set
@@ -2850,28 +2883,19 @@ struct graph
 		//   Is it possible to have nodes composed in sequence sometimes and
 		//   parallel others? If so, then also not composed in parallel sometimes.
 
-		if (composition == parallel) {
+		if (composition == parallel or composition == implies) {
 			for (auto i = a.begin(); i != a.end(); i++) {
 				for (auto j = b.begin(); j != b.end(); j++) {
-					if (*i != *j and not is(parallel, *i, *j, always, bidir)) {
+					if (*i != *j and not is(composition, *i, *j, always, bidir)) {
 						return false;
 					}
 				}
 			}
 			return true;
-		} else if (composition == choice) {
+		} else if (composition == choice or composition == sequence or composition == excludes) {
 			for (auto i = a.begin(); i != a.end(); i++) {
 				for (auto j = b.begin(); j != b.end(); j++) {
-					if (*i != *j and is(choice, *i, *j, always, bidir)) {
-						return true;
-					}
-				}
-			}
-			return false;
-		} else if (composition == sequence) {
-			for (auto i = a.begin(); i != a.end(); i++) {
-				for (auto j = b.begin(); j != b.end(); j++) {
-					if (*i != *j and is(sequence, *i, *j, always, bidir)) {
+					if (*i != *j and is(composition, *i, *j, always, bidir)) {
 						return true;
 					}
 				}
@@ -3038,10 +3062,6 @@ struct graph
 		//  always &  invert - separate nodes that are always composed as the opposite of requested
 
 		vector<vector<petri::iterator> > result;
-		if (composition != choice and composition != parallel) {
-			// This only works for parallel and conditional compositions
-			return result;
-		}
 
 		// This is the problem of identifying all maximal cliques in the
 		// graph constructed using the nodes in "from" as vertices and
@@ -3051,6 +3071,17 @@ struct graph
 		struct BronKerboschFrame {
 			vector<petri::iterator> R, P, X;
 		};
+
+		int opposite = composition;
+		if (composition == parallel) {
+			opposite = choice;
+		} else if (composition == choice) {
+			opposite = parallel;
+		} else if (composition == implies) {
+			opposite = excludes;
+		} else if (composition == excludes) {
+			opposite = implies;
+		}
 
 		vector<BronKerboschFrame> frames;
 		frames.push_back(BronKerboschFrame());
@@ -3072,14 +3103,14 @@ struct graph
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
 						if (frames.back().P[i] == frame.P.back()
 							or (not invert and not is(composition, frames.back().P[i], frame.P.back(), always, true))
-							or (invert and is(1-composition, frames.back().P[i], frame.P.back(), always, true))) {
+							or (invert and is(opposite, frames.back().P[i], frame.P.back(), always, true))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
 						if (frames.back().X[i] == frame.P.back()
 							or (not invert and not is(composition, frames.back().X[i], frame.P.back(), always, true))
-							or (invert and is(1-composition, frames.back().X[i], frame.P.back(), always, true))) {
+							or (invert and is(opposite, frames.back().X[i], frame.P.back(), always, true))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}
@@ -3103,6 +3134,17 @@ struct graph
 		struct BronKerboschFrame {
 			vector<int> R, P, X;
 		};
+
+		int opposite = composition;
+		if (composition == parallel) {
+			opposite = choice;
+		} else if (composition == choice) {
+			opposite = parallel;
+		} else if (composition == implies) {
+			opposite = excludes;
+		} else if (composition == excludes) {
+			opposite = implies;
+		}
 
 		vector<BronKerboschFrame> frames;
 		frames.push_back(BronKerboschFrame());
@@ -3131,14 +3173,14 @@ struct graph
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
 						if (frames.back().P[i] == frame.P.back()
 							or (not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
-							or (invert and is(1-composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
+							or (invert and is(opposite, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
 						if (frames.back().X[i] == frame.P.back()
 							or (not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
-							or (invert and is(1-composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
+							or (invert and is(opposite, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}

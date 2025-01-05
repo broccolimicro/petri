@@ -13,7 +13,9 @@ enum composition
 {
 	choice = 0,
 	parallel = 1,
-	sequence = 2
+	sequence = 2,
+	implies = 3,
+	excludes = 4
 };
 
 struct split_group
@@ -29,7 +31,8 @@ struct split_group
 		NEGATIVE_DIFFERENCE = 3,
 		SYMMETRIC_DIFFERENCE = 4,
 		SUBSET = 5,
-		SUBSET_EQUAL = 6
+		SUBSET_EQUAL = 6,
+		NOT_EQUAL = 7
 	};
 	
 	int split; // index of place/transition with split

@@ -109,6 +109,9 @@ bool compare(int group_operation, int branch_operation, vector<split_group> g0, 
 				if (branch_operation == split_group::NEGATIVE_DIFFERENCE and found1) {
 					return true;
 				}
+				if (branch_operation == split_group::NOT_EQUAL and (found0 or found1)) {
+					return true;
+				}
 
 				if ((branch_operation == split_group::SUBSET
 					or branch_operation == split_group::SUBSET_EQUAL) and found0) {

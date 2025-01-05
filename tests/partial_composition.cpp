@@ -43,6 +43,13 @@ TEST(partial_composition, parallel_choice) {
 	EXPECT_TRUE(g.is(sequence, {p[0], p[4]}, {p[3], p[7]}));
 	EXPECT_FALSE(g.is(choice, {p[0], p[4]}, {p[3], p[7]}));
 	EXPECT_FALSE(g.is(parallel, {p[0], p[4]}, {p[3], p[7]}));
+
+	EXPECT_TRUE(g.is(excludes, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_TRUE(g.is(excludes, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(g.is(implies, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_FALSE(g.is(implies, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(g.is(excludes, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_TRUE(g.is(implies, {p[0], p[4]}, {p[3], p[7]}));
 }
 
 TEST(partial_composition, parallel_parallel) {
@@ -89,5 +96,22 @@ TEST(partial_composition, parallel_parallel) {
 	EXPECT_TRUE(g.is(sequence, {p[1], p[3]}, {p[2], p[4]}, true, true));
 	EXPECT_FALSE(g.is(choice, {p[1], p[3]}, {p[2], p[4]}, true, true));
 	EXPECT_FALSE(g.is(parallel, {p[1], p[3]}, {p[2], p[4]}, true, true));
+
+
+	EXPECT_TRUE (g.is(implies, {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(g.is(excludes,   {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_TRUE (g.is(implies, {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_FALSE(g.is(excludes,   {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_TRUE (g.is(implies, {t[2], t[6]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(g.is(excludes,   {t[2], t[6]}, {t[6], t[7]}, true, true));
+
+	// TODO(edward.bingham) Need to be able to determine ordering before I can
+	// answer these questions for cross orderings.
+	// EXPECT_TRUE(g.is(excludes, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_FALSE(g.is(implies, {p[1], p[4]}, {p[2], p[3]}));
+
+	EXPECT_FALSE(g.is(excludes, {p[1], p[3]}, {p[2], p[4]}, true, true));
+	EXPECT_TRUE(g.is(implies, {p[1], p[3]}, {p[2], p[4]}, true, true));
+
 }
 
