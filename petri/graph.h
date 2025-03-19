@@ -12,6 +12,14 @@
 namespace petri
 {
 
+// An arc represents a directed connection between two nodes in a Petri net
+// It stores references to both the source ('from') and destination ('to') nodes using iterators
+// Arcs are the edges in the bipartite graph structure of a Petri net, connecting
+// places to transitions or transitions to places (never place-to-place or transition-to-transition)
+// Used for:
+// - Modeling flow of tokens and control in the Petri net
+// - Defining the topology and connectivity of the net
+// - Supporting graph traversal and reachability analysis
 struct arc
 {
 	arc();
@@ -30,6 +38,22 @@ bool operator==(arc a0, arc a1);
 bool operator!=(arc a0, arc a1);
 
 // Generic petri net graph representation.
+// A comprehensive implementation of Petri nets for modeling concurrent and distributed systems
+// 
+// The graph template represents a complete Petri net with:
+// - Places (represented by the place template parameter)
+// - Transitions (represented by the transition template parameter)
+// - Tokens (represented by the token template parameter)
+// - States (collections of tokens, represented by the state template parameter)
+// - Arcs connecting places to transitions and transitions to places
+//
+// This class provides extensive functionality for:
+// - Creating, modifying, and analyzing Petri net structures
+// - Navigation and traversal of the net (next, prev, neighbors functions)
+// - Structural analysis (cycles, reachability, distance calculations)
+// - Relationship analysis between nodes (parallelism, choice, sequence)
+// - Graph transformations and reductions
+// - Split group analysis for understanding choice and parallel execution patterns
 template <class place, class transition, class token, class state>
 struct graph
 {
@@ -98,6 +122,11 @@ struct graph
 		node_distances_ready = false;
 	}
 
+	// Updates the node distance matrix for a specific node position
+	// This calculates minimum arc distances from the given node to all other nodes
+	// Uses a breadth-first search approach to find the shortest paths
+	// Maintains the cached distance data in node_distances
+	// Used in reachability analysis and path calculations
 	virtual void update_node_distances(petri::iterator pos) const {
 		set<petri::iterator> seen;
 
@@ -132,6 +161,10 @@ struct graph
 		}
 	}
 
+	// Updates the entire node distance matrix for all nodes in the Petri net
+	// Calls update_node_distances for each place and transition
+	// Used to calculate the complete reachability information for the net
+	// This is an expensive operation and is performed only when necessary
 	virtual void update_node_distances() const {
 		// TODO(edward.bingham) This needs to take the max of the node distances
 		// for all of the pre-set nodes. However, doing so triggers an infinite
@@ -312,6 +345,22 @@ struct graph
 		return false;
 	}
 
+	// Computes and propagates split-merge relationship information for a specific split point.
+	//
+	// This function analyzes how nodes in the Petri net relate to a specific split point,
+	// identifying which execution branches they belong to. It is fundamental for understanding
+	// concurrent behaviors and choice patterns in the net. The algorithm performs a sophisticated
+	// flow analysis using forward and backward traversal to handle properly nested and non-properly
+	// nested splits and merges.
+	//
+	// The first phase is a forward traversal that propagates branch information from split points,
+	// using a specialized algorithm to resolve complex merge situations. The second phase is a
+	// backward cleanup that removes unnecessary split markings. Together, these phases create a
+	// complete picture of which branches each node belongs to.
+	//
+	// @param composition The composition type to analyze (parallel or choice)
+	// @param split The index of the split node being analyzed
+	// @param init Vector of initial nodes representing the branches of the split
 	virtual void compute_split_group(int composition, int split, vector<petri::iterator> init) const {
 		if (init.size() <= 1) {
 			// there is no split here
@@ -531,6 +580,22 @@ struct graph
 		//cout << endl << endl;
 	}
 
+	// Analyzes and computes all split-merge relationships throughout the Petri net.
+	//
+	// This function serves as the primary coordinator for split group analysis in the net.
+	// It systematically analyzes the structure of the Petri net to identify and catalog all 
+	// conditional (choice) and parallel execution splits. The function first processes choice splits,
+	// which is necessary to provide context for parallel splits analysis, then analyzes parallel
+	// splits. It also handles special cases related to reset states, which represent initial 
+	// markings of the net.
+	//
+	// After identifying potential split points, the function calls compute_split_group for each one,
+	// then performs post-processing to remove "covered" conditional splits - those that don't 
+	// represent true choices because they are predetermined by earlier choices in the net. This
+	// creates a clean, accurate representation of the net's behavioral structure.
+	//
+	// The information computed by this function is essential for higher-level relationship
+	// analysis like determining if nodes are in sequence, choice, or parallel relationships.
 	virtual void compute_split_groups() const {
 		// DESIGN(edward.bingham) Choice must go first, because we use that to determine whether we're dealing with non-properly nested parallelism or shared conditional parallel branches. It just so happens that "choice" = 0 and "parallel" = 1
 		for (int composition = 0; composition < 2; composition++) {
@@ -1490,6 +1555,26 @@ struct graph
 		return result;
 	}
 
+	// pinch performs sophisticated graph surgery to bypass a node while preserving connectivity
+	//
+	// Purpose:
+	// - Enables removal of nodes while maintaining essential graph connectivity
+	// - Critical for graph reduction and simplification
+	// - Preserves token flow and behavioral semantics during transformations
+	// - Creates direct connections between predecessor and successor nodes
+	//
+	// Algorithm:
+	// - Analyzes incoming and outgoing connections of the target node
+	// - Creates direct connections that bypass the node
+	// - Duplicates nodes as needed to maintain proper connection patterns
+	// - Handles complex cases with multiple inputs and outputs
+	// - Ensures token flow integrity through carefully managed connection patterns
+	//
+	// Implementation complexity:
+	// - Creates and manages potentially complex connection combinations
+	// - Handles state updates for source, sink, and reset tokens
+	// - Returns mapping between original and modified nodes
+	// - Used heavily in reduction operations to simplify the net
 	virtual map<petri::iterator, vector<petri::iterator> > pinch(petri::iterator n)
 	{
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
@@ -1828,6 +1913,27 @@ struct graph
 		return result;
 	}
 
+	// Combines two Petri nets according to specified composition semantics.
+	//
+	// This function implements graph composition operations that merge
+	// the current Petri net with another one according to one of three fundamental
+	// composition patterns: sequence, choice, or parallel. Each composition type creates
+	// a different relationship between the two nets:
+	//
+	// - Sequence: Connect the sink nodes of the current net to the source nodes of the
+	//   provided net, creating a sequential flow.
+	// - Choice: Create a structure where either the current net or the provided net
+	//   will execute, but not both.
+	// - Parallel: Create a structure where both nets execute concurrently.
+	//
+	// The function handles complex cases like merging multiple source or sink nodes,
+	// ensuring proper token flow, and maintaining consistent state management. It returns
+	// a mapping between original nodes in the provided net and their corresponding nodes
+	// in the merged result, which is essential for tracking relationships.
+	//
+	// @param composition The composition type to use (sequence, choice, or parallel)
+	// @param g The Petri net to merge with the current one
+	// @return A mapping from original nodes to corresponding nodes in the merged net
 	virtual map<petri::iterator, vector<petri::iterator> > merge(int composition, const graph &g)
 	{
 		if (places.size() == 0 && transitions.size() == 0)
@@ -2488,6 +2594,29 @@ struct graph
 		return result;
 	}
 
+	// reduce simplifies the Petri net while preserving essential behavior
+	//
+	// Purpose:
+	// - Decreases model complexity without changing behavioral semantics
+	// - Eliminates redundant and ineffective structures
+	// - Makes analysis and verification more tractable
+	// - Creates cleaner, more understandable net representations
+	//
+	// Algorithm:
+	// - Employs multiple reduction rules applied iteratively until no more reductions are possible:
+	//   * Removes infeasible transitions (those that can never be enabled)
+	//   * Eliminates vacuous transitions (those that don't affect behavior)
+	//   * Removes unmarked and unreachable places
+	//   * Merges functionally equivalent places
+	// - Can operate in different modes:
+	//   * proper_nesting=true: preserves hierarchy and proper nesting
+	//   * aggressive=true: applies additional reductions that preserve behavior but may change structure
+	//
+	// Implementation considerations:
+	// - Uses carefully designed checks to ensure behavioral preservation
+	// - Handles special cases for transitions with no inputs/outputs
+	// - Maintains proper connectivity during structure simplification
+	// - Returns whether any reductions were successfully performed
 	virtual bool reduce(bool proper_nesting = true, bool aggressive = false)
 	{
 		bool result = false;
@@ -2992,7 +3121,23 @@ struct graph
 		return stack;
 	}
 
-	// Find all partial state pairs (for v0 and v1 respectively) that are ordered (not in parallel).
+	// Identifies configurations where node groups can be sequentially ordered.
+	//
+	// This function finds ways to organize potentially parallel nodes into
+	// sequentially orderable groups by identifying additional nodes that can 
+	// resolve parallelism. It's essential for transformations that need to
+	// convert concurrent behaviors into sequential ones.
+	//
+	// The algorithm analyzes relationship patterns between node sets, particularly
+	// looking for parallel relationships that can be broken by adding specific nodes.
+	// It systematically explores the graph to find nodes that, when added to either 
+	// group, would make the two groups non-parallel, enabling sequential execution.
+	//
+	// This operation is particularly important for state-variable insertion.
+	//
+	// @param v0 First vector of nodes to analyze
+	// @param v1 Second vector of nodes to analyze
+	// @return Vector of possible solutions, each containing two vectors of nodes that can be ordered
 	virtual vector<array<vector<petri::iterator>, 2> > deinterfere(vector<petri::iterator> v0, vector<petri::iterator> v1) {
 		sort(v0.begin(), v0.end());
 		sort(v1.begin(), v1.end());
@@ -3045,6 +3190,8 @@ struct graph
 		return result;
 	}
 
+	// select groups nodes into maximal cliques based on specific relationship types
+	//
 	// Nodes can be simultaneously composed in both parallel and conditional.
 	// This function selects nodes into groups based upon a composition operator
 	// (ex. conditional groups of parallel nodes for the "parallel" composition).
@@ -3053,6 +3200,26 @@ struct graph
 	// compared as desired and also composed as not desired. For example, strict
 	// will also separate nodes that are simultaneously composed in parallel and
 	// conditional.
+	//
+	// This function identifies sets of nodes that share specific relationships (like choice,
+	// parallel, sequence, etc.) using the Bron-Kerbosch algorithm to find maximal cliques.
+	// It's a fundamental analysis tool that supports higher-level understanding of the
+	// Petri net's behavioral patterns and structural properties.
+	//
+	// The function operates by constructing an implicit graph where nodes that share the
+	// specified relationship have edges between them, then finding all maximal cliques
+	// in this graph. This provides insight into groups of nodes that have consistent
+	// behavioral relationships.
+	//
+	// The algorithm handles the NP-complete maximal clique problem using an iterative
+	// frame-based approach that efficiently identifies all relationships matching the
+	// specified criteria, with options for strict or relaxed relationship requirements.
+	//
+	// @param composition The relationship type to analyze (parallel, choice, implies, excludes)
+	// @param nodes The set of nodes to analyze for relationships
+	// @param always If true, requires consistent (always) relationships; if false, allows occasional relationships
+	// @param invert If true, inverts the relationship criteria, finding opposite relationships
+	// @return A vector of vectors, where each inner vector contains a maximal clique of related nodes
 	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
 		// ~always & ~invert - separate nodes that aren't sometimes composed as requested
 		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
