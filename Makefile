@@ -1,23 +1,36 @@
 NAME          = petri
 DEPEND        = common
+TEST_DEPEND   = common
+
+COVERAGE ?= 0
+
+ifeq ($(COVERAGE),0)
+CXXFLAGS = -std=c++20 -g -Wall -fmessage-length=0 -O2
+LDFLAGS  =
+else
+CXXFLAGS = -std=c++20 -g -Wall -fmessage-length=0 -O0 --coverage -fprofile-arcs -ftest-coverage
+LDFLAGS  = --coverage -fprofile-arcs -ftest-coverage 
+endif
 
 SRCDIR        = $(NAME)
-TESTDIR       = tests
-GTEST        := ../../googletest
-GTEST_I      := -I$(GTEST)/googletest/include -I.
-GTEST_L      := -L$(GTEST)/build/lib -L.
-
 INCLUDE_PATHS = $(DEPEND:%=-I../%) -I.
-LIBRARY_PATHS = $(DEPEND:%=-L../%) -L.
-LIBRARIES     = $(DEPEND:%=-l%)
-LIBFILES      = $(foreach dep,$(DEPEND),../$(dep)/lib$(dep).a)
-CXXFLAGS      = -std=c++17 -O2 -g -Wall -fmessage-length=0 $(DEPEND:%=-I../%) -I.
-LDFLAGS	      =  
+LIBRARY_PATHS =
+LIBRARIES     =
 
 SOURCES	     := $(shell mkdir -p $(SRCDIR); find $(SRCDIR) -name '*.cpp')
 OBJECTS	     := $(SOURCES:%.cpp=build/%.o)
 DEPS         := $(shell mkdir -p build/$(SRCDIR); find build/$(SRCDIR) -name '*.d')
-TARGET        = lib$(NAME).a
+TARGET	      = lib$(NAME).a
+
+TESTDIR       = tests
+
+ifndef GTEST
+override GTEST=../../googletest
+endif
+
+TEST_INCLUDE_PATHS = -I$(GTEST)/googletest/include $(TEST_DEPEND:%=-I../%) -I.
+TEST_LIBRARY_PATHS = -L$(GTEST)/build/lib $(TEST_DEPEND:%=-L../%) -L.
+TEST_LIBRARIES = -l$(NAME) $(TEST_DEPEND:%=-l%) -pthread -lgtest
 
 TESTS        := $(shell mkdir -p $(TESTDIR); find $(TESTDIR) -name '*.cpp')
 TEST_OBJECTS := $(TESTS:%.cpp=build/%.o) build/$(TESTDIR)/gtest_main.o
@@ -63,27 +76,40 @@ lib: $(TARGET)
 
 tests: lib $(TEST_TARGET)
 
+coverage: clean
+	$(MAKE) COVERAGE=1 tests
+	./$(TEST_TARGET) || true  # Continue even if tests fail
+	lcov --capture --directory build/$(SRCDIR) --output-file coverage.info
+	lcov --ignore-errors unused --remove coverage.info '/usr/include/*' '*/googletest/*' '*/tests/*' --output-file coverage_filtered.info
+	genhtml coverage_filtered.info --output-directory coverage_report
+
 $(TARGET): $(OBJECTS)
 	ar rvs $(TARGET) $(OBJECTS)
 
 build/$(SRCDIR)/%.o: $(SRCDIR)/%.cpp 
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(LDFLAGS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	@$(CXX) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(INCLUDE_PATHS) -c -o $@ $<
 
-$(TEST_TARGET): $(TEST_OBJECTS) $(TARGET) $(LIBFILES)
-	$(CXX) $(LIBRARY_PATHS) $(GTEST_L) $(CXXFLAGS) $(LDFLAGS) $(TEST_OBJECTS) -o $(TEST_TARGET) -pthread -l$(NAME) -lgtest $(LIBRARIES)
+$(TEST_TARGET): $(TEST_OBJECTS) $(OBJECTS) $(TARGET)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(TEST_LIBRARY_PATHS) $(TEST_OBJECTS) $(TEST_LIBRARIES) -o $(TEST_TARGET)
 
 build/$(TESTDIR)/%.o: $(TESTDIR)/%.cpp
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $(GTEST_I) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
-	$(CXX) $(CXXFLAGS) $(GTEST_I) $< -c -o $@
+	@$(CXX) $(CXXFLAGS) $(TEST_INCLUDE_PATHS) -MM -MF $(patsubst %.o,%.d,$@) -MT $@ -c $<
+	$(CXX) $(CXXFLAGS) $(TEST_INCLUDE_PATHS) $< -c -o $@
 
 build/$(TESTDIR)/gtest_main.o: $(GTEST)/googletest/src/gtest_main.cc
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $(GTEST_I) $< -c -o $@
+	$(CXX) $(CXXFLAGS) $(TEST_INCLUDE_PATHS) $< -c -o $@
 
 include $(DEPS) $(TEST_DEPS)
 
 clean:
-	rm -rf build $(TARGET) $(TEST_TARGET)
+	rm -rf build $(TARGET) $(TEST_TARGET) coverage.info coverage_filtered.info coverage_report *.gcda *.gcno
+
+clean-test:
+	rm -rf build/$(TESTDIR) $(TEST_TARGET)
+
+clean-coverage:
+	rm -rf coverage.info coverage_filtered.info coverage_report *.gcda *.gcno
