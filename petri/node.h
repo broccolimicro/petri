@@ -69,6 +69,8 @@ struct place
 	static place merge(int composition, const place &p0, const place &p1);
 };
 
+ostream &operator<<(ostream &os, const place &p);
+
 struct transition
 {
 	transition();
@@ -87,5 +89,7 @@ struct transition
 	static transition merge(int composition, const transition &t0, const transition &t1);
 	static bool mergeable(int composition, const transition &t0, const transition &t1);
 };
+
+ostream &operator<<(ostream &os, const transition &t);
 
 }

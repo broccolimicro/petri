@@ -301,6 +301,10 @@ place place::merge(int composition, const place &p0, const place &p1)
 	return place();
 }
 
+ostream &operator<<(ostream &os, const place &p) {
+	return os;
+}
+
 transition::transition()
 {
 
@@ -329,6 +333,10 @@ bool transition::is_infeasible()
 bool transition::is_vacuous()
 {
 	return false;
+}
+
+ostream &operator<<(ostream &os, const transition &t) {
+	return os;
 }
 
 }

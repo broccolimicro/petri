@@ -379,6 +379,11 @@ struct graph
 				p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
 			}
 		}
+		for (int i = 0; i < (int)reset.size(); i++) {
+			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
+				p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
+			}
+		}
 
 		petri::iterator splitNode(
 				composition == parallel ? transition::type : place::type,
@@ -464,7 +469,7 @@ struct graph
 					}
 				}
 			}
-
+			
 			//cout << "enabled: " << ::to_string(enabled) << endl;
 			//cout << "blocked: " << ::to_string(blocked) << endl;
 
@@ -597,7 +602,10 @@ struct graph
 	// The information computed by this function is essential for higher-level relationship
 	// analysis like determining if nodes are in sequence, choice, or parallel relationships.
 	virtual void compute_split_groups() const {
-		// DESIGN(edward.bingham) Choice must go first, because we use that to determine whether we're dealing with non-properly nested parallelism or shared conditional parallel branches. It just so happens that "choice" = 0 and "parallel" = 1
+		// DESIGN(edward.bingham) Choice must go first, because we use that to
+		// determine whether we're dealing with non-properly nested parallelism or
+		// shared conditional parallel branches. It just so happens that "choice" =
+		// 0 and "parallel" = 1
 		for (int composition = 0; composition < 2; composition++) {
 			// clear previous executions of this function and cache previous places and
 			// transitions as an optimization.
@@ -3633,7 +3641,7 @@ struct graph
 
 	virtual void print() const {
 		for (int i = 0; i < (int)places.size(); i++) {
-			cout << "p" << i << ": p" << ::to_string(places[i].splits[place::type]) << " t" << ::to_string(places[i].splits[transition::type]) << "{";
+			cout << "p" << i << ": " << places[i] << " p" << ::to_string(places[i].splits[place::type]) << " t" << ::to_string(places[i].splits[transition::type]) << "{";
 			for (int j = 0; j < (int)places.size(); j++) {
 				if (distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) >= 0) {
 					cout << "->p" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) << " ";
@@ -3654,7 +3662,7 @@ struct graph
 			cout << "}" << endl;
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
-			cout << "t" << i << ": p" << ::to_string(transitions[i].splits[place::type]) << " t" << ::to_string(transitions[i].splits[transition::type]) << "{";
+			cout << "t" << i << ": " << transitions[i] << " p" << ::to_string(transitions[i].splits[place::type]) << " t" << ::to_string(transitions[i].splits[transition::type]) << "{";
 
 			for (int j = 0; j < (int)places.size(); j++) {
 				if (distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) >= 0) {
@@ -3674,6 +3682,11 @@ struct graph
 				}
 			}
 			cout << "}" << endl;
+		}
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				cout << arcs[type][i].from << "->" << arcs[type][i].to << endl;
+			}
 		}
 	}
 };
