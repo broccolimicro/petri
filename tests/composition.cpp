@@ -793,4 +793,29 @@ TEST(composition, regular_parallel_choice) {
 	test_always(g, sequence, {t[0], p[0], p[4]}, {p[6]}, true);
 }*/
 
+TEST(composition, compose_sequence) {
+	// p0-->t0-->p1   .
+	// p2-->t1-->p3   .
+	// p4-->t2-->p5   .
+	// p6-->t3-->p7   .
 
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 16);
+	auto t = g.create(transition(), 8);
+
+	g.connect({p[0], t[0], p[1]});
+	g.connect({p[2], t[1], p[3]});
+	g.connect({p[4], t[2], p[5]});
+	g.connect({p[6], t[3], p[7]});
+	g.connect({p[8], t[4], p[9]});
+	g.connect({p[10], t[5], p[11]});
+	g.connect({p[12], t[6], p[13]});
+	g.connect({p[14], t[7], p[15]});
+
+	bound result = g.compose(sequence, bound(region<state<token> >({state<token>({token(0), token(2)}), state<token>({token(4), token(6)})}), region<state<token> >({state<token>({token(1), token(3)}), state<token>({token(5), token(7)})})), bound(region<state<token> >({state<token>({token(8), token(10)}), state<token>({token(12), token(14)})}), region<state<token> >({state<token>({token(9), token(11)}), state<token>({token(13), token(15)})})));
+
+	g.print();
+
+	//g.compute_split_groups();
+}
