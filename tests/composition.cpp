@@ -108,6 +108,15 @@ void test_not_always(const graph<place, transition, token, state<token> > &g, in
 	}
 }
 
+bool connected(const graph<place, transition, token, state<token> > &g, petri::iterator from, petri::iterator to) {
+	for (int i = 0; i < (int)g.arcs[from.type].size(); i++) {
+		if (g.arcs[from.type][i].from == from and g.arcs[from.type][i].to == to) {
+			return true;
+		}
+	}
+	return false;
+}
+
 TEST(composition, always_choice) {
 	//          ->t0-->p1-->t1-           .
 	//         /               \          .
@@ -793,29 +802,93 @@ TEST(composition, regular_parallel_choice) {
 	test_always(g, sequence, {t[0], p[0], p[4]}, {p[6]}, true);
 }*/
 
-TEST(composition, compose_sequence) {
-	// p0-->t0-->p1   .
-	// p2-->t1-->p3   .
-	// p4-->t2-->p5   .
-	// p6-->t3-->p7   .
-
+TEST(composition, compose_proper_2of2x2of2) {
 	graph<place, transition, token, state<token> > g;
 
-	auto p = g.create(place(), 16);
-	auto t = g.create(transition(), 8);
+	auto n = g.create(transition(), 8);
 
-	g.connect({p[0], t[0], p[1]});
-	g.connect({p[2], t[1], p[3]});
-	g.connect({p[4], t[2], p[5]});
-	g.connect({p[6], t[3], p[7]});
-	g.connect({p[8], t[4], p[9]});
-	g.connect({p[10], t[5], p[11]});
-	g.connect({p[12], t[6], p[13]});
-	g.connect({p[14], t[7], p[15]});
+	segment result = g.compose(sequence,
+		segment({{n[0], n[1]}, {n[2], n[3]}}, {{n[0], n[1]}, {n[2], n[3]}}),
+		segment({{n[4], n[5]}, {n[6], n[7]}}, {{n[4], n[5]}, {n[6], n[7]}}), true);
 
-	bound result = g.compose(sequence, bound(region<state<token> >({state<token>({token(0), token(2)}), state<token>({token(4), token(6)})}), region<state<token> >({state<token>({token(1), token(3)}), state<token>({token(5), token(7)})})), bound(region<state<token> >({state<token>({token(8), token(10)}), state<token>({token(12), token(14)})}), region<state<token> >({state<token>({token(9), token(11)}), state<token>({token(13), token(15)})})));
+	auto p = g.get_places();
+	auto t = g.get_transitions();
 
-	g.print();
+	EXPECT_EQ(p.size(), 9u);
+	EXPECT_EQ(t.size(), 12u);
+	EXPECT_EQ(g.arcs[place::type].size(), 10u);
+	EXPECT_EQ(g.arcs[transition::type].size(), 10u);
 
-	//g.compute_split_groups();
+	EXPECT_TRUE(connected(g, t[0], p[5]));
+	EXPECT_TRUE(connected(g, t[1], p[6]));
+	EXPECT_TRUE(connected(g, t[2], p[7]));
+	EXPECT_TRUE(connected(g, t[3], p[8]));
+
+	EXPECT_TRUE(connected(g, p[5], t[10]));
+	EXPECT_TRUE(connected(g, p[6], t[10]));
+	EXPECT_TRUE(connected(g, p[7], t[11]));
+	EXPECT_TRUE(connected(g, p[8], t[11]));
+
+	EXPECT_TRUE(connected(g, t[10], p[4]));
+	EXPECT_TRUE(connected(g, t[11], p[4]));
+	EXPECT_TRUE(connected(g, p[4], t[8]));
+	EXPECT_TRUE(connected(g, p[4], t[9]));
+
+	EXPECT_TRUE(connected(g, t[8], p[0]));
+	EXPECT_TRUE(connected(g, t[8], p[1]));
+	EXPECT_TRUE(connected(g, t[9], p[2]));
+	EXPECT_TRUE(connected(g, t[9], p[3]));
+
+	EXPECT_TRUE(connected(g, p[0], t[4]));
+	EXPECT_TRUE(connected(g, p[1], t[5]));
+	EXPECT_TRUE(connected(g, p[2], t[6]));
+	EXPECT_TRUE(connected(g, p[3], t[7]));
+}
+
+TEST(composition, compose_2of2x2of2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto n = g.create(transition(), 8);
+
+	segment result = g.compose(sequence,
+		segment({{n[0], n[1]}, {n[2], n[3]}}, {{n[0], n[1]}, {n[2], n[3]}}),
+		segment({{n[4], n[5]}, {n[6], n[7]}}, {{n[4], n[5]}, {n[6], n[7]}}), false);
+
+	auto p = g.get_places();
+	auto t = g.get_transitions();
+
+	EXPECT_EQ(p.size(), 8u);
+	EXPECT_EQ(t.size(), 12u);
+	EXPECT_EQ(g.arcs[place::type].size(), 12u);
+	EXPECT_EQ(g.arcs[transition::type].size(), 12u);
+
+	EXPECT_TRUE(connected(g, t[0], p[0]));
+	EXPECT_TRUE(connected(g, t[1], p[1]));
+	EXPECT_TRUE(connected(g, t[2], p[2]));
+	EXPECT_TRUE(connected(g, t[3], p[3]));
+
+	EXPECT_TRUE(connected(g, p[0], t[8]));
+	EXPECT_TRUE(connected(g, p[1], t[9]));
+	EXPECT_TRUE(connected(g, p[2], t[10]));
+	EXPECT_TRUE(connected(g, p[3], t[11]));
+
+	EXPECT_TRUE(connected(g, p[0], t[9]));
+	EXPECT_TRUE(connected(g, p[1], t[8]));
+	EXPECT_TRUE(connected(g, p[2], t[11]));
+	EXPECT_TRUE(connected(g, p[3], t[10]));
+
+	EXPECT_TRUE(connected(g, t[8], p[4]));
+	EXPECT_TRUE(connected(g, t[8], p[5]));
+	EXPECT_TRUE(connected(g, t[9], p[6]));
+	EXPECT_TRUE(connected(g, t[9], p[7]));
+
+	EXPECT_TRUE(connected(g, t[10], p[4]));
+	EXPECT_TRUE(connected(g, t[10], p[5]));
+	EXPECT_TRUE(connected(g, t[11], p[6]));
+	EXPECT_TRUE(connected(g, t[11], p[7]));
+
+	EXPECT_TRUE(connected(g, p[4], t[4]));
+	EXPECT_TRUE(connected(g, p[5], t[5]));
+	EXPECT_TRUE(connected(g, p[6], t[6]));
+	EXPECT_TRUE(connected(g, p[7], t[7]));
 }

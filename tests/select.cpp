@@ -12,8 +12,6 @@ using namespace petri;
 using namespace std;
 
 // just to make the tests easier to write
-constexpr auto mark = static_cast<vector<vector<petri::iterator> >(*)(initializer_list<initializer_list<petri::iterator> >)>(petri::iterator::mark);
-
 TEST(select, sequence) {
 	//  =-t0-->p0-->t1-->p1-->t2-->p2-=  .
 
@@ -26,41 +24,41 @@ TEST(select, sequence) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, false, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(parallel, {p[0]}, true, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(choice, {p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(choice, {p[0]}, false, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(choice, {p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(choice, {p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(parallel, {p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(parallel, {p[0]}, false, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(parallel, {p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(parallel, {p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(choice, {p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(choice, {p[0]}, false, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(choice, {p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(choice, {p[0]}, true, true));
 
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(parallel, {p[0], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(parallel, {p[0], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(parallel, {p[0], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(parallel, {p[0], p[2]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(choice, {p[0], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(choice, {p[0], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(choice, {p[0], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(choice, {p[0], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(parallel, {p[0], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(parallel, {p[0], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(parallel, {p[0], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(parallel, {p[0], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(choice, {p[0], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(choice, {p[0], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(choice, {p[0], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(choice, {p[0], p[2]}, true, true));
 
-	EXPECT_EQ(mark({{p[0]}}), g.select(implies, {p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(implies, {p[0]}, false, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(implies, {p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(implies, {p[0]}, true, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(excludes, {p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(excludes, {p[0]}, false, true));
-	EXPECT_EQ(mark({{p[0]}}), g.select(excludes, {p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0]}}), g.select(excludes, {p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(implies, {p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(implies, {p[0]}, false, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(implies, {p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(implies, {p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(excludes, {p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(excludes, {p[0]}, false, true));
+	EXPECT_EQ(bound({{p[0]}}), g.select(excludes, {p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0]}}), g.select(excludes, {p[0]}, true, true));
 
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2]}}), g.select(implies, {p[0], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[0]},{p[2]}}), g.select(excludes, {p[0], p[2]}, true, true));
 }
 
 TEST(select, always_choice) {
@@ -80,60 +78,60 @@ TEST(select, always_choice) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, true, true));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(parallel, {p[1], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(choice, {p[1], p[2]}, true, true));
 
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(parallel, {p[1], t[5]}, false, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(parallel, {p[1], t[5]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(parallel, {p[1], t[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(parallel, {p[1], t[5]}, true, true));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(choice, {p[1], t[5]}, false, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(choice, {p[1], t[5]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(choice, {p[1], t[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(choice, {p[1], t[5]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(parallel, {p[1], t[5]}, false, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(parallel, {p[1], t[5]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(parallel, {p[1], t[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(parallel, {p[1], t[5]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(choice, {p[1], t[5]}, false, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(choice, {p[1], t[5]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(choice, {p[1], t[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(choice, {p[1], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(parallel, {p[1], t[4]}, false, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(parallel, {p[1], t[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(parallel, {p[1], t[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(parallel, {p[1], t[4]}, true, true));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(choice, {p[1], t[4]}, false, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(choice, {p[1], t[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(choice, {p[1], t[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(choice, {p[1], t[4]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(parallel, {p[1], t[4]}, false, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(parallel, {p[1], t[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(parallel, {p[1], t[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(parallel, {p[1], t[4]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(choice, {p[1], t[4]}, false, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(choice, {p[1], t[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(choice, {p[1], t[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(choice, {p[1], t[4]}, true, true));
 
 
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, true, true));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.select(implies, {p[1], p[2]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[2]}}), g.select(excludes, {p[1], p[2]}, true, true));
 
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(implies, {p[1], t[5]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(implies, {p[1], t[5]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(implies, {p[1], t[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(implies, {p[1], t[5]}, true, true));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(excludes, {p[1], t[5]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(excludes, {p[1], t[5]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[5]}}), g.select(excludes, {p[1], t[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[5]}}), g.select(excludes, {p[1], t[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(implies, {p[1], t[5]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(implies, {p[1], t[5]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(implies, {p[1], t[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(implies, {p[1], t[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(excludes, {p[1], t[5]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(excludes, {p[1], t[5]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[5]}}), g.select(excludes, {p[1], t[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[5]}}), g.select(excludes, {p[1], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(implies, {p[1], t[4]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(implies, {p[1], t[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(implies, {p[1], t[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(implies, {p[1], t[4]}, true, true));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(excludes, {p[1], t[4]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(excludes, {p[1], t[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{t[4]}}), g.select(excludes, {p[1], t[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],t[4]}}), g.select(excludes, {p[1], t[4]}, true, true));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(implies, {p[1], t[4]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(implies, {p[1], t[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(implies, {p[1], t[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(implies, {p[1], t[4]}, true, true));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(excludes, {p[1], t[4]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(excludes, {p[1], t[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{t[4]}}), g.select(excludes, {p[1], t[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],t[4]}}), g.select(excludes, {p[1], t[4]}, true, true));
 }
 
 TEST(select, always_parallel) {
@@ -153,59 +151,59 @@ TEST(select, always_parallel) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(parallel, {t[1], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(choice, {t[1], t[2]}, true, true));
 
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(parallel, {t[1], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(parallel, {t[1], p[5]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(parallel, {t[1], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(parallel, {t[1], p[5]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(choice, {t[1], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(choice, {t[1], p[5]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(choice, {t[1], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(choice, {t[1], p[5]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(parallel, {t[1], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(parallel, {t[1], p[5]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(parallel, {t[1], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(parallel, {t[1], p[5]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(choice, {t[1], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(choice, {t[1], p[5]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(choice, {t[1], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(choice, {t[1], p[5]}, true, true));
 
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(parallel, {t[1], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(parallel, {t[1], p[4]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(parallel, {t[1], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(parallel, {t[1], p[4]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(choice, {t[1], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(choice, {t[1], p[4]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(choice, {t[1], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(choice, {t[1], p[4]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(parallel, {t[1], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(parallel, {t[1], p[4]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(parallel, {t[1], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(parallel, {t[1], p[4]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(choice, {t[1], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(choice, {t[1], p[4]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(choice, {t[1], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(choice, {t[1], p[4]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]}}), g.select(implies, {t[1], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.select(excludes, {t[1], t[2]}, true, true));
 
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[5],t[1]}}), g.select(implies, {t[1], p[5]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{p[5]}}), g.select(excludes, {t[1], p[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, false, true));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, true, true));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, false, true));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[4],t[1]}}), g.select(implies, {t[1], p[4]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{p[4]}}), g.select(excludes, {t[1], p[4]}, true, true));
 }
 
 TEST(select, regular_interleaved) {
@@ -233,77 +231,77 @@ TEST(select, regular_interleaved) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, true, true));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(parallel, {t[0], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(choice, {t[0], t[2]}, true, true));
 
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(parallel, {t[0], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(parallel, {t[0], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(parallel, {t[0], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(parallel, {t[0], t[3]}, true, true));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(choice, {t[0], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(choice, {t[0], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(choice, {t[0], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(choice, {t[0], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(parallel, {t[0], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(parallel, {t[0], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(parallel, {t[0], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(parallel, {t[0], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(choice, {t[0], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(choice, {t[0], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(choice, {t[0], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(choice, {t[0], t[3]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(parallel, {t[1], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(choice, {t[1], t[3]}, true, true));
 
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(parallel, {p[0], p[1]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(parallel, {p[0], p[1]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(parallel, {p[0], p[1]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(parallel, {p[0], p[1]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(choice, {p[0], p[1]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(choice, {p[0], p[1]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(choice, {p[0], p[1]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(choice, {p[0], p[1]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(parallel, {p[0], p[1]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(parallel, {p[0], p[1]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(parallel, {p[0], p[1]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(parallel, {p[0], p[1]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(choice, {p[0], p[1]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(choice, {p[0], p[1]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(choice, {p[0], p[1]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(choice, {p[0], p[1]}, true, true));
 
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, true, true));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, false, true));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[0]},{t[2]}}), g.select(implies, {t[0], t[2]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, false, true));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2]}}), g.select(excludes, {t[0], t[2]}, true, true));
 
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(implies, {t[0], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(implies, {t[0], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(implies, {t[0], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(implies, {t[0], t[3]}, true, true));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(excludes, {t[0], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(excludes, {t[0], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[3]}}), g.select(excludes, {t[0], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[3]}}), g.select(excludes, {t[0], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(implies, {t[0], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(implies, {t[0], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(implies, {t[0], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(implies, {t[0], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(excludes, {t[0], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(excludes, {t[0], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[3]}}), g.select(excludes, {t[0], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[3]}}), g.select(excludes, {t[0], t[3]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[3]}}), g.select(implies, {t[1], t[3]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[3]}}), g.select(excludes, {t[1], t[3]}, true, true));
 
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, false, true));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, false, false));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, true, false));
-	EXPECT_EQ(mark({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, false, true));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1]}}), g.select(implies, {p[0], p[1]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, false, false));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, true, false));
+	EXPECT_EQ(bound({{p[0]},{p[1]}}), g.select(excludes, {p[0], p[1]}, true, true));
 
 }
 
@@ -327,41 +325,41 @@ TEST(select, choice_parallel) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(parallel, {t[1], t[2], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[2]},{t[0]}}), g.select(parallel, {t[1], t[2], t[0]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(parallel, {t[1], t[2], t[0]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[0]}}), g.select(parallel, {t[1], t[2], t[0]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(parallel, {t[1], t[2], t[0]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(choice, {t[1], t[2], t[0]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[1]},{t[0],t[2]}}), g.select(choice, {t[1], t[2], t[0]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(choice, {t[1], t[2], t[0]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[1]},{t[0],t[2]}}), g.select(choice, {t[1], t[2], t[0]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[0]}}), g.select(parallel, {t[1], t[2], t[0]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(parallel, {t[1], t[2], t[0]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[0]}}), g.select(parallel, {t[1], t[2], t[0]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(parallel, {t[1], t[2], t[0]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(choice, {t[1], t[2], t[0]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[1]},{t[0],t[2]}}), g.select(choice, {t[1], t[2], t[0]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(choice, {t[1], t[2], t[0]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[1]},{t[0],t[2]}}), g.select(choice, {t[1], t[2], t[0]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[5]}}), g.select(implies, {t[1], t[2], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, false, true));
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, true, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, false, true));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[1],t[2]}}), g.select(implies, {t[1], t[2], t[0]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[0]}}), g.select(excludes, {t[1], t[2], t[0]}, true, true));
 }
 
 TEST(select, parallel_choice) {
@@ -384,41 +382,41 @@ TEST(select, parallel_choice) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, true, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(parallel, {p[1], p[2], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(choice, {p[1], p[2], p[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[0]}}), g.select(parallel, {p[1], p[2], p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[1]},{p[0],p[2]}}), g.select(parallel, {p[1], p[2], p[0]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[0]}}), g.select(parallel, {p[1], p[2], p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1]},{p[0],p[2]}}), g.select(parallel, {p[1], p[2], p[0]}, true, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[0]}}), g.select(choice, {p[1], p[2], p[0]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[1],p[2]}}), g.select(choice, {p[1], p[2], p[0]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[0]}}), g.select(choice, {p[1], p[2], p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1],p[2]}}), g.select(choice, {p[1], p[2], p[0]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[0]}}), g.select(parallel, {p[1], p[2], p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[1]},{p[0],p[2]}}), g.select(parallel, {p[1], p[2], p[0]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[0]}}), g.select(parallel, {p[1], p[2], p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1]},{p[0],p[2]}}), g.select(parallel, {p[1], p[2], p[0]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[0]}}), g.select(choice, {p[1], p[2], p[0]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[1],p[2]}}), g.select(choice, {p[1], p[2], p[0]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[0]}}), g.select(choice, {p[1], p[2], p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1],p[2]}}), g.select(choice, {p[1], p[2], p[0]}, true, true));
 
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(implies, {p[1], p[2], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[5]}}), g.select(implies, {p[1], p[2], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[5]}}), g.select(implies, {p[1], p[2], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[5]},{p[2],p[5]}}), g.select(implies, {p[1], p[2], p[5]}, true, true));
-	EXPECT_EQ(mark({{p[1],p[2],p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[2],p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(implies, {p[1], p[2], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[5]}}), g.select(implies, {p[1], p[2], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[5]}}), g.select(implies, {p[1], p[2], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[5]},{p[2],p[5]}}), g.select(implies, {p[1], p[2], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[2],p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[2],p[5]}}), g.select(excludes, {p[1], p[2], p[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[0],p[1]},{p[0],p[2]}}), g.select(implies, {p[1], p[2], p[0]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[0]}}), g.select(implies, {p[1], p[2], p[0]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[2]},{p[0]}}), g.select(implies, {p[1], p[2], p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1]},{p[0],p[2]}}), g.select(implies, {p[1], p[2], p[0]}, true, true));
-	EXPECT_EQ(mark({{p[0],p[1],p[2]}}), g.select(excludes, {p[1], p[2], p[0]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[0]}}), g.select(excludes, {p[1], p[2], p[0]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[2]},{p[0]}}), g.select(excludes, {p[1], p[2], p[0]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[1],p[2]}}), g.select(excludes, {p[1], p[2], p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[1]},{p[0],p[2]}}), g.select(implies, {p[1], p[2], p[0]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[0]}}), g.select(implies, {p[1], p[2], p[0]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[0]}}), g.select(implies, {p[1], p[2], p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1]},{p[0],p[2]}}), g.select(implies, {p[1], p[2], p[0]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[1],p[2]}}), g.select(excludes, {p[1], p[2], p[0]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[0]}}), g.select(excludes, {p[1], p[2], p[0]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[2]},{p[0]}}), g.select(excludes, {p[1], p[2], p[0]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[1],p[2]}}), g.select(excludes, {p[1], p[2], p[0]}, true, true));
 }
 
 TEST(select, nonproper_choice) {
@@ -441,41 +439,41 @@ TEST(select, nonproper_choice) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(parallel, {t[1], t[6], t[4]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(choice, {t[1], t[6], t[4]}, true, true));
 
-	EXPECT_EQ(mark({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[0],t[3],t[5]},{t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(parallel, {t[0], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[3],t[5]},{t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2],t[3],t[5]}}), g.select(choice, {t[0], t[2], t[3], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, false, false));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, false, true));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, true, false));
-	EXPECT_EQ(mark({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, true, true));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, false, false));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, false, true));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, true, false));
+	EXPECT_EQ(bound({{t[1]},{t[6]},{t[4]}}), g.select(implies, {t[1], t[6], t[4]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[4],t[6]}}), g.select(excludes, {t[1], t[6], t[4]}, true, true));
 
-	EXPECT_EQ(mark({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[0],t[2],t[3],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[0],t[2],t[3],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[0]},{t[2]},{t[3]},{t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2]},{t[0],t[5]},{t[3],t[5]}}), g.select(implies, {t[0], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[0],t[2],t[3],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[0],t[3]},{t[2],t[3]},{t[2],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[0],t[2],t[3],t[5]}}), g.select(excludes, {t[0], t[2], t[3], t[5]}, true, true));
 }
 
 TEST(select, nonproper_parallel) {
@@ -498,41 +496,41 @@ TEST(select, nonproper_parallel) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, true, true));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(parallel, {p[1], p[6], p[4]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(choice, {p[1], p[6], p[4]}, true, true));
 
-	EXPECT_EQ(mark({{p[0],p[3]},{p[2],p[3]},{p[2],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[0],p[3]},{p[2],p[3]},{p[2],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2]},{p[0],p[5]},{p[3],p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2]},{p[0],p[5]},{p[3],p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[3]},{p[2],p[3]},{p[2],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[0],p[3]},{p[2],p[3]},{p[2],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(parallel, {p[0], p[2], p[3], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2]},{p[0],p[5]},{p[3],p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2]},{p[0],p[5]},{p[3],p[5]}}), g.select(choice, {p[0], p[2], p[3], p[5]}, true, true));
 
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, false, true));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, true, true));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, false, false));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, false, true));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, true, false));
-	EXPECT_EQ(mark({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, true, true));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, false, true));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[1],p[4],p[6]}}), g.select(implies, {p[1], p[6], p[4]}, true, true));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, false, false));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, false, true));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, true, false));
+	EXPECT_EQ(bound({{p[1]},{p[6]},{p[4]}}), g.select(excludes, {p[1], p[6], p[4]}, true, true));
 
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, true, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, false, false));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, false, true));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, true, false));
-	EXPECT_EQ(mark({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[0],p[2],p[3],p[5]}}), g.select(implies, {p[0], p[2], p[3], p[5]}, true, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, false, false));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, false, true));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, true, false));
+	EXPECT_EQ(bound({{p[0]},{p[2]},{p[3]},{p[5]}}), g.select(excludes, {p[0], p[2], p[3], p[5]}, true, true));
 }
 
 /*
@@ -617,23 +615,23 @@ TEST(select, regular_choice_parallel) {
 
 	g.compute_split_groups();
 
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(parallel, {t[1], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(choice, {t[1], t[2], t[3], t[5]}, true, true));
 
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, true, true));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, false, false));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, false, true));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, true, false));
-	EXPECT_EQ(mark({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[2]},{t[3],t[5]}}), g.select(implies, {t[1], t[2], t[3], t[5]}, true, true));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, false, false));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, false, true));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, true, false));
+	EXPECT_EQ(bound({{t[1],t[3]},{t[2],t[3]},{t[1],t[5]},{t[2],t[5]}}), g.select(excludes, {t[1], t[2], t[3], t[5]}, true, true));
 }
 
 /* This structure violates liveness

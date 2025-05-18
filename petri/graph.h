@@ -67,7 +67,6 @@ struct graph
 	vector<transition> transitions;
 	// index by from.type
 	array<vector<arc>, 2> arcs;
-	vector<state> source, sink;
 	vector<state> reset;
 
 	graph()
@@ -714,6 +713,22 @@ struct graph
 		return petri::iterator(type, -1);
 	}
 
+	vector<petri::iterator> get_places() const {
+		vector<petri::iterator> result;
+		for (int i = 0; i < (int)places.size(); i++) {
+			result.push_back(petri::iterator(place::type, i));
+		}
+		return result;
+	}
+
+	vector<petri::iterator> get_transitions() const {
+		vector<petri::iterator> result;
+		for (int i = 0; i < (int)transitions.size(); i++) {
+			result.push_back(petri::iterator(transition::type, i));
+		}
+		return result;
+	}
+
 	virtual petri::iterator create_at(place p, int index)
 	{
 		mark_modified();
@@ -843,15 +858,6 @@ struct graph
 
 		if (n.type == place::type)
 		{
-			for (int j = 0; j < (int)source.size(); j++)
-				for (int i = (int)source[j].tokens.size()-1; i >= 0; i--)
-				{
-					if (source[j].tokens[i].index == n.index)
-						source[j].tokens.erase(source[j].tokens.begin() + i);
-					else if (source[j].tokens[i].index > n.index)
-						source[j].tokens[i].index--;
-				}
-
 			for (int j = 0; j < (int)reset.size(); j++)
 				for (int i = (int)reset[j].tokens.size()-1; i >= 0; i--)
 				{
@@ -859,15 +865,6 @@ struct graph
 						reset[j].tokens.erase(reset[j].tokens.begin() + i);
 					else if (reset[j].tokens[i].index > n.index)
 						reset[j].tokens[i].index--;
-				}
-
-			for (int j = 0; j < (int)sink.size(); j++)
-				for (int i = (int)sink[j].tokens.size()-1; i >= 0; i--)
-				{
-					if (sink[j].tokens[i].index == n.index)
-						sink[j].tokens.erase(sink[j].tokens.begin() + i);
-					else if (sink[j].tokens[i].index > n.index)
-						sink[j].tokens[i].index--;
 				}
 		}
 
@@ -939,6 +936,15 @@ struct graph
 			}
 	}
 
+	virtual void erase(vector<petri::iterator> n, bool rsorted = false)
+	{
+		if (!rsorted)
+			sort(n.rbegin(), n.rend());
+
+		for (int i = 0; i < (int)n.size(); i++)
+			erase(n[i]);
+	}
+
 	// from must be sorted in reverse order
 	static void replace(vector<petri::iterator> from, petri::iterator to, map<petri::iterator, vector<petri::iterator> > &diff) {
 		for (int i = 0; i < (int)from.size(); i++) {
@@ -958,167 +964,220 @@ struct graph
 		}
 	}
 
-	virtual void erase(vector<petri::iterator> n, bool rsorted = false)
-	{
-		if (!rsorted)
-			sort(n.rbegin(), n.rend());
+	virtual petri::iterator nest_in(region to) {
+		if (to.size() == 1u) {
+			return to[0];
+		}
 
-		for (int i = 0; i < (int)n.size(); i++)
-			erase(n[i]);
+		petri::iterator link = create(transition::type);
+		for (auto i = to.begin(); i != to.end(); i++) {
+			connect(link, *i);
+		}
+		return link;
 	}
 
-	virtual petri::iterator connect(petri::iterator from, petri::iterator to)
-	{
-		if (from.type == place::type && to.type == place::type)
-		{
+	virtual petri::iterator nest_out(region from) {
+		if (from.size() == 1u) {
+			return from[0];
+		}
+
+		petri::iterator link = create(transition::type);
+		for (auto i = from.begin(); i != from.end(); i++) {
+			connect(*i, link);
+		}
+		return link;
+	}
+	
+	virtual petri::iterator nest_in(bound to) {
+		if (to.size() == 1u) {
+			return nest_in(to[0]);
+		}
+
+		petri::iterator link = create(place::type);
+		for (auto i = to.begin(); i != to.end(); i++) {
+			connect(link, nest_in(*i));
+		}
+		return link;
+	}
+
+	virtual petri::iterator nest_out(bound from) {
+		if (from.size() == 1u) {
+			return nest_out(from[0]);
+		}
+
+		petri::iterator link = create(place::type);
+		for (auto i = from.begin(); i != from.end(); i++) {
+			connect(nest_out(*i), link);
+		}
+		return link;
+	}
+
+	virtual petri::iterator connect(petri::iterator from, petri::iterator to) {
+		if (from.type == place::type && to.type == place::type) {
 			petri::iterator mid = create(transition());
 			arcs[from.type].push_back(arc(from, mid));
 			arcs[mid.type].push_back(arc(mid, to));
-		}
-		else if (from.type == transition::type && to.type == transition::type)
-		{
+		} else if (from.type == transition::type && to.type == transition::type) {
 			petri::iterator mid = create(place());
 			arcs[from.type].push_back(arc(from, mid));
 			arcs[mid.type].push_back(arc(mid, to));
-		}
-		else
-		{
+		} else {
 			mark_modified();
 			arcs[from.type].push_back(arc(from, to));
 		}
 		return to;
 	}
 
-	virtual vector<petri::iterator> connect(petri::iterator from, vector<petri::iterator> to)
-	{
-		for (int i = 0; i < (int)to.size(); i++)
-			connect(from, to[i]);
+	virtual petri::iterator connect(vector<petri::iterator> from, petri::iterator to) {
+		for (auto i = from.begin(); i != from.end(); i++) {
+			connect(*i, to);
+		}
 		return to;
 	}
 
-	virtual petri::iterator connect(vector<petri::iterator> from, petri::iterator to)
-	{
-		for (int i = 0; i < (int)from.size(); i++)
-			connect(from[i], to);
+	virtual vector<petri::iterator> connect(petri::iterator from, vector<petri::iterator> to) {
+		for (auto i = to.begin(); i != to.end(); i++) {
+			connect(from, *i);
+		}
 		return to;
 	}
 
-	virtual vector<petri::iterator> connect(vector<petri::iterator> from, vector<petri::iterator> to)
-	{
-		for (int i = 0; i < (int)from.size(); i++)
-			for (int j = 0; j < (int)to.size(); j++)
-				connect(from[i], to[j]);
-		return to;
-	}
-
-	virtual vector<petri::iterator> connect(state s, petri::iterator p, vector<petri::iterator> &rem) {
-		if (p.type == transition::type) {
-			for (int j = 0; j < (int)s.tokens.size(); j++) {
-				connect(petri::iterator(place::type, s.tokens[j].index), p);
+	virtual vector<petri::iterator> connect(vector<petri::iterator> from, vector<petri::iterator> to) {
+		for (auto i = from.begin(); i != from.end(); i++) {
+			for (auto j = to.begin(); j != to.end(); j++) {
+				connect(*i, *j);
 			}
-			return {p};
 		}
-
-		vector<petri::iterator> m;
-		vector<petri::iterator> nm = next(p);
-		vector<petri::iterator> pm = prev(p);
-		for (auto t = s.tokens.begin(); t != s.tokens.end(); t++) {
-			m.push_back(petri::iterator(place::type, t->index));
-			places[t->index] = place::merge(sequence, places[t->index], places[p.index]);
-			connect(m.back(), nm);
-			connect(pm, m.back());
-		}
-		rem.push_back(p);
-		return m;
+		return to;
 	}
 
-	virtual vector<petri::iterator> connect(petri::iterator p, state s, vector<petri::iterator> &rem) {
-		vector<petri::iterator> m;
-		if (p.type == transition::type) {
-			for (int j = 0; j < (int)s.tokens.size(); j++) {
-				m.push_back(petri::iterator(place::type, s.tokens[j].index));
-				connect(p, m.back());
+	virtual petri::region connect(petri::iterator from, petri::region to) {
+		if (to.size() == 1u) {
+			if (from.valid()) {
+				connect(from, to[0]);
+			} else {
+				from = to[0];
 			}
-			return m;
+			return to;
 		}
 
-		vector<petri::iterator> nm = next(p);
-		vector<petri::iterator> pm = prev(p);
-		for (auto t = s.tokens.begin(); t != s.tokens.end(); t++) {
-			m.push_back(petri::iterator(place::type, t->index));
-			places[t->index] = place::merge(sequence, places[p.index], places[t->index]);
-			connect(m.back(), nm);
-			connect(pm, m.back());
+		petri::iterator link = from;
+		if (link.type != transition::type) {
+			link = create(transition::type);
+			if (from.valid()) {
+				connect(from, link);
+			}
 		}
-		rem.push_back(p);
-		return m;
+		if (not from.valid()) {
+			from = link;
+		}
+
+		for (auto i = to.begin(); i != to.end(); i++) {
+			connect(link, *i);
+		}
+		return to;
 	}
 
-	virtual void connect(petri::iterator p, vector<state> &source, vector<petri::iterator> &rem) {
-		if (p.type == transition::type) {
-			p = connect(p, create(place()));
+	virtual petri::iterator connect(petri::region from, petri::iterator to) {
+		if (from.size() == 1u) {
+			if (to.valid()) {
+				connect(from[0], to);
+			} else {
+				to = from[0];
+			}
+			return to;
 		}
 
-		for (int i = 0; i < (int)source.size(); i++) {
-			if (source[i].tokens.size() > 1) {
-				petri::iterator t = create(transition());
-				connect(p, t);
-				for (int j = 0; j < (int)source[i].tokens.size(); j++) {
-					connect(t, petri::iterator(place::type, source[i].tokens[j].index));
+		petri::iterator link = to;
+		if (link.type != transition::type) {
+			link = create(transition::type);
+			if (to.valid()) {
+				connect(link, to);
+			}
+		}
+		if (not to.valid()) {
+			to = link;
+		}
+
+		for (auto i = from.begin(); i != from.end(); i++) {
+			connect(*i, link);
+		}
+		return to;
+	}
+
+	virtual petri::region connect(petri::region from, petri::region to) {
+		if (from.size() == 1u and to.size() == 1u) {
+			return {connect(from[0], to[0])};
+		} else if (from.size() == 1u) {
+			return connect(from[0], to);
+		} else if (to.size() == 1u) {
+			return {connect(from, to[0])};
+		} else {
+			petri::iterator link = create(transition::type);
+			connect(from, link);
+			connect(link, to);
+		}
+		return to;
+	}
+
+	virtual petri::bound connect(petri::bound from, petri::bound to, bool proper=false) {
+		petri::bound link;
+		if (proper) {
+			petri::bound sub;
+			for (auto i = to.begin(); i != to.end(); i++) {
+				sub.push_back(region());
+				if (i->size() == 1u) {
+					sub.regions.back().push_back((*i)[0]);
+				} else {
+					petri::iterator j = create(transition::type);
+					connect(j, *i);
+					sub.regions.back().push_back(j);
 				}
-			} else if (source[i].tokens.size() == 1) {
-				petri::iterator p0(place::type, source[i].tokens[0].index);
-				connect(p, next(p0));
-				connect(prev(p0), p);
-				places[p.index] = place::merge(sequence, places[p.index], places[p0.index]);
-				rem.push_back(p0);
 			}
-
-			source[i] = state::collapse(p.index, source[i]);
-			if (i != 0) {
-				source[0] = state::merge(source[0], source[i]);
-			}
-		}
-		
-		source = vector<state>(1, state::collapse(p.index, source[0]));
-
-		sort(rem.begin(), rem.end());
-		rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-		reverse(rem.begin(), rem.end());
-	}
-
-	virtual void connect(vector<state> &sink, petri::iterator p, vector<petri::iterator> &rem) {
-		if (p.type == transition::type) {
-			petri::iterator tmp = create(place());
-			connect(tmp, p);
-			p = tmp;
-		}
-
-		for (int i = 0; i < (int)sink.size(); i++) {
-			if (sink[i].tokens.size() > 1) {
-				petri::iterator t = create(transition());
-				connect(t, p);
-				for (int j = 0; j < (int)sink[i].tokens.size(); j++) {
-					connect(petri::iterator(place::type, sink[i].tokens[j].index), t);
+			if (sub.size() == 1u) {
+				link = sub;
+			} else {
+				petri::iterator n = create(place::type);
+				for (auto i = sub.begin(); i != sub.end(); i++) {
+					connect(n, *i);
 				}
-			} else if (sink[i].tokens.size() == 1) {
-				petri::iterator p0(place::type, sink[i].tokens[0].index);
-				connect(p, next(p0));
-				connect(prev(p0), p);
-				places[p.index] = place::merge(sequence, places[p0.index], places[p.index]);
-				rem.push_back(p0);
+				link.push_back({n});
+			}
+		} else {
+			if (from.size() > 1u) {
+				for (auto i = from.begin(); i != from.end(); i++) {
+					for (auto j = i->begin(); j != i->end(); j++) {
+						if (j->type != place::type) {
+							*j = connect(*j, create(place::type));
+						}
+					}
+				}
 			}
 
-			sink[i] = state::collapse(p.index, sink[i]);
-			if (i != 0) {
-				sink[0] = state::merge(sink[0], sink[i]);
+			if (to.size() > 1u) {
+				for (auto i = to.begin(); i != to.end(); i++) {
+					link.push_back(region());
+					for (auto j = i->begin(); j != i->end(); j++) {
+						if (j->type != place::type) {
+							petri::iterator n = create(place::type);
+							connect(n, *j);
+							link.back().push_back(n);
+						} else {
+							link.back().push_back(*j);
+						}
+					}
+				}
+			} else {
+				link = to;
 			}
 		}
-		sink = vector<state>(1, state::collapse(p.index, sink[0]));
 
-		sort(rem.begin(), rem.end());
-		rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-		reverse(rem.begin(), rem.end());
+		for (auto i = from.begin(); i != from.end(); i++) {
+			for (auto j = link.begin(); j != link.end(); j++) {
+				connect(*i, *j);
+			}
+		}
+		return to;
 	}
 
 	virtual petri::iterator connect(arc a)
@@ -1142,42 +1201,39 @@ struct graph
 		return a.back();
 	}
 
-	virtual void disconnect(petri::iterator a)
-	{
+	virtual petri::region connect(vector<petri::region> a) {
+		for (auto i0 = a.begin(); ::next(i0) != a.end(); i0++) {
+			auto i1 = ::next(i0);
+			connect(*i0, *i1);
+		}
+		return a.back();
+	}
+
+	virtual petri::bound connect(vector<petri::bound> a, bool proper=false) {
+		for (auto i0 = a.begin(); ::next(i0) != a.end(); i0++) {
+			auto i1 = ::next(i0);
+			connect(*i0, *i1, proper);
+		}
+		return a.back();
+	}
+
+	virtual void erase_arc(petri::iterator a) {
 		mark_modified();
 		arcs[a.type].erase(arcs[a.type].begin() + a.index);
 	}
 
-
-	virtual petri::iterator copy(petri::iterator i)
-	{
+	virtual petri::iterator copy(petri::iterator i) {
 		if (i.type == place::type && i.index < (int)places.size())
 		{
 			mark_modified();
 			places.push_back(places[i.index]);
 			petri::iterator result(i.type, places.size()-1);
-			for (int j = 0; j < (int)source.size(); j++)
-				for (int k = 0; k < (int)source[j].tokens.size(); k++)
-					if (source[j].tokens[k].index == i.index)
-					{
-						source[j].tokens.push_back(source[j].tokens[k]);
-						source[j].tokens.back().index = result.index;
-					}
-
 			for (int j = 0; j < (int)reset.size(); j++)
 				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
 					if (reset[j].tokens[k].index == i.index)
 					{
 						reset[j].tokens.push_back(reset[j].tokens[k]);
 						reset[j].tokens.back().index = result.index;
-					}
-
-			for (int j = 0; j < (int)sink.size(); j++)
-				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-					if (sink[j].tokens[k].index == i.index)
-					{
-						sink[j].tokens.push_back(sink[j].tokens[k]);
-						sink[j].tokens.back().index = result.index;
 					}
 
 			return result;
@@ -1206,15 +1262,6 @@ struct graph
 				result.push_back(petri::iterator(i.type, places.size()-1));
 			}
 
-			for (int j = 0; j < (int)source.size(); j++)
-				for (int k = 0; k < (int)source[j].tokens.size(); k++)
-					if (source[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)result.size(); l++)
-						{
-							source[j].tokens.push_back(source[j].tokens[k]);
-							source[j].tokens.back().index = result[l].index;
-						}
-
 			for (int j = 0; j < (int)reset.size(); j++)
 				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
 					if (reset[j].tokens[k].index == i.index)
@@ -1222,15 +1269,6 @@ struct graph
 						{
 							reset[j].tokens.push_back(reset[j].tokens[k]);
 							reset[j].tokens.back().index = result[l].index;
-						}
-
-			for (int j = 0; j < (int)sink.size(); j++)
-				for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-					if (sink[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)result.size(); l++)
-						{
-							sink[j].tokens.push_back(sink[j].tokens[k]);
-							sink[j].tokens.back().index = result[l].index;
 						}
 		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
 			for (int j = 0; j < num; j++)
@@ -1313,19 +1351,19 @@ struct graph
 	}
 
 	template <class node>
-	petri::iterator push_back(vector<petri::iterator> from, node n)
+	petri::iterator push_back(petri::region from, node n)
 	{
 		return connect(from, create(n));
 	}
 
 	template <class node>
-	vector<petri::iterator> push_back(petri::iterator from, node n, int num)
+	petri::region push_back(petri::iterator from, node n, int num)
 	{
 		return connect(from, create(n, num));
 	}
 
 	template <class node>
-	vector<petri::iterator> push_back(vector<petri::iterator> from, node n, int num)
+	petri::region push_back(petri::region from, node n, int num)
 	{
 		return connect(from, create(n, num));
 	}
@@ -1337,19 +1375,19 @@ struct graph
 	}
 
 	template <class node>
-	petri::iterator push_front(vector<petri::iterator> to, node n)
+	petri::iterator push_front(petri::region to, node n)
 	{
 		return connect(create(n), to);
 	}
 
 	template <class node>
-	vector<petri::iterator> push_front(petri::iterator to, node n, int num)
+	petri::region push_front(petri::iterator to, node n, int num)
 	{
 		return connect(create(n, num), to);
 	}
 
 	template <class node>
-	vector<petri::iterator> push_front(vector<petri::iterator> to, node n, int num)
+	petri::region push_front(petri::region to, node n, int num)
 	{
 		return connect(create(n, num), to);
 	}
@@ -1365,8 +1403,7 @@ struct graph
 		return i[place::type];
 	}
 
-	virtual petri::iterator insert(petri::iterator a, transition n)
-	{
+	virtual petri::iterator insert(petri::iterator a, transition n) {
 		petri::iterator i[2];
 		i[place::type] = create(place());
 		i[transition::type] = create(n);
@@ -1376,108 +1413,101 @@ struct graph
 		return i[transition::type];
 	}
 
-	virtual petri::iterator insert(petri::iterator a, int n)
-	{
-		if (n == place::type)
+	virtual petri::iterator insert(petri::iterator a, int n) {
+		if (n == place::type) {
 			return insert(a, place());
-		else if (n == transition::type)
+		} else if (n == transition::type) {
 			return insert(a, transition());
-		else
-			return petri::iterator();
+		}
+		return petri::iterator();
 	}
 
-	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, place n)
-	{
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, place n) {
 		petri::iterator i = create(n);
-		if (from.type == i.type)
-		{
+		if (from.type == i.type) {
 			petri::iterator j = create(transition());
 			connect(from, j);
 			connect(j, i);
-		}
-		else
+		} else {
 			connect(from, i);
+		}
 
-		if (to.type == i.type)
-		{
+		if (to.type == i.type) {
 			petri::iterator j = create(transition());
 			connect(i, j);
 			connect(j, to);
-		}
-		else
+		} else {
 			connect(i, to);
+		}
 
 		return i;
 	}
 
-	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, transition n)
-	{
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, transition n) {
 		petri::iterator i = create(n);
-		if (from.type == i.type)
-		{
+		if (from.type == i.type) {
 			petri::iterator j = create(place());
 			connect(from, j);
 			connect(j, i);
-		}
-		else
+		} else {
 			connect(from, i);
+		}
 
-		if (to.type == i.type)
-		{
+		if (to.type == i.type) {
 			petri::iterator j = create(place());
 			connect(i, j);
 			connect(j, to);
-		}
-		else
+		} else {
 			connect(i, to);
+		}
 
 		return i;
 	}
 
-	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, int n)
-	{
-		if (n == place::type)
+	virtual petri::iterator insert_alongside(petri::iterator from, petri::iterator to, int n) {
+		if (n == place::type) {
 			return insert_alongside(from, to, place());
-		else if (n == transition::type)
+		} else if (n == transition::type) {
 			return insert_alongside(from, to, transition());
-		else
-			return petri::iterator();
+		}
+		return petri::iterator();
 	}
 
-	virtual petri::iterator insert_before(petri::iterator to, place n)
-	{
+	virtual petri::iterator insert_before(petri::iterator to, place n) {
 		petri::iterator i[2];
 		i[transition::type] = create(transition());
 		i[place::type] = create(n);
-		for (int j = 0; j < (int)arcs[1-to.type].size(); j++)
-			if (arcs[1-to.type][j].to.index == to.index)
+		for (int j = 0; j < (int)arcs[1-to.type].size(); j++) {
+			if (arcs[1-to.type][j].to.index == to.index) {
 				arcs[1-to.type][j].to.index = i[to.type].index;
+			}
+		}
 		connect(i[1-to.type], to);
 		connect(i[to.type], i[1-to.type]);
 		return i[place::type];
 	}
 
-	virtual petri::iterator insert_before(petri::iterator to, transition n)
-	{
+	virtual petri::iterator insert_before(petri::iterator to, transition n) {
 		petri::iterator i[2];
 		i[transition::type] = create(n);
 		i[place::type] = create(place());
-		for (int j = 0; j < (int)arcs[1-to.type].size(); j++)
-			if (arcs[1-to.type][j].to.index == to.index)
+		for (int j = 0; j < (int)arcs[1-to.type].size(); j++) {
+			if (arcs[1-to.type][j].to.index == to.index) {
 				arcs[1-to.type][j].to.index = i[to.type].index;
+			}
+		}
 		connect(i[1-to.type], to);
 		connect(i[to.type], i[1-to.type]);
 		return i[transition::type];
 	}
 
-	virtual petri::iterator insert_before(petri::iterator to, int n)
-	{
-		if (n == place::type)
+	virtual petri::iterator insert_before(petri::iterator to, int n) {
+		if (n == place::type) {
 			return insert_before(to, place());
-		else if (n == transition::type)
+		} else if (n == transition::type) {
 			return insert_before(to, transition());
-		else
-			return petri::iterator();
+		}
+		return petri::iterator();
 	}
 
 	virtual petri::iterator insert_after(petri::iterator from, place n)
@@ -1732,28 +1762,12 @@ struct graph
 
 			if (right[i].type == place::type)
 			{
-				for (int j = 0; j < (int)source.size(); j++)
-					for (int k = 0; k < (int)source[j].tokens.size(); k++)
-						if (source[j].tokens[k].index == right[i].index)
-						{
-							source[j].tokens.push_back(source[j].tokens[k]);
-							source[j].tokens.back().index = left[i].index;
-						}
-
 				for (int j = 0; j < (int)reset.size(); j++)
 					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
 						if (reset[j].tokens[k].index == right[i].index)
 						{
 							reset[j].tokens.push_back(reset[j].tokens[k]);
 							reset[j].tokens.back().index = left[i].index;
-						}
-
-				for (int j = 0; j < (int)sink.size(); j++)
-					for (int k = 0; k < (int)sink[j].tokens.size(); k++)
-						if (sink[j].tokens[k].index == right[i].index)
-						{
-							sink[j].tokens.push_back(sink[j].tokens[k]);
-							sink[j].tokens.back().index = left[i].index;
 						}
 			}
 		}
@@ -2070,750 +2084,51 @@ struct graph
 	// @param composition The composition type to use (sequence, choice, or parallel)
 	// @param g The Petri net to merge with the current one
 	// @return A mapping from original nodes to corresponding nodes in the merged net
-	virtual bound<state> compose(int composition, bound<state> b0, bound<state> b1) {
+	virtual segment compose(int composition, segment s0, segment s1, bool proper=false) {
 		mark_modified();
 
-		// merge source states for choice and parallel
-		if (composition == choice or b0.source.empty()) {
-			b0.source.merge(composition, b1.source);
-		} else if (composition == parallel) {
-			if (b0.source.size() > 1) {
-				vector<petri::iterator> rem;
-				petri::iterator p = create(place());
-				connect(p, b0.source.states, rem);
-				b0.sink.replace(rem, {p});
-				b0.erase(rem, true);
-				b1.erase(rem, true);
-				erase(rem, true);
-			}
-
-			if (b1.source.size() > 1) {
-				vector<petri::iterator> rem;
-				petri::iterator p = create(place());
-				connect(p, b1.source.states, rem);
-				b1.sink.replace(rem, {p});
-				b0.erase(rem, true);
-				b1.erase(rem, true);
-				erase(rem, true);
-			}
-
-			b0.source.merge(composition, b1.source);
-		}
-
-		// merge sink states for choice and parallel
-		if (composition == choice or b0.sink.empty()) {
-			b0.sink.merge(composition, b1.sink);
-		} else if (composition == parallel) {
-			if (b0.sink.size() > 1) {
-				vector<petri::iterator> rem;
-				petri::iterator p = create(place());
-				connect(b0.sink.states, p, rem);
-				b0.source.replace(rem, {p});
-				b0.erase(rem, true);
-				b1.erase(rem, true);
-				erase(rem, true);
-			}
-
-			if (b1.sink.size() > 1) {
-				vector<petri::iterator> rem;
-				petri::iterator p = create(place());
-				connect(b1.sink.states, p, rem);
-				b1.source.replace(rem, {p});
-				b0.erase(rem, true);
-				b1.erase(rem, true);
-				erase(rem, true);
-			}
-
-			b0.sink.merge(composition, b1.sink);
+		if (s0.source.empty()) {
+			s0 = s1;
+		} else if (s1.source.empty()) {
+			// skip
+		} else if (s0.sink.empty()) {
+			printf("warning: sequencing creates dead code.\n");
+			s0.sink = s1.sink;
 		} else if (composition == sequence) {
-			vector<petri::iterator> rem;
-			vector<petri::iterator> m;
-			if (b0.sink.size() > 1 or b1.source.size() > 1) {
-				petri::iterator p = create(place());
-				connect(b0.sink.states, p, rem);
-				connect(p, b1.source.states, rem);
-			} else if (b0.sink.size() == 1 and b1.source.size() == 1) {
-				if (b0.sink[0].tokens.size() > 1 and b1.source[0].tokens.size() > 1) {
-					petri::iterator t = create(transition());
-					connect(b0.sink[0], t, rem);
-					connect(t, b1.source[0], rem);
-				} else if (b0.sink[0].tokens.size() >= 1 and b1.source[0].tokens.size() == 1) {
-					petri::iterator p(place::type, b1.source[0].tokens[0].index);
-					m = connect(b0.sink[0], p, rem);
-				} else if (b0.sink[0].tokens.size() == 1 and b1.source[0].tokens.size() >= 1) {
-					petri::iterator p(place::type, b0.sink[0].tokens[0].index);
-					m = connect(p, b1.source[0], rem);
-				}
+			connect(s0.sink, s1.source, proper);
+			s0.sink = s1.sink;
+		} else {
+			if (proper) {
+				s0.source = bound({{nest_in(s0.source)}});
+				s0.sink = bound({{nest_out(s0.sink)}});
+				s1.source = bound({{nest_in(s1.source)}});
+				s1.sink = bound({{nest_out(s1.sink)}});
 			}
-
-			sort(rem.begin(), rem.end());
-			rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-			reverse(rem.begin(), rem.end());
-
-			b1.sink.replace(rem, m);
-			b0.source.replace(rem, m);
-
-			b0.sink = b1.sink;
-			erase(rem, true);
+			s0.compose(composition, s1);
 		}
 
-		return b0;
+		return s0;
 	}
 
-
-
-	// Combines two Petri nets according to specified composition semantics.
-	//
-	// This function implements graph composition operations that merge
-	// the current Petri net with another one according to one of three fundamental
-	// composition patterns: sequence, choice, or parallel. Each composition type creates
-	// a different relationship between the two nets:
-	//
-	// - Sequence: Connect the sink nodes of the current net to the source nodes of the
-	//   provided net, creating a sequential flow.
-	// - Choice: Create a structure where either the current net or the provided net
-	//   will execute, but not both.
-	// - Parallel: Create a structure where both nets execute concurrently.
-	//
-	// The function handles complex cases like merging multiple source or sink nodes,
-	// ensuring proper token flow, and maintaining consistent state management. It returns
-	// a mapping between original nodes in the provided net and their corresponding nodes
-	// in the merged result, which is essential for tracking relationships.
-	//
-	// @param composition The composition type to use (sequence, choice, or parallel)
-	// @param g The Petri net to merge with the current one
-	// @return A mapping from original nodes to corresponding nodes in the merged net
-	virtual map<petri::iterator, vector<petri::iterator> > merge(int composition, const graph &g)
-	{
-		if (places.size() == 0 && transitions.size() == 0)
-		{
-			places = g.places;
-			transitions = g.transitions;
-			arcs[0] = g.arcs[0];
-			arcs[1] = g.arcs[1];
-			source = g.source;
-			sink = g.sink;
-			reset = g.reset;
-			node_distances = g.node_distances;
-			node_distances_ready = g.node_distances_ready;
-			split_groups_ready = g.split_groups_ready;
-
-			map<petri::iterator, vector<petri::iterator> > result;
-			for (int i = 0; i < (int)places.size(); i++)
-				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(place::type, i), vector<petri::iterator>(1, petri::iterator(place::type, i))));
-
-			for (int i = 0; i < (int)transitions.size(); i++)
-				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(transition::type, i), vector<petri::iterator>(1, petri::iterator(transition::type, i))));
-
-			return result;
+	virtual array<vector<petri::iterator>, 2> merge(const graph<place, transition, token, state> &g) {
+		array<vector<petri::iterator>, 2> result;
+		result[place::type] = create(g.places);
+		result[transition::type] = create(g.transitions);
+		for (int i = 0; i < 2; i++) {
+			for (int j = 0; j < (int)g.arcs[i].size(); j++) {
+				arcs[i].push_back(arc(result[g.arcs[i][j].from.type][g.arcs[i][j].from.index], result[g.arcs[i][j].to.type][g.arcs[i][j].to.index]));
+			}
 		}
-		else if ((g.places.size() == 0 && g.transitions.size() == 0) || (composition == sequence && (sink.size() == 0 || g.source.size() == 0)))
-			return map<petri::iterator, vector<petri::iterator> >();
-		else
-		{
-			mark_modified();
-			map<petri::iterator, vector<petri::iterator> > result;
-
-			places.reserve(places.size() + g.places.size());
-			for (int i = 0; i < (int)g.places.size(); i++)
-			{
-				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(place::type, i), vector<petri::iterator>(1, petri::iterator(place::type, (int)places.size()))));
-				places.push_back(g.places[i]);
-			}
-
-			transitions.reserve(transitions.size() + g.transitions.size());
-			for (int i = 0; i < (int)g.transitions.size(); i++)
-			{
-				result.insert(pair<petri::iterator, vector<petri::iterator> >(petri::iterator(transition::type, i), vector<petri::iterator>(1, petri::iterator(transition::type, (int)transitions.size()))));
-				transitions.push_back(g.transitions[i]);
-			}
-
-			for (int i = 0; i < 2; i++)
-				for (int j = 0; j < (int)g.arcs[i].size(); j++)
-				{
-					vector<petri::iterator> from = result[g.arcs[i][j].from];
-					vector<petri::iterator> to = result[g.arcs[i][j].to];
-					for (int k = 0; k < (int)from.size(); k++)
-						for (int l = 0; l < (int)to.size(); l++)
-							arcs[i].push_back(arc(from[k], to[l]));
-				}
-
-			vector<state> converted_source;
-			vector<state> converted_sink;
-			vector<state> converted_reset;
-
-			for (int i = 0; i < (int)g.source.size(); i++)
-				converted_source.push_back(g.source[i].convert(result));
-
-			for (int i = 0; i < (int)g.sink.size(); i++)
-				converted_sink.push_back(g.sink[i].convert(result));
-
-			for (int i = 0; i < (int)g.reset.size(); i++)
-				converted_reset.push_back(g.reset[i].convert(result));
-
-
-			if (composition == choice || source.size() == 0)
-			{
-				for (int i = 0; i < (int)converted_source.size(); i++)
-				{
-					typename vector<state>::iterator iter = lower_bound(source.begin(), source.end(), converted_source[i]);
-					if (iter != source.end() && *iter == converted_source[i])
-						*iter = state::merge(*iter, converted_source[i]);
-					else
-						source.insert(iter, converted_source[i]);
-				}
-
-				for (int i = 0; i < (int)converted_reset.size(); i++)
-				{
-					typename vector<state>::iterator iter = lower_bound(reset.begin(), reset.end(), converted_reset[i]);
-					if (iter != reset.end() && *iter == converted_reset[i])
-						*iter = state::merge(*iter, converted_reset[i]);
-					else
-						reset.insert(iter, converted_reset[i]);
-				}
-			}
-			else if (composition == parallel)
-			{
-				if (source.size() > 1)
-				{
-					vector<petri::iterator> rem;
-					petri::iterator p = create(place());
-					for (int i = 0; i < (int)source.size(); i++)
-					{
-						if (source[i].tokens.size() > 1)
-						{
-							petri::iterator t = create(transition());
-							connect(p, t);
-							for (int j = 0; j < (int)source[i].tokens.size(); j++)
-								connect(t, petri::iterator(place::type, source[i].tokens[j].index));
-						}
-						else if (source[i].tokens.size() == 1)
-						{
-							petri::iterator p0(place::type, source[i].tokens[0].index);
-							connect(p, next(p0));
-							connect(prev(p0), p);
-							rem.push_back(p0);
-						}
-
-						source[i] = state::collapse(p.index, source[i]);
-						if (i != 0)
-							source[0] = state::merge(source[0], source[i]);
-					}
-					source = vector<state>(1, state::collapse(p.index, source[0]));
-
-					sort(rem.begin(), rem.end());
-					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-					reverse(rem.begin(), rem.end());
-
-					for (int i = 0; i < (int)rem.size(); i++)
-					{
-						for (int j = 0; j < (int)sink.size(); j++)
-							for (int k = (int)sink[j].tokens.size()-1; k >= 0; k--)
-								if (sink[j].tokens[k].index == rem[i].index)
-									sink[j].tokens[k].index = p.index;
-
-						for (int j = 0; j < (int)reset.size(); j++)
-							for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--)
-								if (reset[j].tokens[k].index == rem[i].index)
-									reset[j].tokens[k].index = p.index;
-
-						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
-						{
-							for (int k = (int)j->second.size()-1; k >= 0; k--)
-							{
-								if (j->second[k] > rem[i])
-									j->second[k]--;
-								else if (j->second[k] == rem[i])
-								{
-									j->second.erase(j->second.begin() + k);
-									j->second.push_back(p);
-								}
-							}
-
-							sort(j->second.begin(), j->second.end());
-							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-						}
-
-						graph::erase(rem[i], converted_source);
-						graph::erase(rem[i], converted_sink);
-						graph::erase(rem[i], converted_reset);
-					}
-
-					erase(rem, true);
-				}
-
-				if (converted_source.size() > 1)
-				{
-					vector<petri::iterator> rem;
-					petri::iterator p = create(place());
-					for (int i = 0; i < (int)converted_source.size(); i++)
-					{
-						if (converted_source[i].tokens.size() > 1)
-						{
-							petri::iterator t = create(transition());
-							connect(p, t);
-							for (int j = 0; j < (int)converted_source[i].tokens.size(); j++)
-								connect(t, petri::iterator(place::type, converted_source[i].tokens[j].index));
-						}
-						else if (converted_source[i].tokens.size() == 1)
-						{
-							petri::iterator p0(place::type, converted_source[i].tokens[0].index);
-							connect(p, next(p0));
-							connect(prev(p0), p);
-							rem.push_back(p0);
-						}
-
-						converted_source[i] = state::collapse(p.index, converted_source[i]);
-						if (i != 0)
-							converted_source[0] = state::merge(converted_source[0], converted_source[i]);
-					}
-					converted_source = vector<state>(1, state::collapse(p.index, converted_source[0]));
-
-					sort(rem.begin(), rem.end());
-					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-					reverse(rem.begin(), rem.end());
-
-					for (int i = 0; i < (int)rem.size(); i++)
-					{
-						for (int j = 0; j < (int)converted_sink.size(); j++)
-							for (int k = (int)converted_sink[j].tokens.size()-1; k >= 0; k--)
-								if (converted_sink[j].tokens[k].index == rem[i].index)
-									converted_sink[j].tokens[k].index = p.index;
-
-						for (int j = 0; j < (int)converted_reset.size(); j++)
-							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
-								if (converted_reset[j].tokens[k].index == rem[i].index)
-									converted_reset[j].tokens[k].index = p.index;
-
-						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
-						{
-							for (int k = (int)j->second.size()-1; k >= 0; k--)
-							{
-								if (j->second[k] > rem[i])
-									j->second[k]--;
-								else if (j->second[k] == rem[i])
-								{
-									j->second.erase(j->second.begin() + k);
-									j->second.push_back(p);
-								}
-							}
-
-							sort(j->second.begin(), j->second.end());
-							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-						}
-
-						graph::erase(rem[i], converted_source);
-						graph::erase(rem[i], converted_sink);
-						graph::erase(rem[i], converted_reset);
-					}
-
-					erase(rem, true);
-				}
-
-				if (source.size() == 1 && converted_source.size() == 1)
-					source[0] = state::merge(source[0], converted_source[0]);
-				else if (converted_source.size() == 1)
-					source = converted_source;
-
-				if (reset.size() == 0 && converted_reset.size() > 0)
-					reset = source;
-				else if (reset.size() > 0 && converted_reset.size() == 0)
-					converted_reset = converted_source;
-
-				if (reset.size() > 0 || converted_reset.size() > 0)
-				{
-					int s = (int)reset.size();
-					for (int i = 0; i < (int)converted_reset.size()-1; i++)
-						for (int j = 0; j < s; j++)
-							reset.push_back(state::merge(reset[j], converted_reset[i]));
-
-					if (converted_reset.size() > 0)
-						for (int j = 0; j < s; j++)
-							reset[j] = state::merge(reset[j], converted_reset.back());
-				}
-			}
-
-			if (composition == choice || sink.size() == 0)
-			{
-				for (int i = 0; i < (int)g.sink.size(); i++)
-				{
-					typename vector<state>::iterator iter = lower_bound(sink.begin(), sink.end(), converted_sink[i]);
-					if (iter != sink.end() && *iter == converted_sink[i])
-						*iter = state::merge(*iter, converted_sink[i]);
-					else
-						sink.insert(iter, converted_sink[i]);
-				}
-			}
-			else if (composition == parallel)
-			{
-				if (sink.size() > 1)
-				{
-					vector<petri::iterator> rem;
-					petri::iterator p = create(place());
-					for (int i = 0; i < (int)sink.size(); i++)
-					{
-						if (sink[i].tokens.size() > 1)
-						{
-							petri::iterator t = create(transition());
-							connect(t, p);
-							for (int j = 0; j < (int)sink[i].tokens.size(); j++)
-								connect(petri::iterator(place::type, sink[i].tokens[j].index), t);
-						}
-						else if (sink[i].tokens.size() == 1)
-						{
-							petri::iterator p0(place::type, sink[i].tokens[0].index);
-							connect(p, next(p0));
-							connect(prev(p0), p);
-							rem.push_back(p0);
-						}
-
-						sink[i] = state::collapse(p.index, sink[i]);
-						if (i != 0)
-							sink[0] = state::merge(sink[0], sink[i]);
-					}
-					sink = vector<state>(1, state::collapse(p.index, sink[0]));
-
-					sort(rem.begin(), rem.end());
-					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-					reverse(rem.begin(), rem.end());
-
-					for (int i = 0; i < (int)rem.size(); i++)
-					{
-						for (int j = 0; j < (int)source.size(); j++)
-							for (int k = (int)source[j].tokens.size()-1; k >= 0; k--)
-								if (source[j].tokens[k].index == rem[i].index)
-									source[j].tokens[k].index = p.index;
-
-						for (int j = 0; j < (int)reset.size(); j++)
-							for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--)
-								if (reset[j].tokens[k].index == rem[i].index)
-									reset[j].tokens[k].index = p.index;
-
-						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
-						{
-							for (int k = (int)j->second.size()-1; k >= 0; k--)
-							{
-								if (j->second[k] > rem[i])
-									j->second[k]--;
-								else if (j->second[k] == rem[i])
-								{
-									j->second.erase(j->second.begin() + k);
-									j->second.push_back(p);
-								}
-							}
-
-							sort(j->second.begin(), j->second.end());
-							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-						}
-
-						graph::erase(rem[i], converted_source);
-						graph::erase(rem[i], converted_sink);
-						graph::erase(rem[i], converted_reset);
-					}
-
-					erase(rem, true);
-				}
-
-				if (converted_sink.size() > 1)
-				{
-					vector<petri::iterator> rem;
-					petri::iterator p = create(place());
-					for (int i = 0; i < (int)converted_sink.size(); i++)
-					{
-						if (converted_sink[i].tokens.size() > 1)
-						{
-							petri::iterator t = create(transition());
-							connect(t, p);
-							for (int j = 0; j < (int)converted_sink[i].tokens.size(); j++)
-								connect(petri::iterator(place::type, converted_sink[i].tokens[j].index), t);
-						}
-						else if (converted_sink[i].tokens.size() == 1)
-						{
-							petri::iterator p0(place::type, converted_sink[i].tokens[0].index);
-							connect(p, next(p0));
-							connect(prev(p0), p);
-							rem.push_back(p0);
-						}
-
-						converted_sink[i] = state::collapse(p.index, converted_sink[i]);
-						if (i != 0)
-							converted_sink[0] = state::merge(converted_sink[0], converted_sink[i]);
-					}
-					converted_sink = vector<state>(1, state::collapse(p.index, converted_sink[0]));
-
-					sort(rem.begin(), rem.end());
-					rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-					reverse(rem.begin(), rem.end());
-
-					for (int i = 0; i < (int)rem.size(); i++)
-					{
-						for (int j = 0; j < (int)converted_source.size(); j++)
-							for (int k = (int)converted_source[j].tokens.size()-1; k >= 0; k--)
-								if (converted_source[j].tokens[k].index == rem[i].index)
-									converted_source[j].tokens[k].index = p.index;
-
-						for (int j = 0; j < (int)converted_reset.size(); j++)
-							for (int k = (int)converted_reset[j].tokens.size()-1; k >= 0; k--)
-								if (converted_reset[j].tokens[k].index == rem[i].index)
-									converted_reset[j].tokens[k].index = p.index;
-
-						for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
-						{
-							for (int k = (int)j->second.size()-1; k >= 0; k--)
-							{
-								if (j->second[k] > rem[i])
-									j->second[k]--;
-								else if (j->second[k] == rem[i])
-								{
-									j->second.erase(j->second.begin() + k);
-									j->second.push_back(p);
-								}
-							}
-
-							sort(j->second.begin(), j->second.end());
-							j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-						}
-
-						graph::erase(rem[i], converted_source);
-						graph::erase(rem[i], converted_sink);
-						graph::erase(rem[i], converted_reset);
-					}
-
-					erase(rem, true);
-				}
-
-				if (sink.size() == 1 && converted_sink.size() == 1)
-					sink[0] = state::merge(sink[0], converted_sink[0]);
-				else if (converted_sink.size() == 1)
-					sink = converted_sink;
-			}
-			else if (composition == sequence)
-			{
-				if (reset.size() > 0 && converted_reset.size() > 0)
-					error("", "only one reset token allowed per sequential", __FILE__, __LINE__);
-				else if (reset.size() == 0)
-					reset = converted_reset;
-
-				vector<petri::iterator> rem;
-				vector<petri::iterator> m;
-				if (sink.size() > 1 || converted_source.size() > 1)
-				{
-					m.push_back(create(place()));
-
-					for (int i = 0; i < (int)sink.size(); i++)
-					{
-						if (sink[i].tokens.size() > 1)
-						{
-							petri::iterator pm = create(transition());
-							for (int k = 0; k < (int)sink[i].tokens.size(); k++)
-								connect(petri::iterator(place::type, sink[i].tokens[k].index), pm);
-							connect(pm, m);
-						}
-						else if (sink[i].tokens.size() == 1)
-						{
-							petri::iterator pm = petri::iterator(place::type, sink[i].tokens[0].index);
-							connect(prev(pm), m);
-							connect(m, next(pm));
-							for (int k = 0; k < (int)m.size(); k++) {
-								places[m[k].index] = place::merge(sequence, places[pm.index], places[m[k].index]);
-							}
-							rem.push_back(pm);
-						}
-					}
-
-					for (int i = 0; i < (int)converted_source.size(); i++)
-					{
-						if (converted_source[i].tokens.size() > 1)
-						{
-							petri::iterator pm = create(transition());
-							for (int k = 0; k < (int)converted_source[i].tokens.size(); k++)
-								connect(pm, petri::iterator(place::type, converted_source[i].tokens[k].index));
-							connect(m, pm);
-						}
-						else if (converted_source[i].tokens.size() == 1)
-						{
-							petri::iterator pm = petri::iterator(place::type, converted_source[i].tokens[0].index);
-							connect(prev(pm), m);
-							connect(m, next(pm));
-							for (int k = 0; k < (int)m.size(); k++) {
-								places[m[k].index] = place::merge(sequence, places[m[k].index], places[pm.index]);
-							}
-							rem.push_back(pm);
-						}
-					}
-				}
-				else if (sink.size() == 1 && converted_source.size() == 1)
-				{
-					if (sink[0].tokens.size() > 1 && converted_source[0].tokens.size() > 1)
-					{
-						petri::iterator p = create(transition());
-						for (int k = 0; k < (int)sink[0].tokens.size(); k++)
-							connect(petri::iterator(place::type, sink[0].tokens[k].index), p);
-						for (int k = 0; k < (int)converted_source[0].tokens.size(); k++)
-							connect(p, petri::iterator(place::type, converted_source[0].tokens[k].index));
-					}
-					else if (sink[0].tokens.size() >= 1 && converted_source[0].tokens.size() == 1)
-					{
-						petri::iterator p(place::type, converted_source[0].tokens[0].index);
-						vector<petri::iterator> nm = next(p);
-						vector<petri::iterator> pm = prev(p);
-						for (int k = 0; k < (int)sink[0].tokens.size(); k++)
-						{
-							m.push_back(petri::iterator(place::type, sink[0].tokens[k].index));
-							places[m.back().index] = place::merge(sequence, places[m.back().index], places[p.index]);
-							connect(m.back(), nm);
-							connect(pm, m.back());
-						}
-						rem.push_back(p);
-					}
-					else if (sink[0].tokens.size() == 1 && converted_source[0].tokens.size() >= 1)
-					{
-						petri::iterator p(place::type, sink[0].tokens[0].index);
-						vector<petri::iterator> nm = next(p);
-						vector<petri::iterator> pm = prev(p);
-						for (int k = 0; k < (int)converted_source[0].tokens.size(); k++)
-						{
-							m.push_back(petri::iterator(place::type, converted_source[0].tokens[k].index));
-							places[m.back().index] = place::merge(sequence, places[p.index], places[m.back().index]);
-							connect(m.back(), nm);
-							connect(pm, m.back());
-						}
-						rem.push_back(p);
-					}
-				}
-
-				sort(rem.begin(), rem.end());
-				rem.resize(unique(rem.begin(), rem.end()) - rem.begin());
-				reverse(rem.begin(), rem.end());
-
-				for (int i = 0; i < (int)rem.size(); i++)
-				{
-					for (int j = 0; j < (int)converted_sink.size(); j++)
-						for (int k = (int)converted_sink[j].tokens.size()-1; k >= 0; k--)
-						{
-							if (converted_sink[j].tokens[k].index == rem[i].index)
-							{
-								for (int l = 0; l < (int)m.size(); l++)
-								{
-									converted_sink[j].tokens.push_back(converted_sink[j].tokens[k]);
-									converted_sink[j].tokens.back().index = m[l].index;
-								}
-								converted_sink[j].tokens.erase(converted_sink[j].tokens.begin() + k);
-							}
-						}
-
-					for (int j = 0; j < (int)reset.size(); j++)
-						for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--)
-						{
-							if (reset[j].tokens[k].index == rem[i].index)
-							{
-								for (int l = 0; l < (int)m.size(); l++)
-								{
-									reset[j].tokens.push_back(reset[j].tokens[k]);
-									reset[j].tokens.back().index = m[l].index;
-								}
-								reset[j].tokens.erase(reset[j].tokens.begin() + k);
-							}
-						}
-
-					for (int j = 0; j < (int)source.size(); j++)
-						for (int k = (int)source[j].tokens.size()-1; k >= 0; k--)
-						{
-							if (source[j].tokens[k].index == rem[i].index)
-							{
-								for (int l = 0; l < (int)m.size(); l++)
-								{
-									source[j].tokens.push_back(source[j].tokens[k]);
-									source[j].tokens.back().index = m[l].index;
-								}
-								source[j].tokens.erase(source[j].tokens.begin() + k);
-							}
-						}
-
-					for (map<petri::iterator, vector<petri::iterator> >::iterator j = result.begin(); j != result.end(); j++)
-					{
-						for (int k = (int)j->second.size()-1; k >= 0; k--)
-						{
-							if (j->second[k] > rem[i])
-								j->second[k]--;
-							else if (j->second[k] == rem[i])
-							{
-								j->second.erase(j->second.begin() + k);
-								j->second.insert(j->second.end(), m.begin(), m.end());
-							}
-						}
-
-						sort(j->second.begin(), j->second.end());
-						j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-					}
-				}
-
-				sink = converted_sink;
-				erase(rem, true);
-			}
-
-			return result;
-		}
+		return result;
 	}
 
-	virtual vector<state> consolidate(vector<state> to, vector<state> from=vector<state>(), bool out = false) {
-		if (from.empty()) {
-			from.push_back(state());
-			from.back().tokens.push_back(create(place::type).index);
-		}
-		vector<petri::iterator> rem;
-
-		for (auto k = from.begin(); k != from.end(); k++) {
-			vector<petri::iterator> con;
-			for (auto i = k->tokens.begin(); i != k->tokens.end(); i++) {
-				con.push_back(petri::iterator(place::type, i->index));
-			}
-			for (auto i = to.begin(); i != to.end(); i++) {
-				if (i->tokens.size() > 1) {
-					vector<petri::iterator> t;
-					if (out) {
-						t = connect(create(transition::type), con);
-					} else {
-						t.push_back(connect(con, create(transition::type)));
-					}
-
-					for (auto j = i->tokens.begin(); j != i->tokens.end(); j++) {
-						if (out) {
-							connect(petri::iterator(place::type, j->index), t);
-						} else {
-							connect(t, petri::iterator(place::type, j->index));
-						}
-					}
-				} else if (i->tokens.size() == 1) {
-					petri::iterator loc(place::type, i->tokens[0].index);
-					connect(prev(loc), con);
-					connect(con, next(loc));
-					for (auto j = con.begin(); j != con.end(); j++) {
-						places[j->index] = place::merge(choice, places[j->index], places[loc.index]);
-					}
-					rem.push_back(loc);
-				}
-			}
-		}
-
-		sort(rem.begin(), rem.end());
-		rem.erase(unique(rem.begin(), rem.end()), rem.end());
-
-		for (int i = (int)rem.size()-1; i >= 0; i--) {
-			erase(rem[i]);
-			erase(rem[i], from);
-		}
-
-		return from;
-	}
-
-	virtual vector<vector<petri::iterator> > cycles() const
+	virtual vector<vector<petri::iterator> > cycles(vector<petri::iterator> from) const
 	{
 		vector<vector<petri::iterator> > curr;
 		vector<vector<petri::iterator> > result;
-		for (int i = 0; i < (int)source.size(); i++)
-			for (int j = 0; j < (int)source[i].tokens.size(); j++)
-				curr.push_back(vector<petri::iterator>(1, petri::iterator(place::type, source[i].tokens[j].index)));
+		for (auto i = from.begin(); i != from.end(); i++) {
+			curr.push_back({*i});
+		}
 
 		sort(curr.begin(), curr.end());
 		curr.resize(unique(curr.begin(), curr.end()) - curr.begin());
@@ -3469,7 +2784,7 @@ struct graph
 	// @param always If true, requires consistent (always) relationships; if false, allows occasional relationships
 	// @param invert If true, inverts the relationship criteria, finding opposite relationships
 	// @return A vector of vectors, where each inner vector contains a maximal clique of related nodes
-	virtual vector<vector<petri::iterator> > select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
+	virtual bound select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
 		// ~always & ~invert - separate nodes that aren't sometimes composed as requested
 		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
 		//  always & ~invert - separate nodes that aren't always composed as requested.
@@ -3477,7 +2792,7 @@ struct graph
 		//                     and choice relations.
 		//  always &  invert - separate nodes that are always composed as the opposite of requested
 
-		vector<vector<petri::iterator> > result;
+		bound result;
 
 		// This is the problem of identifying all maximal cliques in the
 		// graph constructed using the nodes in "from" as vertices and
@@ -3510,7 +2825,7 @@ struct graph
 			if (frame.P.empty() and frame.X.empty()) {
 				// Then we've found a maximal clique
 				sort(frame.R.begin(), frame.R.end());
-				result.push_back(frame.R);
+				result.push_back(region::from_nodes(frame.R));
 			} else {
 				// Otherwise, we need to recurse
 				while (not frame.P.empty()) {
@@ -3541,7 +2856,7 @@ struct graph
 	}
 
 	// Takes a strict selection of nodes (see graph::select() ) and regroups them into all non-strict selections
-	vector<vector<petri::iterator> > group(int composition, vector<vector<petri::iterator> > nodes, bool always=false, bool invert=false) {
+	bound group(int composition, bound nodes, bool always=false, bool invert=false) {
 		// ~always & ~invert - group nodes that are sometimes composed as requested
 		// ~always &  invert - group nodes that aren't sometimes composed as the opposite of requested
 		//  always & ~invert - group nodes that are always composed as requested.
@@ -3575,9 +2890,9 @@ struct graph
 			if (frame.P.empty() and frame.X.empty()) {
 				// Then we've found a maximal clique
 				if ((int)frame.R.size() > 1) {
-					nodes.push_back(vector<petri::iterator>());
+					nodes.push_back(region());
 					for (auto i = frame.R.begin(); i != frame.R.end(); i++) {
-						nodes.back().insert(nodes.back().end(), nodes[*i].begin(), nodes[*i].end());
+						nodes.back().append(nodes[*i]);
 					}
 					sort(nodes.back().begin(), nodes.back().end());
 				}
@@ -3588,15 +2903,15 @@ struct graph
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
 						if (frames.back().P[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
-							or (invert and is(opposite, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
+							or (not invert and not is(composition, nodes[frames.back().P[i]].nodes, nodes[frame.P.back()].nodes, always))
+							or (invert and is(opposite, nodes[frames.back().P[i]].nodes, nodes[frame.P.back()].nodes, always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
 						if (frames.back().X[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
-							or (invert and is(opposite, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
+							or (not invert and not is(composition, nodes[frames.back().X[i]].nodes, nodes[frame.P.back()].nodes, always))
+							or (invert and is(opposite, nodes[frames.back().X[i]].nodes, nodes[frame.P.back()].nodes, always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}
@@ -3610,7 +2925,7 @@ struct graph
 		return nodes;
 	}
 
-	vector<vector<petri::iterator> > complete(int composition, vector<vector<petri::iterator> > nodes) {
+	bound complete(int composition, bound nodes) {
 		// In this function, we are given conditional groups of parallel
 		// nodes. In some cases, one group may entirely overlap another.
 		// We need to add nodes to differentiate them in the petri net
@@ -3633,10 +2948,10 @@ struct graph
 			cout << "starting search " << ::to_string(nodes[i]) << " " << ::to_string(A_groups) << endl;
 			for (int j = 0; j < (int)nodes.size(); j++) {
 				cout << "checking i=" << i << ":" << ::to_string(nodes[i]) << " and j=" << j << ":" << ::to_string(nodes[j]) << endl;	
-				if (i != j and vector_is_subset_of(nodes[i], nodes[j])) {
+				if (i != j and vector_is_subset_of(nodes[i].nodes, nodes[j].nodes)) {
 					cout << "found subset" << endl;
 					// 3. Find the conditional split groups of Bi & ~A union groups, intersect branches.
-					vector<petri::iterator> Bj = vector_difference(nodes[j], nodes[i]);
+					vector<petri::iterator> Bj = vector_difference(nodes[j].nodes, nodes[i].nodes);
 					cout << "j-i" << ::to_string(Bj) << endl;
 
 					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
@@ -3658,14 +2973,13 @@ struct graph
 			}
 
 			// 5. Add these transitions to A
-			vector<petri::iterator> A = nodes[i];
+			region A = nodes[i];
 			for (auto group = B_groups.begin(); group != B_groups.end(); group++) {
 				for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {
 					A.push_back(petri::iterator(transition::type, *branch));
 				}
 			}
-			sort(A.begin(), A.end());
-			A.erase(unique(A.begin(), A.end()), A.end());
+			A.sort();
 
 			/*// 6. select conditional groups of parallel transitions from A (not sometimes conditional)
 			vector<vector<petri::iterator> > groups = select(parallel, A, false, true);
@@ -3684,14 +2998,14 @@ struct graph
 			// missing here? How do I formally prove that this process creates a full
 			// graph cut of the behavior?
 
-			nodes.erase(nodes.begin() + i);
+			nodes.regions.erase(nodes.begin() + i);
 		}
 
 		return nodes;
 	}
 
-	virtual vector<petri::iterator> deselect(const vector<vector<petri::iterator> > &nodes) {
-		vector<petri::iterator> result = nodes[0];
+	virtual vector<petri::iterator> deselect(const bound &nodes) {
+		vector<petri::iterator> result = nodes[0].nodes;
 		for (int i = 1; i < (int)nodes.size(); i++) {
 			result.insert(result.end(), nodes[i].begin(), nodes[i].end());
 		}
@@ -3700,7 +3014,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<vector<petri::iterator> > partials(int composition, vector<petri::iterator> nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
+	virtual bound partials(int composition, vector<petri::iterator> nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
 		sort(nodes.begin(), nodes.end());
 		nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
 
@@ -3720,16 +3034,16 @@ struct graph
 		// Given the set of nodes in "other" and the set of nodes in "nodes", we
 		// need to find all cliques (maximal or not) in the graph created by
 		// the requested composition relations.
-		vector<vector<petri::iterator> > result;
+		bound result;
 		list<pair<vector<petri::iterator>, vector<petri::iterator> > > queue;
 		queue.push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(nodes, other));
 		while (not queue.empty()) {
 			auto curr = queue.front();
 			queue.pop_front();
 
-			auto k = lower_bound(result.begin(), result.end(), curr.first);
-			if (k == result.end() or *k != curr.first) {
-				result.insert(k, curr.first);
+			auto k = lower_bound(result.begin(), result.end(), region::from_nodes(curr.first));
+			if (k == result.end() or *k != region::from_nodes(curr.first)) {
+				result.insert(k, region::from_nodes(curr.first));
 				for (auto i = curr.second.begin(); i != curr.second.end(); i++) {
 					if (is(composition, vector<petri::iterator>(1, *i), curr.first)) {
 						queue.push_back(curr);
@@ -3745,20 +3059,10 @@ struct graph
 	}
 
 	virtual bool is_reset(petri::iterator i) const {
-		if (reset.size() == 0) {
-			for (int j = 0; j < (int)source.size(); j++) {
-				for (int k = 0; k < (int)source[j].tokens.size(); k++) {
-					if (source[j].tokens[k].index == i.index) {
-						return true;
-					}
-				}
-			}
-		} else {
-			for (int j = 0; j < (int)reset.size(); j++) {
-				for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
-					if (reset[j].tokens[k].index == i.index) {
-						return true;
-					}
+		for (int j = 0; j < (int)reset.size(); j++) {
+			for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+				if (reset[j].tokens[k].index == i.index) {
+					return true;
 				}
 			}
 		}
