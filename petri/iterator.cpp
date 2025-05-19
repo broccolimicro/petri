@@ -566,6 +566,19 @@ string bound::to_string() const {
 	return result;
 }
 
+bool bound::isOnlyChoice() const {
+	for (auto i = regions.begin(); i != regions.end(); i++) {
+		if (i->nodes.size() != 1u) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool bound::isOnlyParallel() const {
+	return regions.size() == 1u;
+}
+
 ostream &operator<<(ostream &os, bound b0) {
 	os << "[";
 	for (auto i = b0.regions.begin(); i != b0.regions.end(); i++) {

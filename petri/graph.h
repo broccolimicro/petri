@@ -1122,7 +1122,34 @@ struct graph
 
 	virtual petri::bound connect(petri::bound from, petri::bound to, bool proper=false) {
 		petri::bound link;
-		if (proper) {
+		if (not proper or (from.size() == 1u and from[0].size() == 1u) or (to.size() == 1u and to[0].size() == 1u)) {
+			if (to.size() > 1u) {	
+				for (auto i = from.begin(); i != from.end(); i++) {
+					for (auto j = i->begin(); j != i->end(); j++) {
+						if (j->type != place::type) {
+							*j = connect(*j, create(place::type));
+						}
+					}
+				}
+			}
+
+			if (from.size() > 1u) {
+				for (auto i = to.begin(); i != to.end(); i++) {
+					link.push_back(region());
+					for (auto j = i->begin(); j != i->end(); j++) {
+						if (j->type != place::type) {
+							petri::iterator n = create(place::type);
+							connect(n, *j);
+							link.back().push_back(n);
+						} else {
+							link.back().push_back(*j);
+						}
+					}
+				}
+			} else {
+				link = to;
+			}
+		} else {
 			petri::bound sub;
 			for (auto i = to.begin(); i != to.end(); i++) {
 				sub.push_back(region());
@@ -1142,33 +1169,6 @@ struct graph
 					connect(n, *i);
 				}
 				link.push_back({n});
-			}
-		} else {
-			if (from.size() > 1u) {
-				for (auto i = from.begin(); i != from.end(); i++) {
-					for (auto j = i->begin(); j != i->end(); j++) {
-						if (j->type != place::type) {
-							*j = connect(*j, create(place::type));
-						}
-					}
-				}
-			}
-
-			if (to.size() > 1u) {
-				for (auto i = to.begin(); i != to.end(); i++) {
-					link.push_back(region());
-					for (auto j = i->begin(); j != i->end(); j++) {
-						if (j->type != place::type) {
-							petri::iterator n = create(place::type);
-							connect(n, *j);
-							link.back().push_back(n);
-						} else {
-							link.back().push_back(*j);
-						}
-					}
-				}
-			} else {
-				link = to;
 			}
 		}
 

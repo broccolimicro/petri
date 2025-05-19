@@ -158,6 +158,9 @@ struct bound {
 	bool operator!=(bound b0) const;
 
 	string to_string() const;
+
+	bool isOnlyChoice() const;
+	bool isOnlyParallel() const;
 };
 
 ostream &operator<<(ostream &os, bound b0);
