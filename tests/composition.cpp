@@ -802,7 +802,7 @@ TEST(composition, regular_parallel_choice) {
 	test_always(g, sequence, {t[0], p[0], p[4]}, {p[6]}, true);
 }*/
 
-TEST(composition, compose_proper_2_2x2_2) {
+TEST(composition, compose_proper_t2_2x2_2) {
 	graph<place, transition, token, state<token> > g;
 
 	auto n = g.create(transition(), 8);
@@ -845,7 +845,7 @@ TEST(composition, compose_proper_2_2x2_2) {
 	EXPECT_TRUE(connected(g, p[3], t[7]));
 }
 
-TEST(composition, compose_2_2x2_2) {
+TEST(composition, compose_t2_2x2_2) {
 	graph<place, transition, token, state<token> > g;
 
 	auto n = g.create(transition(), 8);
@@ -893,7 +893,7 @@ TEST(composition, compose_2_2x2_2) {
 	EXPECT_TRUE(connected(g, p[7], t[7]));
 }
 
-TEST(composition, compose_proper_2_1x2_1) {
+TEST(composition, compose_proper_t2_1x2_1) {
 	graph<place, transition, token, state<token> > g;
 
 	auto n = g.create(transition(), 6);
@@ -926,7 +926,7 @@ TEST(composition, compose_proper_2_1x2_1) {
 	EXPECT_TRUE(connected(g, p[2], t[5]));
 }
 
-TEST(composition, compose_2_1x2_1) {
+TEST(composition, compose_t2_1x2_1) {
 	graph<place, transition, token, state<token> > g;
 
 	auto n = g.create(transition(), 6);
@@ -1078,3 +1078,349 @@ TEST(composition, compose_proper_t1x2) {
 	EXPECT_TRUE(connected(g, p[6], t[13]));
 }
 
+TEST(composition, compose_p1x2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto n = g.create(place(), 14);
+
+	segment r0 = g.compose(sequence,
+		segment({{n[0], n[1]}}, {{n[0], n[1]}}),
+		segment({{n[2]}}, {{n[2]}}), false);
+
+	segment r1 = g.compose(sequence,
+		segment({{n[3]}, {n[4]}}, {{n[3]}, {n[4]}}),
+		segment({{n[5]}}, {{n[5]}}), false);
+
+	segment r2 = g.compose(sequence,
+		segment({{n[6]}}, {{n[6]}}),
+		segment({{n[7], n[8]}}, {{n[7], n[8]}}), false);
+
+	segment r3 = g.compose(sequence,
+		segment({{n[9]}}, {{n[9]}}),
+		segment({{n[10]}, {n[11]}}, {{n[10]}, {n[11]}}), false);
+
+	segment r4 = g.compose(sequence,
+		segment({{n[12]}}, {{n[12]}}),
+		segment({{n[13]}}, {{n[13]}}), false);
+
+	auto p = g.get_places();
+	auto t = g.get_transitions();
+
+	ASSERT_EQ(t.size(), 7u);
+	ASSERT_EQ(p.size(), 14u);
+	ASSERT_EQ(g.arcs[place::type].size(), 8u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 8u);
+
+	EXPECT_TRUE(connected(g, p[0], t[0]));
+	EXPECT_TRUE(connected(g, p[1], t[0]));
+	EXPECT_TRUE(connected(g, t[0], p[2]));
+
+	EXPECT_TRUE(connected(g, p[3], t[1]));
+	EXPECT_TRUE(connected(g, p[4], t[2]));
+	EXPECT_TRUE(connected(g, t[1], p[5]));
+	EXPECT_TRUE(connected(g, t[2], p[5]));
+
+	EXPECT_TRUE(connected(g, p[6], t[3]));
+	EXPECT_TRUE(connected(g, t[3], p[7]));
+	EXPECT_TRUE(connected(g, t[3], p[8]));
+
+	EXPECT_TRUE(connected(g, p[9], t[4]));
+	EXPECT_TRUE(connected(g, p[9], t[5]));
+	EXPECT_TRUE(connected(g, t[4], p[10]));
+	EXPECT_TRUE(connected(g, t[5], p[11]));
+
+	EXPECT_TRUE(connected(g, p[12], t[6]));
+	EXPECT_TRUE(connected(g, t[6], p[13]));
+}
+
+TEST(composition, compose_proper_p1x2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto n = g.create(place(), 14);
+
+	segment r0 = g.compose(sequence,
+		segment({{n[0], n[1]}}, {{n[0], n[1]}}),
+		segment({{n[2]}}, {{n[2]}}), true);
+
+	segment r1 = g.compose(sequence,
+		segment({{n[3]}, {n[4]}}, {{n[3]}, {n[4]}}),
+		segment({{n[5]}}, {{n[5]}}), true);
+
+	segment r2 = g.compose(sequence,
+		segment({{n[6]}}, {{n[6]}}),
+		segment({{n[7], n[8]}}, {{n[7], n[8]}}), true);
+
+	segment r3 = g.compose(sequence,
+		segment({{n[9]}}, {{n[9]}}),
+		segment({{n[10]}, {n[11]}}, {{n[10]}, {n[11]}}), true);
+
+	segment r4 = g.compose(sequence,
+		segment({{n[12]}}, {{n[12]}}),
+		segment({{n[13]}}, {{n[13]}}), true);
+
+	auto p = g.get_places();
+	auto t = g.get_transitions();
+
+	ASSERT_EQ(t.size(), 7u);
+	ASSERT_EQ(p.size(), 14u);
+	ASSERT_EQ(g.arcs[place::type].size(), 8u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 8u);
+
+	EXPECT_TRUE(connected(g, p[0], t[0]));
+	EXPECT_TRUE(connected(g, p[1], t[0]));
+	EXPECT_TRUE(connected(g, t[0], p[2]));
+
+	EXPECT_TRUE(connected(g, p[3], t[1]));
+	EXPECT_TRUE(connected(g, p[4], t[2]));
+	EXPECT_TRUE(connected(g, t[1], p[5]));
+	EXPECT_TRUE(connected(g, t[2], p[5]));
+
+	EXPECT_TRUE(connected(g, p[6], t[3]));
+	EXPECT_TRUE(connected(g, t[3], p[7]));
+	EXPECT_TRUE(connected(g, t[3], p[8]));
+
+	EXPECT_TRUE(connected(g, p[9], t[4]));
+	EXPECT_TRUE(connected(g, p[9], t[5]));
+	EXPECT_TRUE(connected(g, t[4], p[10]));
+	EXPECT_TRUE(connected(g, t[5], p[11]));
+
+	EXPECT_TRUE(connected(g, p[12], t[6]));
+	EXPECT_TRUE(connected(g, t[6], p[13]));
+}
+
+TEST(composition, compose_m1x2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto t = g.create(transition(), 12);
+	auto p = g.create(place(), 12);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0]}, {t[0]}}, {{p[0]}, {t[0]}}),
+		segment({{p[1]}}, {{p[1]}}), false);
+
+	segment r1 = g.compose(sequence,
+		segment({{p[2], t[1]}}, {{p[2], t[1]}}),
+		segment({{p[3]}}, {{p[3]}}), false);
+
+	segment r2 = g.compose(sequence,
+		segment({{p[4]}, {t[2]}}, {{p[4]}, {t[2]}}),
+		segment({{t[3]}}, {{t[3]}}), false);
+
+	segment r3 = g.compose(sequence,
+		segment({{p[5], t[4]}}, {{p[5], t[4]}}),
+		segment({{t[5]}}, {{t[5]}}), false);
+
+	segment r4 = g.compose(sequence,
+		segment({{p[6]}}, {{p[6]}}),
+		segment({{p[7]}, {t[6]}}, {{p[7]}, {t[6]}}), false);
+
+	segment r5 = g.compose(sequence,
+		segment({{p[8]}}, {{p[8]}}),
+		segment({{p[9], t[7]}}, {{p[9], t[7]}}), false);
+
+	segment r6 = g.compose(sequence,
+		segment({{t[8]}}, {{t[8]}}),
+		segment({{p[10]}, {t[9]}}, {{p[10]}, {t[9]}}), false);
+
+	segment r7 = g.compose(sequence,
+		segment({{t[10]}}, {{t[10]}}),
+		segment({{p[11], t[11]}}, {{p[11], t[11]}}), false);
+
+	p = g.get_places();
+	t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 18u);
+	ASSERT_EQ(t.size(), 18u);
+	ASSERT_EQ(g.arcs[place::type].size(), 14u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 14u);
+
+	EXPECT_TRUE(connected(g, p[0], t[12]));
+	EXPECT_TRUE(connected(g, t[12], p[1]));
+	EXPECT_TRUE(connected(g, t[0], p[1]));
+	
+	EXPECT_TRUE(connected(g, p[2], t[13]));
+	EXPECT_TRUE(connected(g, t[1], p[12]));
+	EXPECT_TRUE(connected(g, p[12], t[13]));
+	EXPECT_TRUE(connected(g, t[13], p[3]));
+
+	EXPECT_TRUE(connected(g, p[4], t[14]));
+	EXPECT_TRUE(connected(g, t[14], p[13]));
+	EXPECT_TRUE(connected(g, t[2], p[13]));
+	EXPECT_TRUE(connected(g, p[13], t[3]));
+	
+	EXPECT_TRUE(connected(g, p[5], t[5]));
+	EXPECT_TRUE(connected(g, t[4], p[14]));
+	EXPECT_TRUE(connected(g, p[14], t[5]));
+	
+	EXPECT_TRUE(connected(g, p[6], t[15]));
+	EXPECT_TRUE(connected(g, t[15], p[7]));
+	EXPECT_TRUE(connected(g, p[6], t[6]));
+	
+	EXPECT_TRUE(connected(g, p[8], t[16]));
+	EXPECT_TRUE(connected(g, t[16], p[9]));
+	EXPECT_TRUE(connected(g, t[16], p[15]));
+	EXPECT_TRUE(connected(g, p[15], t[7]));
+	
+	EXPECT_TRUE(connected(g, t[8], p[16]));
+	EXPECT_TRUE(connected(g, p[16], t[17]));
+	EXPECT_TRUE(connected(g, p[16], t[9]));
+	EXPECT_TRUE(connected(g, t[17], p[10]));
+	
+	EXPECT_TRUE(connected(g, t[10], p[11]));
+	EXPECT_TRUE(connected(g, t[10], p[17]));
+	EXPECT_TRUE(connected(g, p[17], t[11]));
+}
+
+TEST(composition, compose_proper_m1x2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto t = g.create(transition(), 12);
+	auto p = g.create(place(), 12);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0]}, {t[0]}}, {{p[0]}, {t[0]}}),
+		segment({{p[1]}}, {{p[1]}}), true);
+
+	segment r1 = g.compose(sequence,
+		segment({{p[2], t[1]}}, {{p[2], t[1]}}),
+		segment({{p[3]}}, {{p[3]}}), true);
+
+	segment r2 = g.compose(sequence,
+		segment({{p[4]}, {t[2]}}, {{p[4]}, {t[2]}}),
+		segment({{t[3]}}, {{t[3]}}), true);
+
+	segment r3 = g.compose(sequence,
+		segment({{p[5], t[4]}}, {{p[5], t[4]}}),
+		segment({{t[5]}}, {{t[5]}}), true);
+
+	segment r4 = g.compose(sequence,
+		segment({{p[6]}}, {{p[6]}}),
+		segment({{p[7]}, {t[6]}}, {{p[7]}, {t[6]}}), true);
+
+	segment r5 = g.compose(sequence,
+		segment({{p[8]}}, {{p[8]}}),
+		segment({{p[9], t[7]}}, {{p[9], t[7]}}), true);
+
+	segment r6 = g.compose(sequence,
+		segment({{t[8]}}, {{t[8]}}),
+		segment({{p[10]}, {t[9]}}, {{p[10]}, {t[9]}}), true);
+
+	segment r7 = g.compose(sequence,
+		segment({{t[10]}}, {{t[10]}}),
+		segment({{p[11], t[11]}}, {{p[11], t[11]}}), true);
+
+	p = g.get_places();
+	t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 18u);
+	ASSERT_EQ(t.size(), 18u);
+	ASSERT_EQ(g.arcs[place::type].size(), 14u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 14u);
+
+	EXPECT_TRUE(connected(g, p[0], t[12]));
+	EXPECT_TRUE(connected(g, t[12], p[1]));
+	EXPECT_TRUE(connected(g, t[0], p[1]));
+	
+	EXPECT_TRUE(connected(g, p[2], t[13]));
+	EXPECT_TRUE(connected(g, t[1], p[12]));
+	EXPECT_TRUE(connected(g, p[12], t[13]));
+	EXPECT_TRUE(connected(g, t[13], p[3]));
+
+	EXPECT_TRUE(connected(g, p[4], t[14]));
+	EXPECT_TRUE(connected(g, t[14], p[13]));
+	EXPECT_TRUE(connected(g, t[2], p[13]));
+	EXPECT_TRUE(connected(g, p[13], t[3]));
+	
+	EXPECT_TRUE(connected(g, p[5], t[5]));
+	EXPECT_TRUE(connected(g, t[4], p[14]));
+	EXPECT_TRUE(connected(g, p[14], t[5]));
+	
+	EXPECT_TRUE(connected(g, p[6], t[15]));
+	EXPECT_TRUE(connected(g, t[15], p[7]));
+	EXPECT_TRUE(connected(g, p[6], t[6]));
+	
+	EXPECT_TRUE(connected(g, p[8], t[16]));
+	EXPECT_TRUE(connected(g, t[16], p[9]));
+	EXPECT_TRUE(connected(g, t[16], p[15]));
+	EXPECT_TRUE(connected(g, p[15], t[7]));
+	
+	EXPECT_TRUE(connected(g, t[8], p[16]));
+	EXPECT_TRUE(connected(g, p[16], t[17]));
+	EXPECT_TRUE(connected(g, p[16], t[9]));
+	EXPECT_TRUE(connected(g, t[17], p[10]));
+	
+	EXPECT_TRUE(connected(g, t[10], p[11]));
+	EXPECT_TRUE(connected(g, t[10], p[17]));
+	EXPECT_TRUE(connected(g, p[17], t[11]));
+}
+
+TEST(composition, compose_p2_2x2_2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 8);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0], p[1]}, {p[2], p[3]}}, {{p[0], p[1]}, {p[2], p[3]}}),
+		segment({{p[4], p[5]}, {p[6], p[7]}}, {{p[4], p[5]}, {p[6], p[7]}}), false);
+
+	p = g.get_places();
+	auto t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 8u);
+	ASSERT_EQ(t.size(), 4u);
+	ASSERT_EQ(g.arcs[place::type].size(), 8u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 8u);
+
+	EXPECT_TRUE(connected(g, p[0], t[0]));
+	EXPECT_TRUE(connected(g, p[0], t[1]));
+	EXPECT_TRUE(connected(g, p[1], t[0]));
+	EXPECT_TRUE(connected(g, p[1], t[1]));
+
+	EXPECT_TRUE(connected(g, p[2], t[2]));
+	EXPECT_TRUE(connected(g, p[2], t[3]));
+	EXPECT_TRUE(connected(g, p[3], t[2]));
+	EXPECT_TRUE(connected(g, p[3], t[3]));
+	
+	EXPECT_TRUE(connected(g, t[0], p[4]));
+	EXPECT_TRUE(connected(g, t[0], p[5]));
+	EXPECT_TRUE(connected(g, t[1], p[6]));
+	EXPECT_TRUE(connected(g, t[1], p[7]));
+
+	EXPECT_TRUE(connected(g, t[2], p[4]));
+	EXPECT_TRUE(connected(g, t[2], p[5]));
+	EXPECT_TRUE(connected(g, t[3], p[6]));
+	EXPECT_TRUE(connected(g, t[3], p[7]));
+}
+
+TEST(composition, compose_proper_p2_2x2_2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 8);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0], p[1]}, {p[2], p[3]}}, {{p[0], p[1]}, {p[2], p[3]}}),
+		segment({{p[4], p[5]}, {p[6], p[7]}}, {{p[4], p[5]}, {p[6], p[7]}}), true);
+
+	p = g.get_places();
+	auto t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 9u);
+	ASSERT_EQ(t.size(), 4u);
+	ASSERT_EQ(g.arcs[place::type].size(), 6u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 6u);
+
+	EXPECT_TRUE(connected(g, p[0], t[2]));
+	EXPECT_TRUE(connected(g, p[1], t[2]));
+	EXPECT_TRUE(connected(g, p[2], t[3]));
+	EXPECT_TRUE(connected(g, p[3], t[3]));
+
+	EXPECT_TRUE(connected(g, t[2], p[8]));
+	EXPECT_TRUE(connected(g, t[3], p[8]));
+	EXPECT_TRUE(connected(g, p[8], t[0]));
+	EXPECT_TRUE(connected(g, p[8], t[1]));
+
+	EXPECT_TRUE(connected(g, t[0], p[4]));
+	EXPECT_TRUE(connected(g, t[0], p[5]));
+	EXPECT_TRUE(connected(g, t[1], p[6]));
+	EXPECT_TRUE(connected(g, t[1], p[7]));
+}
