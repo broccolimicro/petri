@@ -1424,3 +1424,85 @@ TEST(composition, compose_proper_p2_2x2_2) {
 	EXPECT_TRUE(connected(g, t[1], p[6]));
 	EXPECT_TRUE(connected(g, t[1], p[7]));
 }
+
+TEST(composition, compose_m2_2x2_2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 4);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0], t[0]}, {p[1], t[1]}}, {{p[0], t[0]}, {p[1], t[1]}}),
+		segment({{p[2], t[2]}, {p[3], t[3]}}, {{p[2], t[2]}, {p[3], t[3]}}), false);
+
+	p = g.get_places();
+	t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 8u);
+	ASSERT_EQ(t.size(), 8u);
+	ASSERT_EQ(g.arcs[place::type].size(), 10u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 10u);
+
+	EXPECT_TRUE(connected(g, p[0], t[4]));
+	EXPECT_TRUE(connected(g, p[0], t[5]));
+	EXPECT_TRUE(connected(g, p[1], t[6]));
+	EXPECT_TRUE(connected(g, p[1], t[7]));
+	EXPECT_TRUE(connected(g, t[0], p[4]));
+
+	EXPECT_TRUE(connected(g, p[4], t[4]));
+	EXPECT_TRUE(connected(g, p[4], t[5]));
+	EXPECT_TRUE(connected(g, p[5], t[6]));
+	EXPECT_TRUE(connected(g, p[5], t[7]));
+	EXPECT_TRUE(connected(g, t[1], p[5]));
+
+	EXPECT_TRUE(connected(g, t[4], p[2]));
+	EXPECT_TRUE(connected(g, t[4], p[6]));
+	EXPECT_TRUE(connected(g, t[5], p[3]));
+	EXPECT_TRUE(connected(g, t[5], p[7]));
+	EXPECT_TRUE(connected(g, t[6], p[2]));
+	EXPECT_TRUE(connected(g, t[6], p[6]));
+	EXPECT_TRUE(connected(g, t[7], p[3]));
+	EXPECT_TRUE(connected(g, t[7], p[7]));
+	EXPECT_TRUE(connected(g, p[6], t[2]));
+	EXPECT_TRUE(connected(g, p[7], t[3]));
+}
+
+TEST(composition, compose_proper_m2_2x2_2) {
+	graph<place, transition, token, state<token> > g;
+
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 4);
+
+	segment r0 = g.compose(sequence,
+		segment({{p[0], t[0]}, {p[1], t[1]}}, {{p[0], t[0]}, {p[1], t[1]}}),
+		segment({{p[2], t[2]}, {p[3], t[3]}}, {{p[2], t[2]}, {p[3], t[3]}}), true);
+
+	p = g.get_places();
+	t = g.get_transitions();
+
+	ASSERT_EQ(p.size(), 9u);
+	ASSERT_EQ(t.size(), 8u);
+	ASSERT_EQ(g.arcs[place::type].size(), 8u);
+	ASSERT_EQ(g.arcs[transition::type].size(), 8u);
+
+	EXPECT_TRUE(connected(g, p[0], t[6]));
+	EXPECT_TRUE(connected(g, p[7], t[6]));
+	EXPECT_TRUE(connected(g, t[0], p[7]));
+	
+	EXPECT_TRUE(connected(g, p[1], t[7]));
+	EXPECT_TRUE(connected(g, p[8], t[7]));
+	EXPECT_TRUE(connected(g, t[1], p[8]));
+	
+	EXPECT_TRUE(connected(g, t[6], p[6]));
+	EXPECT_TRUE(connected(g, t[7], p[6]));
+	EXPECT_TRUE(connected(g, p[6], t[4]));
+	EXPECT_TRUE(connected(g, p[6], t[5]));
+
+	EXPECT_TRUE(connected(g, t[4], p[2]));
+	EXPECT_TRUE(connected(g, t[4], p[4]));
+	EXPECT_TRUE(connected(g, p[4], t[2]));
+
+	EXPECT_TRUE(connected(g, t[5], p[3]));
+	EXPECT_TRUE(connected(g, t[5], p[5]));
+	EXPECT_TRUE(connected(g, p[5], t[3]));
+}
