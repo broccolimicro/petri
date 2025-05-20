@@ -1722,45 +1722,42 @@ struct graph
 	// - Handles state updates for source, sink, and reset tokens
 	// - Returns mapping between original and modified nodes
 	// - Used heavily in reduction operations to simplify the net
-	virtual mapping pinch(petri::iterator n)
+	virtual void pinch(petri::iterator n)
 	{
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
 		vector<petri::iterator> left = duplicate(n.type, neighbors.first, neighbors.second.size(), false);
 		vector<petri::iterator> right = duplicate(n.type, neighbors.second, neighbors.first.size(), true);
 
-		for (int i = 0; i < (int)right.size(); i++)
-		{
+		for (int i = 0; i < (int)right.size(); i++) {
 			combine(sequence, left[i], right[i]);
 
-			for (int j = 0; j < (int)arcs[right[i].type].size(); j++)
-				if (arcs[right[i].type][j].from == right[i])
+			for (int j = 0; j < (int)arcs[right[i].type].size(); j++) {
+				if (arcs[right[i].type][j].from == right[i]) {
 					arcs[right[i].type][j].from = left[i];
+				}
+			}
 
-			for (int j = 0; j < (int)arcs[1-right[i].type].size(); j++)
-				if (arcs[1-right[i].type][j].to == right[i])
+			for (int j = 0; j < (int)arcs[1-right[i].type].size(); j++) {
+				if (arcs[1-right[i].type][j].to == right[i]) {
 					arcs[1-right[i].type][j].to = left[i];
+				}
+			}
 
-			if (right[i].type == place::type)
-			{
-				for (int j = 0; j < (int)reset.size(); j++)
-					for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-						if (reset[j].tokens[k].index == right[i].index)
-						{
+			if (right[i].type == place::type) {
+				for (int j = 0; j < (int)reset.size(); j++) {
+					for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+						if (reset[j].tokens[k].index == right[i].index) {
 							reset[j].tokens.push_back(reset[j].tokens[k]);
 							reset[j].tokens.back().index = left[i].index;
 						}
+					}
+				}
 			}
 		}
 
 		erase(right);
 		erase(right, left);
-
-		mapping result;
-		for (int i = 0; i < (int)left.size(); i++) {
-			result.set(right[i], left[i]);
-		}
-		return result;
 	}
 
 	virtual vector<petri::iterator> next(petri::iterator n) const
@@ -2092,13 +2089,13 @@ struct graph
 		return s0;
 	}
 
-	virtual array<vector<petri::iterator>, 2> merge(const graph<place, transition, token, state> &g) {
-		array<vector<petri::iterator>, 2> result;
-		result[place::type] = create(g.places);
-		result[transition::type] = create(g.transitions);
+	virtual mapping merge(const graph<place, transition, token, state> &g) {
+		mapping result;
+		result.nodes[place::type] = create(g.places);
+		result.nodes[transition::type] = create(g.transitions);
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < (int)g.arcs[i].size(); j++) {
-				arcs[i].push_back(arc(result[g.arcs[i][j].from.type][g.arcs[i][j].from.index], result[g.arcs[i][j].to.type][g.arcs[i][j].to.index]));
+				arcs[i].push_back(arc(result.map(g.arcs[i][j].from), result.map(g.arcs[i][j].to)));
 			}
 		}
 		return result;

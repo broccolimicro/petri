@@ -186,7 +186,7 @@ struct segment {
 ostream &operator<<(ostream &os, segment s0);
 
 struct mapping {
-	mapping(bool isIdentity=true);
+	mapping(bool isIdentity=false);
 	mapping(int places, int transitions);
 	~mapping();
 
