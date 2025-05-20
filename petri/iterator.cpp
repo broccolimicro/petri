@@ -639,7 +639,8 @@ ostream &operator<<(ostream &os, segment s0) {
 	return os;
 }
 
-mapping::mapping() {
+mapping::mapping(bool isIdentity) {
+	this->isIdentity = isIdentity;
 }
 
 mapping::mapping(int places, int transitions) {
@@ -650,6 +651,10 @@ mapping::~mapping() {
 }
 
 petri::iterator mapping::unmap(petri::iterator node) const {
+	if (isIdentity) {
+		return node;
+	}
+
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes[i].size(); j++) {
 			if (nodes[i][j] == node) {
@@ -661,6 +666,10 @@ petri::iterator mapping::unmap(petri::iterator node) const {
 }
 
 petri::iterator mapping::map(petri::iterator node) const {
+	if (isIdentity) {
+		return node;
+	}
+
 	if ((node.type == place::type or node.type == transition::type) and node.index >= 0 and node.index < (int)nodes[node.type].size()) {
 		return nodes[node.type][node.index];
 	}
@@ -668,9 +677,12 @@ petri::iterator mapping::map(petri::iterator node) const {
 }
 
 void mapping::identity(int places, int transitions) {
+	nodes[place::type].clear();
+	nodes[transition::type].clear();
+	isIdentity = false;
+
 	nodes[place::type].reserve(places);
 	nodes[transition::type].reserve(transitions);
-
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes[i].size(); j++) {
 			nodes[i].push_back(petri::iterator(i, j));
@@ -679,16 +691,28 @@ void mapping::identity(int places, int transitions) {
 }
 
 void mapping::apply(const mapping &m) {
+	if (isIdentity) {
+		isIdentity = m.isIdentity;
+		nodes = m.nodes;
+	} else if (m.isIdentity) {
+		return;
+	}
+
 	array<vector<petri::iterator>, 2> updated;
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)m.nodes[i].size(); j++) {
-			updated[i].push_back(nodes[m.nodes[i][j].type][m.nodes[i][j].index]);
+			updated[i].push_back(map(m.map(petri::iterator(i, j))));
 		}
 	}
 	nodes = updated;
 }
 
 void mapping::set(petri::iterator from, petri::iterator to) {
+	if (isIdentity) {
+		printf("error: set() not supported for identity mapping\n");
+		return;
+	}
+
 	if (from.index >= (int)nodes[from.type].size()) {
 		nodes[from.type].resize(from.index+1, petri::iterator());
 	}
@@ -698,6 +722,11 @@ void mapping::set(petri::iterator from, petri::iterator to) {
 }
 
 void mapping::set(vector<petri::iterator> from, petri::iterator to) {
+	if (isIdentity) {
+		printf("error: set() not supported for identity mapping\n");
+		return;
+	}
+
 	for (int i = 0; i < 2; i++) {
 		int m = (int)nodes[i].size()-1;
 		for (int j = 0; j < (int)from.size(); j++) {
@@ -715,15 +744,20 @@ void mapping::set(vector<petri::iterator> from, petri::iterator to) {
 }
 
 bool mapping::has(petri::iterator from) const {
-	return ((from.type == place::type or from.type == transition::type) and from.index >= 0 and from.index < (int)nodes[from.type].size() and nodes[from.type][from.index].valid());
+	return (isIdentity and from.valid()) or ((from.type == place::type or from.type == transition::type) and from.index >= 0 and from.index < (int)nodes[from.type].size() and nodes[from.type][from.index].valid());
 }
 
 void mapping::erase(petri::iterator n) {
+	if (isIdentity) {
+		printf("error: erase() not supported for identity mapping\n");
+		return;
+	}
+
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes[i].size(); j++) {
 			if (nodes[i][j].type == n.type and nodes[i][j].index > n.index) {
 				nodes[i][j].index--;
-			} else if (nodes[i][j].type == n.type and nodes[i][j].index == n.index) {
+			} else if (nodes[i][j] == n) {
 				nodes[i][j] = petri::iterator();
 			}
 		}
@@ -731,6 +765,11 @@ void mapping::erase(petri::iterator n) {
 }
 
 void mapping::erase(vector<petri::iterator> n, bool rsorted) {
+	if (isIdentity) {
+		printf("error: erase() not supported for identity mapping\n");
+		return;
+	}
+
 	if (not rsorted) {
 		sort(n.begin(), n.end());
 		n.erase(unique(n.begin(), n.end()), n.end());
@@ -743,7 +782,22 @@ void mapping::erase(vector<petri::iterator> n, bool rsorted) {
 }
 
 mapping mapping::reverse() const {
-	mapping result;
+	if (isIdentity) {
+		// reverse of identity is identity
+		return *this;
+	}
+
+	mapping result = *this;
+	result.reverse_inplace();	
+	return result;
+}
+
+void mapping::reverse_inplace() {
+	if (isIdentity) {
+		// reverse of identity is identity
+		return;
+	}
+
 	array<int, 2> hi = {0,0};
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes.size(); j++) {
@@ -752,24 +806,22 @@ mapping mapping::reverse() const {
 			}
 		}
 	}
-	result.nodes[0].resize(hi[0]+1, petri::iterator());
-	result.nodes[1].resize(hi[1]+1, petri::iterator());
+	
+	array<vector<petri::iterator>, 2> updated;
+	updated[0].resize(hi[0]+1, petri::iterator());
+	updated[1].resize(hi[1]+1, petri::iterator());
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes.size(); j++) {
 			if (nodes[i][j].valid()) {
-				result.nodes[nodes[i][j].type][nodes[i][j].index] = petri::iterator(i, j);
+				updated[nodes[i][j].type][nodes[i][j].index] = petri::iterator(i, j);
 			}
 		}
 	}
-	return result;
-}
-
-void mapping::reverse_inplace() {
-	nodes = reverse().nodes;
+	nodes = updated;
 }
 
 void mapping::print() const {
-	printf("map{");
+	printf("map{%s", (isIdentity ? "identity" : ""));
 	bool first = true;
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < (int)nodes[i].size(); j++) {

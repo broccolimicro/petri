@@ -186,11 +186,12 @@ struct segment {
 ostream &operator<<(ostream &os, segment s0);
 
 struct mapping {
-	mapping();
+	mapping(bool isIdentity=true);
 	mapping(int places, int transitions);
 	~mapping();
 
 	array<vector<petri::iterator>, 2> nodes;
+	bool isIdentity;
 
 	petri::iterator unmap(petri::iterator node) const;
 	petri::iterator map(petri::iterator node) const;
