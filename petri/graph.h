@@ -945,25 +945,6 @@ struct graph
 			erase(n[i]);
 	}
 
-	// from must be sorted in reverse order
-	static void replace(vector<petri::iterator> from, petri::iterator to, map<petri::iterator, vector<petri::iterator> > &diff) {
-		for (int i = 0; i < (int)from.size(); i++) {
-			for (auto j = diff.begin(); j != diff.end(); j++) {
-				for (int k = (int)j->second.size()-1; k >= 0; k--) {
-					if (j->second[k] > from[i]) {
-						j->second[k]--;
-					} else if (j->second[k] == from[i]) {
-						j->second.erase(j->second.begin() + k);
-						j->second.push_back(to);
-					}
-				}
-
-				sort(j->second.begin(), j->second.end());
-				j->second.resize(unique(j->second.begin(), j->second.end()) - j->second.begin());
-			}
-		}
-	}
-
 	virtual petri::iterator nest_in(region to) {
 		if (to.size() == 1u) {
 			return to[0];
@@ -1741,7 +1722,7 @@ struct graph
 	// - Handles state updates for source, sink, and reset tokens
 	// - Returns mapping between original and modified nodes
 	// - Used heavily in reduction operations to simplify the net
-	virtual map<petri::iterator, vector<petri::iterator> > pinch(petri::iterator n)
+	virtual mapping pinch(petri::iterator n)
 	{
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
@@ -1775,9 +1756,10 @@ struct graph
 		erase(right);
 		erase(right, left);
 
-		map<petri::iterator, vector<petri::iterator> > result;
-		for (int i = 0; i < (int)left.size(); i++)
-			result.insert(pair<petri::iterator, vector<petri::iterator> >(right[i], vector<petri::iterator>(1, left[i])));
+		mapping result;
+		for (int i = 0; i < (int)left.size(); i++) {
+			result.set(right[i], left[i]);
+		}
 		return result;
 	}
 

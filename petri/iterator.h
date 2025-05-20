@@ -185,4 +185,29 @@ struct segment {
 
 ostream &operator<<(ostream &os, segment s0);
 
+struct mapping {
+	mapping();
+	mapping(int places, int transitions);
+	~mapping();
+
+	array<vector<petri::iterator>, 2> nodes;
+
+	petri::iterator unmap(petri::iterator node) const;
+	petri::iterator map(petri::iterator node) const;
+	void identity(int places, int transitions);
+	void apply(const mapping &m);
+
+	void set(petri::iterator from, petri::iterator to);
+	void set(vector<petri::iterator> from, petri::iterator to);
+	bool has(petri::iterator from) const;
+
+	void erase(petri::iterator n);
+	void erase(vector<petri::iterator> n, bool rsorted=false);
+
+	mapping reverse() const;
+	void reverse_inplace();
+
+	void print() const;	
+};
+
 }

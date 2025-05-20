@@ -639,5 +639,150 @@ ostream &operator<<(ostream &os, segment s0) {
 	return os;
 }
 
+mapping::mapping() {
+}
+
+mapping::mapping(int places, int transitions) {
+	identity(places, transitions);
+}
+
+mapping::~mapping() {
+}
+
+petri::iterator mapping::unmap(petri::iterator node) const {
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes[i].size(); j++) {
+			if (nodes[i][j] == node) {
+				return petri::iterator(i, j);
+			}
+		}
+	}
+	return petri::iterator();
+}
+
+petri::iterator mapping::map(petri::iterator node) const {
+	if ((node.type == place::type or node.type == transition::type) and node.index >= 0 and node.index < (int)nodes[node.type].size()) {
+		return nodes[node.type][node.index];
+	}
+	return petri::iterator();
+}
+
+void mapping::identity(int places, int transitions) {
+	nodes[place::type].reserve(places);
+	nodes[transition::type].reserve(transitions);
+
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes[i].size(); j++) {
+			nodes[i].push_back(petri::iterator(i, j));
+		}
+	}
+}
+
+void mapping::apply(const mapping &m) {
+	array<vector<petri::iterator>, 2> updated;
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)m.nodes[i].size(); j++) {
+			updated[i].push_back(nodes[m.nodes[i][j].type][m.nodes[i][j].index]);
+		}
+	}
+	nodes = updated;
+}
+
+void mapping::set(petri::iterator from, petri::iterator to) {
+	if (from.index >= (int)nodes[from.type].size()) {
+		nodes[from.type].resize(from.index+1, petri::iterator());
+	}
+	if (from.index >= 0) {
+		nodes[from.type][from.index] = to;
+	}
+}
+
+void mapping::set(vector<petri::iterator> from, petri::iterator to) {
+	for (int i = 0; i < 2; i++) {
+		int m = (int)nodes[i].size()-1;
+		for (int j = 0; j < (int)from.size(); j++) {
+			if (from[j].type == i and from[j].index > m) {
+				m = from[j].index;
+			}
+		}
+		nodes[i].resize(m+1, petri::iterator());
+	}
+	for (int i = 0; i < (int)from.size(); i++) {
+		if ((from[i].type == place::type or from[i].type == transition::type) and from[i].index >= 0) {
+			nodes[from[i].type][from[i].index] = to;
+		}
+	}
+}
+
+bool mapping::has(petri::iterator from) const {
+	return ((from.type == place::type or from.type == transition::type) and from.index >= 0 and from.index < (int)nodes[from.type].size() and nodes[from.type][from.index].valid());
+}
+
+void mapping::erase(petri::iterator n) {
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes[i].size(); j++) {
+			if (nodes[i][j].type == n.type and nodes[i][j].index > n.index) {
+				nodes[i][j].index--;
+			} else if (nodes[i][j].type == n.type and nodes[i][j].index == n.index) {
+				nodes[i][j] = petri::iterator();
+			}
+		}
+	}
+}
+
+void mapping::erase(vector<petri::iterator> n, bool rsorted) {
+	if (not rsorted) {
+		sort(n.begin(), n.end());
+		n.erase(unique(n.begin(), n.end()), n.end());
+		std::reverse(n.begin(), n.end());
+	}
+
+	for (auto i = n.begin(); i != n.end(); i++) {
+		erase(*i);
+	}
+}
+
+mapping mapping::reverse() const {
+	mapping result;
+	array<int, 2> hi = {0,0};
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes.size(); j++) {
+			if (nodes[i][j].index > hi[nodes[i][j].type]) {
+				hi[nodes[i][j].type] = nodes[i][j].index;
+			}
+		}
+	}
+	result.nodes[0].resize(hi[0]+1, petri::iterator());
+	result.nodes[1].resize(hi[1]+1, petri::iterator());
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes.size(); j++) {
+			if (nodes[i][j].valid()) {
+				result.nodes[nodes[i][j].type][nodes[i][j].index] = petri::iterator(i, j);
+			}
+		}
+	}
+	return result;
+}
+
+void mapping::reverse_inplace() {
+	nodes = reverse().nodes;
+}
+
+void mapping::print() const {
+	printf("map{");
+	bool first = true;
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < (int)nodes[i].size(); j++) {
+			if (first) {
+				first = false;
+			} else {
+				printf(", ");
+			}
+			printf("%s -> %s", petri::iterator(i, j).to_string().c_str(), nodes[i][j].to_string().c_str());
+		}
+	}
+	printf("}\n");
+}
+
 }
 
