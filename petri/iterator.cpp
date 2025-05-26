@@ -190,6 +190,10 @@ size_t region::size() const {
 	return nodes.size();
 }
 
+void region::clear() {
+	nodes.clear();
+}
+
 vector<petri::iterator>::iterator region::begin() {
 	return nodes.begin();
 }
@@ -219,6 +223,12 @@ void region::rsort() {
 
 void region::push_back(petri::iterator s) {
 	nodes.push_back(s);
+}
+
+petri::iterator region::pop_back() {
+	petri::iterator result = nodes.back();
+	nodes.pop_back();
+	return result;
 }
 
 petri::iterator &region::back() {
@@ -294,8 +304,12 @@ bool region::remap(region from, region to, bool rsorted) {
 region &region::compose(region r0) {
 	nodes.insert(nodes.end(), r0.begin(), r0.end());
 	std::sort(nodes.begin(), nodes.end());
-	nodes.erase(unique(nodes.begin(), nodes.end()));
+	nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
 	return *this;
+}
+
+vector<petri::iterator> region::flat() const {
+	return nodes;
 }
 
 bool region::operator==(region r0) const {
@@ -408,6 +422,10 @@ size_t bound::size() const {
 	return regions.size();
 }
 
+void bound::clear() {
+	regions.clear();
+}
+
 vector<region>::iterator bound::begin() {
 	return regions.begin();
 }
@@ -426,6 +444,12 @@ vector<region>::const_iterator bound::end() const {
 
 void bound::push_back(region s) {
 	regions.push_back(s);
+}
+
+region bound::pop_back() {
+	region result = regions.back();
+	regions.pop_back();
+	return result;
 }
 
 region &bound::back() {
@@ -533,9 +557,20 @@ bound &bound::compose(int composition, bound b0) {
 				b1.compose(choice, r0);
 			}
 		}
-		regions.swap(b1.regions);
+		regions = b1.regions;
 	}
 	return *this;
+}
+
+// Flatten a bound into a list of nodes
+vector<petri::iterator> bound::flat() const {
+	vector<petri::iterator> result;
+	for (auto i = regions.begin(); i != regions.end(); i++) {
+		result.insert(result.end(), i->begin(), i->end());
+	}
+	sort(result.begin(), result.end());
+	result.erase(unique(result.begin(), result.end()), result.end());
+	return result;
 }
 
 bool bound::operator==(bound b0) const {
@@ -600,9 +635,16 @@ segment::segment(bound source, bound sink) : source(source), sink(sink) {
 segment::~segment() {
 }
 
+void segment::clear() {
+	source.clear();
+	sink.clear();
+	reset.clear();
+}
+
 void segment::erase(petri::iterator i) {
 	source.erase(i);
 	sink.erase(i);
+	reset.erase(i);
 }
 
 void segment::erase(region r0, bool rsorted) {
@@ -612,6 +654,7 @@ void segment::erase(region r0, bool rsorted) {
 
 	source.erase(r0, true);
 	sink.erase(r0, true);
+	reset.erase(r0, true);
 }
 
 bool segment::remap(region from, region to, bool rsorted) {
@@ -628,14 +671,15 @@ bool segment::remap(region from, region to, bool rsorted) {
 void segment::compose(int composition, segment s0) {
 	source.compose(composition, s0.source);
 	sink.compose(composition, s0.sink);
+	reset.compose(composition, s0.reset);
 }
 
 string segment::to_string() const {
-	return source.to_string() + "..." + sink.to_string();
+	return source.to_string() + "..." + sink.to_string() + " @" + reset.to_string();
 }
 
 ostream &operator<<(ostream &os, segment s0) {
-	os << s0.source << "..." << s0.sink;
+	os << s0.source << "..." << s0.sink << " @" << s0.reset;
 	return os;
 }
 

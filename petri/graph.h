@@ -1528,7 +1528,7 @@ struct graph
 			return petri::iterator();
 	}
 
-	virtual petri::iterator insert_at(vector<petri::iterator> to, transition n) {
+	virtual petri::iterator insert_at(petri::region to, transition n) {
 		petri::iterator t = create(n);
 		// TODO(edward.bingham) inputs should be arcs between nodes
 		// 1. identify all possible conditional splits of parallel groups of
@@ -2070,12 +2070,16 @@ struct graph
 			s0 = s1;
 		} else if (s1.source.empty()) {
 			// skip
-		} else if (s0.sink.empty()) {
-			printf("warning: sequencing creates dead code.\n");
-			s0.sink = s1.sink;
 		} else if (composition == sequence) {
-			connect(s0.sink, s1.source, proper);
+			if (s0.sink.empty()) {
+				printf("warning: sequencing creates dead code.\n");
+			} else {
+				connect(s0.sink, s1.source, proper);
+			}
 			s0.sink = s1.sink;
+			if (s0.reset.empty()) {
+				s0.reset = s1.reset;
+			}
 		} else {
 			if (proper) {
 				s0.source = bound({{nest_in(s0.source)}});
@@ -2527,7 +2531,7 @@ struct graph
 	// This assumes that a and b represent partial states. IE, there exists a set
 	// of states which each contain all nodes in a and a set of states which each
 	// contain all nodes in b.
-	virtual bool is(int composition, std::vector<petri::iterator> a, std::vector<petri::iterator> b, bool always=false, bool bidir=false) const {
+	virtual bool is(int composition, petri::region a, petri::region b, bool always=false, bool bidir=false) const {
 		// sometimes composed in parallel? - Is there a shared parallel split with
 		// mutually exclusive branches in the group-intersected, branch-unioned
 		// parallel split groups of the nodes of each partial that aren't in the other?
@@ -2627,16 +2631,16 @@ struct graph
 	}
 
 	// Find all partial state pairs (for each node in v0 and v1 respectively) that are ordered (not in parallel).
-	virtual vector<array<vector<vector<petri::iterator> >, 2> > deinterfere_choice(vector<petri::iterator> v0, vector<petri::iterator> v1) {
-		vector<array<vector<vector<petri::iterator> >, 2> > stack;
-		vector<array<vector<vector<petri::iterator> >, 2> > next;
+	virtual vector<array<petri::bound, 2> > deinterfere_choice(vector<petri::iterator> v0, vector<petri::iterator> v1) {
+		vector<array<petri::bound, 2> > stack;
+		vector<array<petri::bound, 2> > next;
 
 		stack.resize(1);
 		for (int i = 0; i < (int)v0.size(); i++) {
-			stack.back()[0].push_back(vector<petri::iterator>(1, v0[i]));
+			stack.back()[0].push_back({v0[i]});
 		}
 		for (int i = 0; i < (int)v1.size(); i++) {
-			stack.back()[1].push_back(vector<petri::iterator>(1, v1[i]));
+			stack.back()[1].push_back({v1[i]});
 		}
 		if (stack.back()[0].empty() or stack.back()[1].empty()) {
 			stack.pop_back();
@@ -2681,23 +2685,23 @@ struct graph
 	// @param v0 First vector of nodes to analyze
 	// @param v1 Second vector of nodes to analyze
 	// @return Vector of possible solutions, each containing two vectors of nodes that can be ordered
-	virtual vector<array<vector<petri::iterator>, 2> > deinterfere(vector<petri::iterator> v0, vector<petri::iterator> v1) {
+	virtual vector<array<petri::region, 2> > deinterfere(petri::region v0, petri::region v1) {
 		sort(v0.begin(), v0.end());
 		sort(v1.begin(), v1.end());
 		vector<petri::iterator> v0p, v1p;
 		for (int j = 0; j < 2; j++) {
 			for (auto i = begin(j); i != end(j); i++) {
-				if (find(v1.begin(), v1.end(), i) == v1.end() and is(parallel, vector<petri::iterator>(1, i), v0)) {
+				if (find(v1.begin(), v1.end(), i) == v1.end() and is(parallel, {i}, v0)) {
 					v0p.push_back(i);
 				}
-				if (find(v0.begin(), v0.end(), i) == v0.end() and is(parallel, vector<petri::iterator>(1, i), v1)) {
+				if (find(v0.begin(), v0.end(), i) == v0.end() and is(parallel, {i}, v1)) {
 					v1p.push_back(i);
 				}
 			}
 		}
 
-		vector<array<vector<petri::iterator>, 2> > result;
-		if (vector_intersects(v0, v1)) {
+		vector<array<petri::region, 2> > result;
+		if (vector_intersects(v0.flat(), v1.flat())) {
 			return result;
 		}
 		
@@ -2707,14 +2711,14 @@ struct graph
 		}
 
 		for (auto i = v0p.begin(); i != v0p.end(); i++) {
-			if (not is(parallel, vector<petri::iterator>(1, *i), v1)) {
+			if (not is(parallel, {*i}, v1)) {
 				result.push_back({v0, v1});
 				result.back()[0].push_back(*i);
 			}
 		}
 
 		for (auto i = v1p.begin(); i != v1p.end(); i++) {
-			if (not is(parallel, vector<petri::iterator>(1, *i), v0)) {
+			if (not is(parallel, {*i}, v0)) {
 				result.push_back({v0, v1});
 				result.back()[1].push_back(*i);
 			}
@@ -2882,15 +2886,15 @@ struct graph
 					frames.back().R.push_back(frame.P.back());
 					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
 						if (frames.back().P[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().P[i]].nodes, nodes[frame.P.back()].nodes, always))
-							or (invert and is(opposite, nodes[frames.back().P[i]].nodes, nodes[frame.P.back()].nodes, always))) {
+							or (not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
+							or (invert and is(opposite, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
 							frames.back().P.erase(frames.back().P.begin() + i);
 						}
 					}
 					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
 						if (frames.back().X[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().X[i]].nodes, nodes[frame.P.back()].nodes, always))
-							or (invert and is(opposite, nodes[frames.back().X[i]].nodes, nodes[frame.P.back()].nodes, always))) {
+							or (not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
+							or (invert and is(opposite, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
 							frames.back().X.erase(frames.back().X.begin() + i);
 						}
 					}
@@ -2981,30 +2985,18 @@ struct graph
 		}
 
 		return nodes;
-	}
+	}	
 
-	virtual vector<petri::iterator> deselect(const bound &nodes) {
-		vector<petri::iterator> result = nodes[0].nodes;
-		for (int i = 1; i < (int)nodes.size(); i++) {
-			result.insert(result.end(), nodes[i].begin(), nodes[i].end());
-		}
-		sort(result.begin(), result.end());
-		result.erase(unique(result.begin(), result.end()), result.end());
-		return result;
-	}
-
-	virtual bound partials(int composition, vector<petri::iterator> nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
-		sort(nodes.begin(), nodes.end());
-		nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
-
+	virtual bound partials(int composition, petri::region nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
+		nodes.sort();
 		if (other.empty()) {
 			for (auto i = begin(place::type); i != end(place::type); i++) {
-				if (is(composition, vector<petri::iterator>(1, i), nodes)) {
+				if (is(composition, {i}, nodes)) {
 					other.push_back(i);
 				}
 			}
 			for (auto i = begin(transition::type); i != end(transition::type); i++) {
-				if (is(composition, vector<petri::iterator>(1, i), nodes)) {
+				if (is(composition, {i}, nodes)) {
 					other.push_back(i);
 				}
 			}
@@ -3014,17 +3006,17 @@ struct graph
 		// need to find all cliques (maximal or not) in the graph created by
 		// the requested composition relations.
 		bound result;
-		list<pair<vector<petri::iterator>, vector<petri::iterator> > > queue;
-		queue.push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(nodes, other));
+		list<pair<petri::region, vector<petri::iterator> > > queue;
+		queue.push_back({nodes, other});
 		while (not queue.empty()) {
 			auto curr = queue.front();
 			queue.pop_front();
 
-			auto k = lower_bound(result.begin(), result.end(), region::from_nodes(curr.first));
-			if (k == result.end() or *k != region::from_nodes(curr.first)) {
-				result.insert(k, region::from_nodes(curr.first));
+			auto k = lower_bound(result.begin(), result.end(), curr.first);
+			if (k == result.end() or *k != curr.first) {
+				result.insert(k, curr.first);
 				for (auto i = curr.second.begin(); i != curr.second.end(); i++) {
-					if (is(composition, vector<petri::iterator>(1, *i), curr.first)) {
+					if (is(composition, {*i}, curr.first)) {
 						queue.push_back(curr);
 						auto j = lower_bound(queue.back().first.begin(), queue.back().first.end(), *i);
 						queue.back().first.insert(j, *i);

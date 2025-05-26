@@ -49,6 +49,11 @@ struct iterator
 
 ostream &operator<<(ostream &os, iterator i);
 
+// A region is a collection of nodes in the petri net that represent a partial
+// state. This means that all of the nodes in the region must be composed in
+// parallel with eachother. In this way, a region is intentionally distinct
+// from a vector<petri::iterator> which has no constraint about what nodes may
+// coexist in the collection.
 struct region {
 	region();
 	region(std::initializer_list<petri::iterator> nodes);
@@ -70,6 +75,8 @@ struct region {
 	bool empty() const;
 	size_t size() const;
 
+	void clear();
+
 	vector<petri::iterator>::iterator begin();
 	vector<petri::iterator>::iterator end();
 	vector<petri::iterator>::const_iterator begin() const;
@@ -79,6 +86,7 @@ struct region {
 	void rsort();
 
 	void push_back(petri::iterator s);
+	petri::iterator pop_back();
 	petri::iterator &back();
 	petri::iterator back() const;
 	void insert(vector<petri::iterator>::iterator at, petri::iterator s);
@@ -96,6 +104,8 @@ struct region {
 	bool remap(region from, region to, bool rsorted=false);
 
 	region &compose(region r0);
+	
+	vector<petri::iterator> flat() const;
 
 	bool operator==(region r0) const;
 	bool operator!=(region r0) const;
@@ -109,6 +119,9 @@ struct region {
 
 ostream &operator<<(ostream &os, region r0);
 
+// A bound is a collection of regions compose in choice. One may select one
+// region or another. There is no constraint about compositions of nodes across
+// regions in the collection.
 struct bound {
 	bound();
 	bound(initializer_list<initializer_list<petri::iterator> > regions);
@@ -132,12 +145,15 @@ struct bound {
 	bool empty() const;
 	size_t size() const;
 
+	void clear();
+
 	vector<region>::iterator begin();
 	vector<region>::iterator end();
 	vector<region>::const_iterator begin() const;
 	vector<region>::const_iterator end() const;
 	
 	void push_back(region s);
+	region pop_back();
 	region &back();
 	region back() const;
 	void insert(vector<region>::iterator at, region s);
@@ -153,6 +169,8 @@ struct bound {
 
 	bound &compose(int composition, region r0);
 	bound &compose(int composition, bound b0);
+
+	vector<petri::iterator> flat() const;
 
 	bool operator==(bound b0) const;
 	bool operator!=(bound b0) const;
@@ -172,6 +190,9 @@ struct segment {
 
 	bound source;
 	bound sink;
+	bound reset;
+
+	void clear();
 
 	void erase(petri::iterator i);
 	void erase(region r0, bool rsorted=false);

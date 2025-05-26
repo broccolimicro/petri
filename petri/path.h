@@ -235,7 +235,7 @@ path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
 template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::iterator> > from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
+path_set trace(graph<place, transition, token, state> &g, petri::bound from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
 	if (from.empty() or to.empty()) {
 		return path_set(g.places.size(), g.transitions.size());
 	}
@@ -250,13 +250,13 @@ path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::i
 	// no elements in the path's "to" list, then there was no path
 	// found.
 
-	vector<pair<vector<petri::iterator>, path> > stack;
+	vector<pair<region, path> > stack;
 	// initialize the stack. To do this, we break the from list into conditional
 	// groups of parallel nodes. Nodes that are in sequence with eachother should
 	// be treated as conditional as well.
 	for (auto partial = from.begin(); partial != from.end(); partial++) {
-		stack.push_back(pair<vector<petri::iterator>, path>(*partial, path(g.places.size(), g.transitions.size())));
-		stack.back().second.from = *partial;
+		stack.push_back(pair<region, path>(*partial, path(g.places.size(), g.transitions.size())));
+		stack.back().second.from = partial->flat();
 	}
 
 	// precache "next" list for all nodes in graph to accelerate
@@ -341,8 +341,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::i
 		auto curr = stack.back();
 		stack.pop_back();
 
-		petri::iterator pos = curr.first.back();
-		curr.first.pop_back();
+		petri::iterator pos = curr.first.pop_back();
 
 		if (pos.type == transition::type) {
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
@@ -374,7 +373,7 @@ path_set trace(graph<place, transition, token, state> &g, vector<vector<petri::i
 			}
 		}	else {
 			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
-				pair<vector<petri::iterator>, path> copy = curr;
+				pair<region, path> copy = curr;
 				if (toCount[*i] > 0) {
 					if (copy.second[*i] == 0) {
 						copy.second.to.push_back(*i);
