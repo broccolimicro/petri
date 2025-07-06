@@ -2141,36 +2141,31 @@ struct graph
 		return result;
 	}
 
-	// reduce simplifies the Petri net while preserving essential behavior
+	// reduce() simplifies the petri net while preserving functional
+	// correctness
 	//
-	// Purpose:
-	// - Decreases model complexity without changing behavioral semantics
-	// - Eliminates redundant and ineffective structures
-	// - Makes analysis and verification more tractable
-	// - Creates cleaner, more understandable net representations
+	// - proper_nesting - preserve hierarchy and proper nesting
+	// - aggressive - experimental, apply additional reductions that
+	//     may make assumptions about the behavior
 	//
-	// Algorithm:
-	// - Employs multiple reduction rules applied iteratively until no more reductions are possible:
-	//   * Removes infeasible transitions (those that can never be enabled)
-	//   * Eliminates vacuous transitions (those that don't affect behavior)
-	//   * Removes unmarked and unreachable places
-	//   * Merges functionally equivalent places
-	// - Can operate in different modes:
-	//   * proper_nesting=true: preserves hierarchy and proper nesting
-	//   * aggressive=true: applies additional reductions that preserve behavior but may change structure
+	// Apply reduction rules iteratively until no more are possible:
+	// - Removes infeasible transitions (can never be enabled)
+	// - Removes vacuous transitions (don't affect behavior)
+	// - Removes unreachable places
+	// - Merges functionally equivalent places
 	//
-	// Implementation considerations:
-	// - Uses carefully designed checks to ensure behavioral preservation
-	// - Handles special cases for transitions with no inputs/outputs
-	// - Maintains proper connectivity during structure simplification
-	// - Returns whether any reductions were successfully performed
-	virtual bool reduce(bool proper_nesting = true, bool aggressive = false)
+	// Returns whether any reductions were successfully performed
+	virtual bool reduce(bool proper_nesting = true, bool aggressive = false, bool debug = false)
 	{
+		if (debug) cout << "starting petri::reduce()" << endl;
+
 		bool result = false;
 		bool change = true;
 		while (change)
 		{
 			change = false;
+
+			if (debug) cout << "reducing from " << places.size() << " places and " << transitions.size() << " transitions" << endl;
 
 			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; )
 			{
@@ -2184,6 +2179,7 @@ struct graph
 				// If it doesn't have any input places, then we need to add one.
 				if (!affect && p.size() == 0)
 				{
+					if (debug) cout << "\tno input places for " << i << ", adding one" << endl;
 					p.push_back(create(place::type));
 					connect(p, i);
 					affect = true;
@@ -2192,6 +2188,7 @@ struct graph
 				// If it doesn't have any output places, then we need to add one.
 				if (!affect && n.size() == 0)
 				{
+					if (debug) cout << "\tno output places for " << i << ", adding one" << endl;
 					n.push_back(create(place::type));
 					connect(i, n);
 					affect = true;
@@ -2203,6 +2200,7 @@ struct graph
 				// possible for this transition to be in the source list.
 				if (!affect && transitions[i.index].is_infeasible())
 				{
+					if (debug) cout << "\terasing infeasible transition " << i << endl;
 					erase(i);
 					affect = true;
 				}
@@ -2214,6 +2212,7 @@ struct graph
 				{
 					if (!proper_nesting)
 					{
+						if (debug) cout << "\tpinching vacuous transition (proper) " << i << endl;
 						pinch(i);
 						affect = true;
 					}
@@ -2224,6 +2223,7 @@ struct graph
 
 						if (p.size() == 1 && n.size() == 1 && (np.size() == 1 || pn.size() == 1))
 						{
+							if (debug) cout << "\tpinching vacuous transition " << i << endl;
 							pinch(i);
 							affect = true;
 						}
@@ -2237,6 +2237,7 @@ struct graph
 							if ((n.size() == 1 && nn.size() == 1 && nnp.size() == 1 && np.size() == 1) ||
 								(p.size() == 1 && pp.size() == 1 && ppn.size() == 1 && pn.size() == 1))
 							{
+								if (debug) cout << "\tpinching vacuous transition " << i << endl;
 								pinch(i);
 								affect = true;
 							}
@@ -2266,6 +2267,7 @@ struct graph
 				// This means that its output transitions will never fire.
 				if (p.size() == 0 && (!i_is_reset || n.size() == 0))
 				{
+					if (debug) cout << "\terasing place with no input arcs " << i << " -> " << to_string(n) << endl;
 					erase(n);
 					erase(i);
 					affect = true;
@@ -2284,6 +2286,7 @@ struct graph
 
 					if (n == n2 && p == p2 && i_is_reset == j_is_reset)
 					{
+						if (debug) cout << "\terasing redundant place " << j << endl;
 						erase(j);
 						affect = true;
 					}
@@ -2334,6 +2337,7 @@ struct graph
 						// share all of the same input and output places.
 						if (n[j.index] == n[i.index] && p[j.index] == p[i.index])
 						{
+							if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
 							transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
 							erase(i);
 							change = true;
@@ -2344,6 +2348,7 @@ struct graph
 						// or output transition and have no output or input transitions other than A or B.
 						else if (vector_intersection_size(n[i.index], n[j.index]) == 0 && vector_intersection_size(p[i.index], p[j.index]) == 0 && nx[i.index] == nx[j.index] && px[i.index] == px[j.index])
 						{
+							if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
 							transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
 							vector<petri::iterator> tocut;
 							tocut.push_back(i);
@@ -2358,6 +2363,8 @@ struct graph
 
 			result = (result or change);
 		}
+
+		if (debug) cout << "ending petri::reduce()" << endl;
 
 		return result;
 	}
