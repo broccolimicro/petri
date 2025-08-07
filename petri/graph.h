@@ -5,6 +5,7 @@
 #include <common/standard.h>
 #include <common/message.h>
 #include <common/text.h>
+#include <common/index_vector.h>
 
 #include "state.h"
 #include "iterator.h"
@@ -65,8 +66,8 @@ struct graph
 	mutable bool split_groups_ready;
 	mutable bool merge_groups_ready[2];
 
-	vector<place> places;
-	vector<transition> transitions;
+	index_vector<place> places;
+	index_vector<transition> transitions;
 	// index by from.type
 	array<vector<arc>, 2> arcs;
 	vector<state> reset;
@@ -83,6 +84,13 @@ struct graph
 	virtual ~graph()
 	{
 
+	}
+
+	bool is_valid(petri::iterator i) const {
+		if (i.type == place::type) {
+			return places.is_valid(i.index);
+		}
+		return transitions.is_valid(i.index);
 	}
 
 	// Calculate the minimum number of arcs between any two nodes. This data
@@ -177,11 +185,15 @@ struct graph
 		}
 
 		for (int i = 0; i < (int)places.size(); i++) {
-			update_node_distances(petri::iterator(place::type, i));
+			if (places.is_valid(i)) {
+				update_node_distances(petri::iterator(place::type, i));
+			}
 		}
 
 		for (int i = 0; i < (int)transitions.size(); i++) {
-			update_node_distances(petri::iterator(transition::type, i));
+			if (transitions.is_valid(i)) {
+				update_node_distances(petri::iterator(transition::type, i));
+			}
 		}
 
 		node_distances_ready = true;
@@ -611,10 +623,14 @@ struct graph
 			// clear previous executions of this function and cache previous places and
 			// transitions as an optimization.
 			for (int i = 0; i < (int)places.size(); i++) {
-				places[i].splits[composition].clear();
+				if (places.is_valid(i)) {
+					places[i].splits[composition].clear();
+				}
 			}
 			for (int i = 0; i < (int)transitions.size(); i++) {
-				transitions[i].splits[composition].clear();
+				if (transitions.is_valid(i)) {
+					transitions[i].splits[composition].clear();
+				}
 			}
 
 			// each place belongs to some set of parallel splits (init[place])
@@ -737,7 +753,9 @@ struct graph
 	vector<petri::iterator> get_places() const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)places.size(); i++) {
-			result.push_back(petri::iterator(place::type, i));
+			if (places.is_valid(i)) {
+				result.push_back(petri::iterator(place::type, i));
+			}
 		}
 		return result;
 	}
@@ -745,47 +763,36 @@ struct graph
 	vector<petri::iterator> get_transitions() const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)transitions.size(); i++) {
-			result.push_back(petri::iterator(transition::type, i));
+			if (transitions.is_valid(i)) {
+				result.push_back(petri::iterator(transition::type, i));
+			}
 		}
 		return result;
 	}
 
-	virtual petri::iterator create_at(place p, int index)
-	{
+	virtual petri::iterator create_at(place p, int index) {
 		mark_modified();
-		if (index >= (int)places.size()) {
-			places.resize(index+1);
-		}
-		places[index] = p;
+		places.emplace_at(index, p);
 		return petri::iterator(place::type, index);
 	}
 
-	virtual petri::iterator create_at(transition t, int index)
-	{
+	virtual petri::iterator create_at(transition t, int index) {
 		mark_modified();
-		if (index >= (int)transitions.size()) {
-			transitions.resize(index+1);
-		}
-		transitions[index] = t;
+		transitions.emplace_at(index, t);
 		return petri::iterator(transition::type, index);
 	}
 
-	virtual petri::iterator create(place p)
-	{
+	virtual petri::iterator create(place p) {
 		mark_modified();
-		places.push_back(p);
-		return petri::iterator(place::type, (int)places.size()-1);
+		return petri::iterator(place::type, (int)places.emplace(p));
 	}
 
-	virtual petri::iterator create(transition t)
-	{
+	virtual petri::iterator create(transition t) {
 		mark_modified();
-		transitions.push_back(t);
-		return petri::iterator(transition::type, (int)transitions.size()-1);
+		return petri::iterator(transition::type, (int)transitions.emplace(t));
 	}
 
-	virtual petri::iterator create(int n)
-	{
+	virtual petri::iterator create(int n) {
 		if (n == place::type)
 			return create(place());
 		else if (n == transition::type)
@@ -794,56 +801,43 @@ struct graph
 			return petri::iterator();
 	}
 
-	virtual vector<petri::iterator> create(vector<place> p)
-	{
+	virtual vector<petri::iterator> create(vector<place> p) {
 		mark_modified();
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)p.size(); i++)
-		{
-			places.push_back(p[i]);
-			result.push_back(petri::iterator(place::type, (int)places.size()-1));
+		for (int i = 0; i < (int)p.size(); i++) {
+			result.push_back(petri::iterator(place::type, (int)places.emplace(p[i])));
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> create(vector<transition> t)
-	{
+	virtual vector<petri::iterator> create(vector<transition> t) {
 		mark_modified();
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)t.size(); i++)
-		{
-			transitions.push_back(t[i]);
-			result.push_back(petri::iterator(transition::type, (int)transitions.size()-1));
+		for (int i = 0; i < (int)t.size(); i++) {
+			result.push_back(petri::iterator(transition::type, (int)transitions.emplace(t[i])));
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> create(place p, int num)
-	{
+	virtual vector<petri::iterator> create(place p, int num) {
 		mark_modified();
 		vector<petri::iterator> result;
-		for (int i = 0; i < num; i++)
-		{
-			places.push_back(p);
-			result.push_back(petri::iterator(place::type, (int)places.size()-1));
+		for (int i = 0; i < num; i++) {
+			result.push_back(petri::iterator(place::type, (int)places.emplace(p)));
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> create(transition t, int num)
-	{
+	virtual vector<petri::iterator> create(transition t, int num) {
 		mark_modified();
 		vector<petri::iterator> result;
-		for (int i = 0; i < num; i++)
-		{
-			transitions.push_back(t);
-			result.push_back(petri::iterator(transition::type, (int)transitions.size()-1));
+		for (int i = 0; i < num; i++) {
+			result.push_back(petri::iterator(transition::type, (int)transitions.emplace(t)));
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> create(int n, int num)
-	{
+	virtual vector<petri::iterator> create(int n, int num) {
 		if (n == place::type)
 			return create(place(), num);
 		else if (n == transition::type)
@@ -852,118 +846,103 @@ struct graph
 			return vector<petri::iterator>();
 	}
 
-	virtual pair<vector<petri::iterator>, vector<petri::iterator> > erase(petri::iterator n)
-	{
+	virtual pair<vector<petri::iterator>, vector<petri::iterator> > erase(petri::iterator n) {
 		mark_modified();
 		pair<vector<petri::iterator>, vector<petri::iterator> > result;
-		for (int i = (int)arcs[n.type].size()-1; i >= 0; i--)
-		{
-			if (arcs[n.type][i].from.index == n.index)
-			{
+		for (int i = (int)arcs[n.type].size()-1; i >= 0; i--) {
+			if (arcs[n.type][i].from.index == n.index) {
 				result.second.push_back(arcs[n.type][i].to);
 				arcs[n.type].erase(arcs[n.type].begin() + i);
 			}
-			else if (arcs[n.type][i].from.index > n.index)
-				arcs[n.type][i].from.index--;
 		}
-		for (int i = (int)arcs[1-n.type].size()-1; i >= 0; i--)
-		{
-			if (arcs[1-n.type][i].to.index == n.index)
-			{
+		for (int i = (int)arcs[1-n.type].size()-1; i >= 0; i--) {
+			if (arcs[1-n.type][i].to.index == n.index) {
 				result.first.push_back(arcs[1-n.type][i].from);
 				arcs[1-n.type].erase(arcs[1-n.type].begin() + i);
 			}
-			else if (arcs[1-n.type][i].to.index > n.index)
-				arcs[1-n.type][i].to.index--;
 		}
 
-		if (n.type == place::type)
-		{
-			for (int j = 0; j < (int)reset.size(); j++)
-				for (int i = (int)reset[j].tokens.size()-1; i >= 0; i--)
-				{
-					if (reset[j].tokens[i].index == n.index)
+		if (n.type == place::type) {
+			for (int j = 0; j < (int)reset.size(); j++) {
+				for (int i = (int)reset[j].tokens.size()-1; i >= 0; i--) {
+					if (reset[j].tokens[i].index == n.index) {
 						reset[j].tokens.erase(reset[j].tokens.begin() + i);
-					else if (reset[j].tokens[i].index > n.index)
-						reset[j].tokens[i].index--;
+					}
 				}
+			}
 		}
 
-		if (n.type == place::type)
-			places.erase(places.begin() + n.index);
-		else if (n.type == transition::type)
-			transitions.erase(transitions.begin() + n.index);
+		if (n.type == place::type) {
+			places.erase(n.index);
+		} else if (n.type == transition::type) {
+			transitions.erase(n.index);
+		}
 
 		return result;
 	}
 
-	static void erase(petri::iterator n, vector<petri::iterator> &iter_list)
-	{
-		for (int i = (int)iter_list.size()-1; i >= 0; i--)
-		{
-			if (iter_list[i] == n)
+	static void erase(petri::iterator n, vector<petri::iterator> &iter_list) {
+		for (int i = (int)iter_list.size()-1; i >= 0; i--) {
+			if (iter_list[i] == n) {
 				iter_list.erase(iter_list.begin() + i);
-			else if (iter_list[i].type == n.type && iter_list[i].index > n.index)
-				iter_list[i].index--;
+			}
 		}
 	}
 
-	static void erase(vector<petri::iterator> n, vector<petri::iterator> &iter_list)
-	{
+	static void erase(vector<petri::iterator> n, vector<petri::iterator> &iter_list) {
 		sort(n.rbegin(), n.rend());
-		for (int i = 0; i < (int)n.size(); i++)
+		for (int i = 0; i < (int)n.size(); i++) {
 			erase(n[i], iter_list);
+		}
 	}
 
-	static void erase(petri::iterator n, int type, vector<int> &iter_list)
-	{
-		if (n.type != type)
+	static void erase(petri::iterator n, int type, vector<int> &iter_list) {
+		if (n.type != type) {
 			return;
+		}
 
-		for (int i = (int)iter_list.size()-1; i >= 0; i--)
-		{
-			if (iter_list[i] == n.index)
+		for (int i = (int)iter_list.size()-1; i >= 0; i--) {
+			if (iter_list[i] == n.index) {
 				iter_list.erase(iter_list.begin() + i);
-			else if (iter_list[i] > n.index)
-				iter_list[i]--;
+			}
 		}
 	}
 
 	static void erase(petri::iterator n, state &s) {
-		if (n.type != place::type)
+		if (n.type != place::type) {
 			return;
+		}
 			
 		for (int i = (int)s.tokens.size()-1; i >= 0; i--) {
 			if (s.tokens[i].index == n.index) {
 				s.tokens.erase(s.tokens.begin() + i);
-			} else if (s.tokens[i].index > n.index) {
-				s.tokens[i]--;
 			}
 		}
 	}
 
-	static void erase(petri::iterator n, vector<state> &s)
-	{
-		if (n.type != place::type)
+	static void erase(petri::iterator n, vector<state> &s) {
+		if (n.type != place::type) {
 			return;
+		}
 			
-		for (int i = 0; i < (int)s.size(); i++)
-			for (int j = (int)s[i].tokens.size()-1; j >= 0; j--)
-			{
-				if (s[i].tokens[j].index == n.index)
+		for (int i = 0; i < (int)s.size(); i++) {
+			for (int j = (int)s[i].tokens.size()-1; j >= 0; j--) {
+				if (s[i].tokens[j].index == n.index) {
 					s[i].tokens.erase(s[i].tokens.begin() + j);
-				else if (s[i].tokens[j].index > n.index)
-					s[i].tokens[j].index--;
+				}
 			}
+		}
 	}
 
-	virtual void erase(vector<petri::iterator> n, bool rsorted = false)
-	{
-		if (!rsorted)
+	// TODO(edward.bingham) this no longer needs to be reverse sorted
+	virtual void erase(vector<petri::iterator> n, bool rsorted = false) {
+		if (!rsorted) {
 			sort(n.rbegin(), n.rend());
+		}
 
-		for (int i = 0; i < (int)n.size(); i++)
+		for (int i = 0; i < (int)n.size(); i++) {
 			erase(n[i]);
+		}
 	}
 
 	virtual petri::iterator nest_in(region to) {
@@ -1225,177 +1204,136 @@ struct graph
 	}
 
 	virtual petri::iterator copy(petri::iterator i) {
-		if (i.type == place::type && i.index < (int)places.size())
-		{
-			mark_modified();
-			places.push_back(places[i.index]);
-			petri::iterator result(i.type, places.size()-1);
-			for (int j = 0; j < (int)reset.size(); j++)
-				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-					if (reset[j].tokens[k].index == i.index)
-					{
+		if (i.type == place::type && i.index < (int)places.size()) {
+			auto result = create(places[i.index]);
+			for (int j = 0; j < (int)reset.size(); j++) {
+				for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+					if (reset[j].tokens[k].index == i.index) {
 						reset[j].tokens.push_back(reset[j].tokens[k]);
 						reset[j].tokens.back().index = result.index;
 					}
+				}
+			}
 
 			return result;
-		}
-		else if (i.type == transition::type && i.index < (int)transitions.size())
-		{
-			mark_modified();
-			transitions.push_back(transitions[i.index]);
-			return petri::iterator(i.type, transitions.size()-1);
-		}
-		else
-		{
+		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
+			return create(transitions[i.index]);
+		} else {
 			internal("petri::copy", "iterator out of bounds", __FILE__, __LINE__);
 			return petri::iterator();
 		}
 	}
 
-	virtual vector<petri::iterator> copy(petri::iterator i, int num)
-	{
+	virtual vector<petri::iterator> copy(petri::iterator i, int num) {
 		vector<petri::iterator> result;
 		if (i.type == place::type && i.index < (int)places.size()) {
-			for (int j = 0; j < num; j++)
-			{
-				mark_modified();
-				places.push_back(places[i.index]);
-				result.push_back(petri::iterator(i.type, places.size()-1));
+			for (int j = 0; j < num; j++) {
+				result.push_back(create(places[i.index]));
 			}
 
-			for (int j = 0; j < (int)reset.size(); j++)
-				for (int k = 0; k < (int)reset[j].tokens.size(); k++)
-					if (reset[j].tokens[k].index == i.index)
-						for (int l = 0; l < (int)result.size(); l++)
-						{
+			for (int j = 0; j < (int)reset.size(); j++) {
+				for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+					if (reset[j].tokens[k].index == i.index) {
+						for (int l = 0; l < (int)result.size(); l++) {
 							reset[j].tokens.push_back(reset[j].tokens[k]);
 							reset[j].tokens.back().index = result[l].index;
 						}
-		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
-			for (int j = 0; j < num; j++)
-			{
-				mark_modified();
-				transitions.push_back(transitions[i.index]);
-				result.push_back(petri::iterator(i.type, transitions.size()-1));
+					}
+				}
 			}
-		} else
-		{
+		} else if (i.type == transition::type && i.index < (int)transitions.size()) {
+			for (int j = 0; j < num; j++) {
+				result.push_back(create(transitions[i.index]));
+			}
+		} else {
 			internal("petri::copy", "iterator out of bounds", __FILE__, __LINE__);
 			return vector<petri::iterator>();
 		}
 		return result;
 	}
-
-	virtual vector<petri::iterator> copy(vector<petri::iterator> i, int num = 1)
-	{
+	
+	virtual vector<petri::iterator> copy(vector<petri::iterator> i, int num = 1) {
 		vector<petri::iterator> result;
-		for (int j = 0; j < (int)i.size(); j++)
-		{
+		for (int j = 0; j < (int)i.size(); j++) {
 			vector<petri::iterator> temp = copy(i[j], num);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual petri::iterator copy_combine(int composition, petri::iterator i0, petri::iterator i1)
-	{
-		if (i0.type == place::type && i1.type == place::type)
+	virtual petri::iterator copy_combine(int composition, petri::iterator i0, petri::iterator i1) {
+		if (i0.type == place::type and i1.type == place::type) {
 			return create(place::merge(composition, places[i0.index], places[i1.index]));
-		else if (i0.type == transition::type && i1.type == transition::type)
-		{
-			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index]))
+		} else if (i0.type == transition::type and i1.type == transition::type) {
+			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index])) {
 				return create(transition::merge(composition, transitions[i0.index], transitions[i1.index]));
-			else
-			{
+			} else {
 				internal("petri::copy_combine", "transitions are not mergeable", __FILE__, __LINE__);
-				return petri::iterator();
 			}
-		}
-		else
-		{
+		} else {
 			internal("petri::copy_combine", "iterator types do not match", __FILE__, __LINE__);
-			return petri::iterator();
 		}
+		return petri::iterator();
 	}
 
-	virtual petri::iterator combine(int composition, petri::iterator i0, petri::iterator i1)
-	{
-		if (i0.type == place::type && i1.type == place::type)
-		{
+	virtual petri::iterator combine(int composition, petri::iterator i0, petri::iterator i1) {
+		if (i0.type == place::type and i1.type == place::type) {
 			places[i0.index] = place::merge(composition, places[i0.index], places[i1.index]);
 			return i0;
-		}
-		else if (i0.type == transition::type && i1.type == transition::type)
-		{
-			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index]))
-			{
+		} else if (i0.type == transition::type and i1.type == transition::type) {
+			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index])) {
 				transitions[i0.index] = transition::merge(composition, transitions[i0.index], transitions[i1.index]);
 				return i0;
-			}
-			else
-			{
+			} else {
 				internal("petri::combine", "transitions are not mergeable", __FILE__, __LINE__);
-				return petri::iterator();
 			}
-		}
-		else
-		{
+		} else {
 			internal("petri::combine", "iterator types do not match", __FILE__, __LINE__);
-			return petri::iterator();
 		}
+		return petri::iterator();
 	}
-
+	
 	template <class node>
-	petri::iterator push_back(petri::iterator from, node n)
-	{
+	petri::iterator push_back(petri::iterator from, node n) {
 		return connect(from, create(n));
 	}
 
 	template <class node>
-	petri::iterator push_back(petri::region from, node n)
-	{
+	petri::iterator push_back(petri::region from, node n) {
 		return connect(from, create(n));
 	}
 
 	template <class node>
-	petri::region push_back(petri::iterator from, node n, int num)
-	{
+	petri::region push_back(petri::iterator from, node n, int num) {
 		return connect(from, create(n, num));
 	}
 
 	template <class node>
-	petri::region push_back(petri::region from, node n, int num)
-	{
+	petri::region push_back(petri::region from, node n, int num) {
 		return connect(from, create(n, num));
 	}
 
 	template <class node>
-	petri::iterator push_front(petri::iterator to, node n)
-	{
+	petri::iterator push_front(petri::iterator to, node n) {
 		return connect(create(n), to);
 	}
 
 	template <class node>
-	petri::iterator push_front(petri::region to, node n)
-	{
+	petri::iterator push_front(petri::region to, node n) {
 		return connect(create(n), to);
 	}
 
 	template <class node>
-	petri::region push_front(petri::iterator to, node n, int num)
-	{
+	petri::region push_front(petri::iterator to, node n, int num) {
 		return connect(create(n, num), to);
 	}
 
 	template <class node>
-	petri::region push_front(petri::region to, node n, int num)
-	{
+	petri::region push_front(petri::region to, node n, int num) {
 		return connect(create(n, num), to);
 	}
 
-	virtual petri::iterator insert(petri::iterator a, place n)
-	{
+	virtual petri::iterator insert(petri::iterator a, place n) {
 		petri::iterator i[2];
 		i[place::type] = create(n);
 		i[transition::type] = create(transition());
@@ -1512,43 +1450,43 @@ struct graph
 		return petri::iterator();
 	}
 
-	virtual petri::iterator insert_after(petri::iterator from, place n)
-	{
+	virtual petri::iterator insert_after(petri::iterator from, place n) {
 		petri::iterator i[2];
 		i[transition::type] = create(transition());
 		i[place::type] = create(n);
-		for (int j = 0; j < (int)arcs[from.type].size(); j++)
-			if (arcs[from.type][j].from.index == from.index)
+		for (int j = 0; j < (int)arcs[from.type].size(); j++) {
+			if (arcs[from.type][j].from.index == from.index) {
 				arcs[from.type][j].from.index = i[from.type].index;
+			}
+		}
 		connect(from, i[1-from.type]);
 		connect(i[1-from.type], i[from.type]);
 		return i[place::type];
 	}
 
-
-	virtual petri::iterator insert_after(petri::iterator from, transition n)
-	{
+	virtual petri::iterator insert_after(petri::iterator from, transition n) {
 		petri::iterator i[2];
 		i[transition::type] = create(n);
 		i[place::type] = create(place());
-		for (int j = 0; j < (int)arcs[from.type].size(); j++)
-			if (arcs[from.type][j].from.index == from.index)
+		for (int j = 0; j < (int)arcs[from.type].size(); j++) {
+			if (arcs[from.type][j].from.index == from.index) {
 				arcs[from.type][j].from.index = i[from.type].index;
+			}
+		}
 		connect(from, i[1-from.type]);
 		connect(i[1-from.type], i[from.type]);
 		return i[transition::type];
 	}
 
-	virtual petri::iterator insert_after(petri::iterator from, int n)
-	{
-		if (n == place::type)
+	virtual petri::iterator insert_after(petri::iterator from, int n) {
+		if (n == place::type) {
 			return insert_after(from, place());
-		else if (n == transition::type)
+		} else if (n == transition::type) {
 			return insert_after(from, transition());
-		else
-			return petri::iterator();
+		}
+		return petri::iterator();
 	}
-
+	
 	virtual petri::iterator insert_at(petri::region to, transition n) {
 		petri::iterator t = create(n);
 		// TODO(edward.bingham) inputs should be arcs between nodes
@@ -1575,29 +1513,33 @@ struct graph
 		return t;
 	}
 
-	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true)
-	{
+	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true) {
 		petri::iterator d = copy(i);
-		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel))
-		{
-			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
-				if (arcs[i.type][j].from == i)
+		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel)) {
+			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
+				if (arcs[i.type][j].from == i) {
 					connect(d, arcs[i.type][j].to);
-			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--)
-				if (arcs[1-i.type][j].to == i)
+				}
+			}
+			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--) {
+				if (arcs[1-i.type][j].to == i) {
 					connect(arcs[1-i.type][j].from, d);
-		}
-		else if (add)
-		{
+				}
+			}
+		} else if (add) {
 			vector<petri::iterator> x = create(1-i.type, 4);
 			vector<petri::iterator> y = create(i.type, 2);
 
-			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
-				if (arcs[i.type][j].from == i)
+			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
+				if (arcs[i.type][j].from == i) {
 					arcs[i.type][j].from = y[1];
-			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--)
-				if (arcs[1-i.type][j].to == i)
+				}
+			}
+			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--) {
+				if (arcs[1-i.type][j].to == i) {
 					arcs[1-i.type][j].to = y[0];
+				}
+			}
 
 			connect(y[0], x[0]);
 			connect(y[0], x[1]);
@@ -1607,22 +1549,25 @@ struct graph
 			connect(d, x[3]);
 			connect(x[2], y[1]);
 			connect(x[3], y[1]);
-		}
-		else
-		{
+		} else {
 			vector<petri::iterator> n = next(i);
 			vector<petri::iterator> p = prev(i);
 
-			for (int j = 0; j < 2; j++)
-				for (int k = (int)arcs[j].size()-1; k >= 0; k--)
-					if (arcs[j][k].from == i || arcs[j][k].to == i)
+			for (int j = 0; j < 2; j++) {
+				for (int k = (int)arcs[j].size()-1; k >= 0; k--) {
+					if (arcs[j][k].from == i or arcs[j][k].to == i) {
 						arcs[j].erase(arcs[j].begin() + k);
+					}
+				}
+			}
 
 			vector<petri::iterator> n1, p1;
-			for (int l = 0; l < (int)n.size(); l++)
+			for (int l = 0; l < (int)n.size(); l++) {
 				n1.push_back(duplicate(composition, n[l]));
-			for (int l = 0; l < (int)p.size(); l++)
+			}
+			for (int l = 0; l < (int)p.size(); l++) {
 				p1.push_back(duplicate(composition, p[l]));
+			}
 
 			connect(p1, d);
 			connect(d, n1);
@@ -1633,67 +1578,74 @@ struct graph
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true)
-	{
+	virtual vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true) {
 		if (num == 0) {
 			return vector<petri::iterator>();
 		}
 
 		vector<petri::iterator> d = copy(i, num-1);
-		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel))
-		{
-			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
-				if (arcs[i.type][j].from == i)
-					for (int k = 0; k < (int)d.size(); k++)
+		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel)) {
+			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
+				if (arcs[i.type][j].from == i) {
+					for (int k = 0; k < (int)d.size(); k++) {
 						connect(d[k], arcs[i.type][j].to);
-			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--)
-				if (arcs[1-i.type][j].to == i)
-					for (int k = 0; k < (int)d.size(); k++)
+					}
+				}
+			}
+			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--) {
+				if (arcs[1-i.type][j].to == i) {
+					for (int k = 0; k < (int)d.size(); k++) {
 						connect(arcs[1-i.type][j].from, d[k]);
-		}
-		else if (add)
-		{
+					}
+				}
+			}
+		} else if (add) {
 			vector<petri::iterator> x = create(1-i.type, 2*(num-1));
 			vector<petri::iterator> y = create(i.type, 2);
 			vector<petri::iterator> z = create(1-i.type, 2);
 
-			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--)
-				if (arcs[i.type][j].from == i)
+			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
+				if (arcs[i.type][j].from == i) {
 					arcs[i.type][j].from = y[1];
-			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--)
-				if (arcs[1-i.type][j].to == i)
+				}
+			}
+			for (int j = (int)arcs[1-i.type].size()-1; j >= 0; j--) {
+				if (arcs[1-i.type][j].to == i) {
 					arcs[1-i.type][j].to = y[0];
+				}
+			}
 
 			connect(y[0], z[0]);
 			connect(z[0], i);
 			connect(i, z[1]);
 			connect(z[1], y[1]);
 
-			for (int k = 0; k < (int)d.size(); k++)
-			{
+			for (int k = 0; k < (int)d.size(); k++) {
 				connect(y[0], x[k*2 + 0]);
 				connect(x[k*2 + 0], d[k]);
 				connect(d[k], x[k*2 + 1]);
 				connect(x[k*2 + 1], y[1]);
 			}
-		}
-		else
-		{
+		} else {
 			vector<petri::iterator> n = next(i);
 			vector<petri::iterator> p = prev(i);
 
-			for (int j = 0; j < 2; j++)
-				for (int k = (int)arcs[j].size()-1; k >= 0; k--)
-					if (arcs[j][k].from == i || arcs[j][k].to == i)
+			for (int j = 0; j < 2; j++) {
+				for (int k = (int)arcs[j].size()-1; k >= 0; k--) {
+					if (arcs[j][k].from == i or arcs[j][k].to == i) {
 						arcs[j].erase(arcs[j].begin() + k);
+					}
+				}
+			}
 
-			for (int k = 0; k < num-1; k++)
-			{
+			for (int k = 0; k < num-1; k++) {
 				vector<petri::iterator> n1, p1;
-				for (int l = 0; l < (int)n.size(); l++)
+				for (int l = 0; l < (int)n.size(); l++) {
 					n1.push_back(duplicate(composition, n[l]));
-				for (int l = 0; l < (int)p.size(); l++)
+				}
+				for (int l = 0; l < (int)p.size(); l++) {
 					p1.push_back(duplicate(composition, p[l]));
+				}
 
 				connect(p1, d[k]);
 				connect(d[k], n1);
@@ -1707,44 +1659,33 @@ struct graph
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(int composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true)
-	{
+	virtual vector<petri::iterator> duplicate(int composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true) {
 		vector<petri::iterator> result;
 		result.reserve(n.size()*num);
-		for (int i = 0; i < (int)n.size(); i++)
-		{
+		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = duplicate(composition, n[i], num, add);
-			if (interleaved && i > 0)
-				for (int j = 0; j < (int)temp.size(); j++)
+			if (interleaved and i > 0) {
+				for (int j = 0; j < (int)temp.size(); j++) {
 					result.insert(result.begin() + j*(i+1) + 1, temp[j]);
-			else
+				}
+			} else {
 				result.insert(result.end(), temp.begin(), temp.end());
+			}
 		}
 		return result;
 	}
 
-	// pinch performs sophisticated graph surgery to bypass a node while preserving connectivity
+	// Pinch removes a node without affecting the connectivity, node dominance,
+	// or token flow of the graph by creating direct connections between
+	// predecessor and successor nodes
 	//
-	// Purpose:
-	// - Enables removal of nodes while maintaining essential graph connectivity
-	// - Critical for graph reduction and simplification
-	// - Preserves token flow and behavioral semantics during transformations
-	// - Creates direct connections between predecessor and successor nodes
+	// 1. Analyze incoming and outgoing connections of the target node
+	// 2. Create direct connections that bypass the node
+	// 3. Duplicate nodes as needed to maintain proper connection patterns
+	// 4. Handle state updates for source, sink, and reset tokens
 	//
-	// Algorithm:
-	// - Analyzes incoming and outgoing connections of the target node
-	// - Creates direct connections that bypass the node
-	// - Duplicates nodes as needed to maintain proper connection patterns
-	// - Handles complex cases with multiple inputs and outputs
-	// - Ensures token flow integrity through carefully managed connection patterns
-	//
-	// Implementation complexity:
-	// - Creates and manages potentially complex connection combinations
-	// - Handles state updates for source, sink, and reset tokens
-	// - Returns mapping between original and modified nodes
-	// - Used heavily in reduction operations to simplify the net
-	virtual void pinch(petri::iterator n)
-	{
+	// Return mapping between original and modified nodes
+	virtual void pinch(petri::iterator n) {
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
 		vector<petri::iterator> left = duplicate(n.type, neighbors.first, neighbors.second.size(), false);
@@ -1781,121 +1722,127 @@ struct graph
 		erase(right, left);
 	}
 
-	virtual vector<petri::iterator> next(petri::iterator n) const
-	{
+	virtual vector<petri::iterator> next(petri::iterator n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)arcs[n.type].size(); i++)
-			if (arcs[n.type][i].from.index == n.index)
+		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
+			if (arcs[n.type][i].from.index == n.index) {
 				result.push_back(arcs[n.type][i].to);
+			}
+		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> next(vector<petri::iterator> n) const
-	{
+	virtual vector<petri::iterator> next(vector<petri::iterator> n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)n.size(); i++)
-		{
+		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = next(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev(petri::iterator n) const
-	{
+	virtual vector<petri::iterator> prev(petri::iterator n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
-			if (arcs[1-n.type][i].to.index == n.index)
+		for (int i = 0; i < (int)arcs[1-n.type].size(); i++) {
+			if (arcs[1-n.type][i].to.index == n.index) {
 				result.push_back(arcs[1-n.type][i].from);
+			}
+		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev(vector<petri::iterator> n) const
-	{
+	virtual vector<petri::iterator> prev(vector<petri::iterator> n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)n.size(); i++)
-		{
+		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = prev(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> neighbors(petri::iterator n, bool sorted = false) const
-	{
+	virtual vector<petri::iterator> neighbors(petri::iterator n, bool sorted = false) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
-			if (arcs[1-n.type][i].to.index == n.index)
+		for (int i = 0; i < (int)arcs[1-n.type].size(); i++) {
+			if (arcs[1-n.type][i].to.index == n.index) {
 				result.push_back(arcs[1-n.type][i].from);
+			}
+		}
 
-		for (int i = 0; i < (int)arcs[n.type].size(); i++)
-			if (arcs[n.type][i].from.index == n.index)
+		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
+			if (arcs[n.type][i].from.index == n.index) {
 				result.push_back(arcs[n.type][i].to);
+			}
+		}
 
-		if (sorted)
+		if (sorted) {
 			sort(result.begin(), result.end());
+		}
 		return result;
 	}
 
-	virtual vector<int> next(int type, int n) const
-	{
+	virtual vector<int> next(int type, int n) const {
 		vector<int> result;
-		for (int i = 0; i < (int)arcs[type].size(); i++)
-			if (arcs[type][i].from.index == n)
+		for (int i = 0; i < (int)arcs[type].size(); i++) {
+			if (arcs[type][i].from.index == n) {
 				result.push_back(arcs[type][i].to.index);
+			}
+		}
 		return result;
 	}
 
-	virtual vector<int> next(int type, vector<int> n) const
-	{
+	virtual vector<int> next(int type, vector<int> n) const {
 		vector<int> result;
-		for (int i = 0; i < (int)arcs[type].size(); i++)
-			if (find(n.begin(), n.end(), arcs[type][i].from.index) != n.end())
+		for (int i = 0; i < (int)arcs[type].size(); i++) {
+			if (find(n.begin(), n.end(), arcs[type][i].from.index) != n.end()) {
 				result.push_back(arcs[type][i].to.index);
+			}
+		}
 		return result;
 	}
 
-	virtual vector<int> prev(int type, int n) const
-	{
+	virtual vector<int> prev(int type, int n) const {
 		vector<int> result;
-		for (int i = 0; i < (int)arcs[1-type].size(); i++)
-			if (arcs[1-type][i].to.index == n)
+		for (int i = 0; i < (int)arcs[1-type].size(); i++) {
+			if (arcs[1-type][i].to.index == n) {
 				result.push_back(arcs[1-type][i].from.index);
+			}
+		}
 		return result;
 	}
 
-	virtual vector<int> prev(int type, vector<int> n) const
-	{
+	virtual vector<int> prev(int type, vector<int> n) const {
+		vector<int> result;
+		for (int i = 0; i < (int)arcs[1-type].size(); i++) {
+			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end()) {
+				result.push_back(arcs[1-type][i].from.index);
+			}
+		}
+		return result;
+	}
+
+	virtual vector<int> neighbors(int type, int n, bool sorted = false) const {
+		vector<int> result;
+		for (int i = 0; i < (int)arcs[1-type].size(); i++) {
+			if (arcs[1-type][i].to.index == n) {
+				result.push_back(arcs[1-type][i].from.index);
+			}
+		}
+		for (int i = 0; i < (int)arcs[type].size(); i++) {
+			if (arcs[type][i].from.index == n) {
+				result.push_back(arcs[type][i].to.index);
+			}
+		}
+		if (sorted) {
+			sort(result.begin(), result.end());
+		}
+		return result;
+	}
+
+	virtual vector<int> neighbors(int type, vector<int> n, bool sorted = false) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end())
 				result.push_back(arcs[1-type][i].from.index);
-		return result;
-	}
-
-	virtual vector<int> neighbors(int type, int n, bool sorted = false) const
-	{
-		vector<int> result;
-		for (int i = 0; i < (int)arcs[1-type].size(); i++)
-			if (arcs[1-type][i].to.index == n)
-				result.push_back(arcs[1-type][i].from.index);
-
-		for (int i = 0; i < (int)arcs[type].size(); i++)
-			if (arcs[type][i].from.index == n)
-				result.push_back(arcs[type][i].to.index);
-
-		if (sorted)
-			sort(result.begin(), result.end());
-
-		return result;
-	}
-
-	virtual vector<int> neighbors(int type, vector<int> n, bool sorted = false) const
-	{
-		vector<int> result;
-		for (int i = 0; i < (int)arcs[1-type].size(); i++)
-			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end())
-				result.push_back(arcs[1-type][i].from.index);
 
 		for (int i = 0; i < (int)arcs[type].size(); i++)
 			if (find(n.begin(), n.end(), arcs[type][i].from.index) != n.end())
@@ -1907,8 +1854,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> out(petri::iterator n) const
-	{
+	virtual vector<petri::iterator> out(petri::iterator n) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++)
 			if (arcs[n.type][i].from.index == n.index)
@@ -1916,19 +1862,16 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> out(vector<petri::iterator> n) const
-	{
+	virtual vector<petri::iterator> out(vector<petri::iterator> n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)n.size(); i++)
-		{
+		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = out(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> in(petri::iterator n) const
-	{
+	virtual vector<petri::iterator> in(petri::iterator n) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-n.type].size(); i++)
 			if (arcs[1-n.type][i].to.index == n.index)
@@ -1936,19 +1879,16 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> in(vector<petri::iterator> n) const
-	{
+	virtual vector<petri::iterator> in(vector<petri::iterator> n) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)n.size(); i++)
-		{
+		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = in(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<int> out(int type, int n) const
-	{
+	virtual vector<int> out(int type, int n) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
 			if (arcs[type][i].from.index == n)
@@ -1956,8 +1896,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<int> out(int type, vector<int> n) const
-	{
+	virtual vector<int> out(int type, vector<int> n) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[type].size(); i++)
 			if (find(n.begin(), n.end(), arcs[type][i].from.index) != n.end())
@@ -1965,8 +1904,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<int> in(int type, int n) const
-	{
+	virtual vector<int> in(int type, int n) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (arcs[1-type][i].to.index == n)
@@ -1974,8 +1912,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<int> in(int type, vector<int> n) const
-	{
+	virtual vector<int> in(int type, vector<int> n) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (find(n.begin(), n.end(), arcs[1-type][i].to.index) != n.end())
@@ -1983,8 +1920,7 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> next_arcs(petri::iterator a) const
-	{
+	virtual vector<petri::iterator> next_arcs(petri::iterator a) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-a.type].size(); i++)
 			if (arcs[1-a.type][i].from == arcs[a.type][a.index].to)
@@ -1992,19 +1928,16 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> next_arcs(vector<petri::iterator> a) const
-	{
+	virtual vector<petri::iterator> next_arcs(vector<petri::iterator> a) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)a.size(); i++)
-		{
+		for (int i = 0; i < (int)a.size(); i++) {
 			vector<petri::iterator> temp = next_arcs(a[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev_arcs(petri::iterator a) const
-	{
+	virtual vector<petri::iterator> prev_arcs(petri::iterator a) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-a.type].size(); i++)
 			if (arcs[1-a.type][i].to == arcs[a.type][a.index].from)
@@ -2012,19 +1945,16 @@ struct graph
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev_arcs(vector<petri::iterator> a) const
-	{
+	virtual vector<petri::iterator> prev_arcs(vector<petri::iterator> a) const {
 		vector<petri::iterator> result;
-		for (int i = 0; i < (int)a.size(); i++)
-		{
+		for (int i = 0; i < (int)a.size(); i++) {
 			vector<petri::iterator> temp = prev_arcs(a[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<int> next_arcs(int type, int a) const
-	{
+	virtual vector<int> next_arcs(int type, int a) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (arcs[1-type][i].from == arcs[type][a].to)
@@ -2032,19 +1962,16 @@ struct graph
 		return result;
 	}
 
-	virtual vector<int> next_arcs(int type, vector<int> a) const
-	{
+	virtual vector<int> next_arcs(int type, vector<int> a) const {
 		vector<int> result;
-		for (int i = 0; i < (int)a.size(); i++)
-		{
+		for (int i = 0; i < (int)a.size(); i++) {
 			vector<int> temp = next_arcs(type, a[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	virtual vector<int> prev_arcs(int type, int a) const
-	{
+	virtual vector<int> prev_arcs(int type, int a) const {
 		vector<int> result;
 		for (int i = 0; i < (int)arcs[1-type].size(); i++)
 			if (arcs[1-type][i].to == arcs[type][a].from)
@@ -2052,19 +1979,15 @@ struct graph
 		return result;
 	}
 
-	virtual vector<int> prev_arcs(int type, vector<int> a) const
-	{
+	virtual vector<int> prev_arcs(int type, vector<int> a) const {
 		vector<int> result;
-		for (int i = 0; i < (int)a.size(); i++)
-		{
+		for (int i = 0; i < (int)a.size(); i++) {
 			vector<int> temp = prev_arcs(type, a[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
 		return result;
 	}
 
-	// Combines two Petri nets according to specified composition semantics.
-	//
 	// This function implements graph composition operations that merge
 	// the current Petri net with another one according to one of three fundamental
 	// composition patterns: sequence, choice, or parallel. Each composition type creates
@@ -2075,11 +1998,6 @@ struct graph
 	// - Choice: Create a structure where either the current net or the provided net
 	//   will execute, but not both.
 	// - Parallel: Create a structure where both nets execute concurrently.
-	//
-	// The function handles complex cases like merging multiple source or sink nodes,
-	// ensuring proper token flow, and maintaining consistent state management. It returns
-	// a mapping between original nodes in the provided net and their corresponding nodes
-	// in the merged result, which is essential for tracking relationships.
 	//
 	// @param composition The composition type to use (sequence, choice, or parallel)
 	// @param g The Petri net to merge with the current one
@@ -2116,8 +2034,16 @@ struct graph
 
 	virtual mapping merge(const graph<place, transition, token, state> &g) {
 		mapping result;
-		result.nodes[place::type] = create(g.places);
-		result.nodes[transition::type] = create(g.transitions);
+		for (int i = 0; i < (int)g.places.size(); i++) {
+			if (g.places.is_valid(i)) {
+				result.set(petri::iterator(place::type, i), create(g.places[i]));
+			}
+		}
+		for (int i = 0; i < (int)g.transitions.size(); i++) {
+			if (g.transitions.is_valid(i)) {
+				result.set(petri::iterator(transition::type, i), create(g.transitions[i]));
+			}
+		}	
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < (int)g.arcs[i].size(); j++) {
 				arcs[i].push_back(arc(result.map(g.arcs[i][j].from), result.map(g.arcs[i][j].to)));
@@ -2126,8 +2052,8 @@ struct graph
 		return result;
 	}
 
-	virtual vector<vector<petri::iterator> > cycles(vector<petri::iterator> from) const
-	{
+	// Do a depth first search to find all cycles in the graph from the starting node
+	virtual vector<vector<petri::iterator> > cycles(vector<petri::iterator> from) const {
 		vector<vector<petri::iterator> > curr;
 		vector<vector<petri::iterator> > result;
 		for (auto i = from.begin(); i != from.end(); i++) {
@@ -2137,22 +2063,17 @@ struct graph
 		sort(curr.begin(), curr.end());
 		curr.resize(unique(curr.begin(), curr.end()) - curr.begin());
 
-		while (curr.size() > 0)
-		{
+		while (curr.size() > 0) {
 			vector<petri::iterator> x = curr.back();
 			curr.pop_back();
 
 			vector<petri::iterator> n = next(x.back());
-			for (int j = 0; j < (int)n.size(); j++)
-			{
+			for (int j = 0; j < (int)n.size(); j++) {
 				vector<petri::iterator>::iterator loopback = find(x.begin(), x.end(), n[j]);
-				if (loopback != x.end())
-				{
+				if (loopback != x.end()) {
 					result.push_back(x);
 					result.back().erase(result.back().begin(), result.back().begin() + (loopback - x.begin()));
-				}
-				else
-				{
+				} else {
 					curr.push_back(x);
 					curr.back().push_back(n[j]);
 				}
@@ -2161,7 +2082,7 @@ struct graph
 
 		return result;
 	}
-
+	
 	// reduce() simplifies the petri net while preserving functional
 	// correctness
 	//
@@ -2176,20 +2097,22 @@ struct graph
 	// - Merges functionally equivalent places
 	//
 	// Returns whether any reductions were successfully performed
-	virtual bool reduce(bool proper_nesting = true, bool aggressive = false, bool debug = false)
-	{
+	virtual bool reduce(bool proper_nesting = true, bool aggressive = false, bool debug = false) {
 		if (debug) cout << "starting petri::reduce()" << endl;
 
 		bool result = false;
 		bool change = true;
-		while (change)
-		{
+		while (change) {
 			change = false;
 
 			if (debug) cout << "reducing from " << places.size() << " places and " << transitions.size() << " transitions" << endl;
 
-			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; )
-			{
+			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; ) {
+				if (not is_valid(i)) {
+					i++;
+					continue;
+				}
+
 				vector<petri::iterator> n = next(i);
 				vector<petri::iterator> p = prev(i);
 
@@ -2198,8 +2121,7 @@ struct graph
 
 				bool affect = false;
 				// If it doesn't have any input places, then we need to add one.
-				if (!affect && p.size() == 0)
-				{
+				if (!affect && p.size() == 0) {
 					if (debug) cout << "\tno input places for " << i << ", adding one" << endl;
 					p.push_back(create(place::type));
 					connect(p, i);
@@ -2207,8 +2129,7 @@ struct graph
 				}
 
 				// If it doesn't have any output places, then we need to add one.
-				if (!affect && n.size() == 0)
-				{
+				if (!affect && n.size() == 0) {
 					if (debug) cout << "\tno output places for " << i << ", adding one" << endl;
 					n.push_back(create(place::type));
 					connect(i, n);
@@ -2219,8 +2140,7 @@ struct graph
 				// These transitions may be removed while preserving proper nesting, token flow
 				// stability, non interference, and deadlock freedom. At this point, it is not
 				// possible for this transition to be in the source list.
-				if (!affect && transitions[i.index].is_infeasible())
-				{
+				if (!affect and transitions[i.index].is_infeasible()) {
 					if (debug) cout << "\terasing infeasible transition " << i << endl;
 					erase(i);
 					affect = true;
@@ -2229,35 +2149,27 @@ struct graph
 				// Vacuous transitions may be pinched while preserving token flow,
 				// stability, non interference, and deadlock freedom. However, proper nesting is not necessarily
 				// preserved. We have to take special precautions if we want to preserver proper nesting.
-				if (!affect && transitions[i.index].is_vacuous())
-				{
-					if (!proper_nesting)
-					{
+				if (!affect and transitions[i.index].is_vacuous()) {
+					if (!proper_nesting) {
 						if (debug) cout << "\tpinching vacuous transition (proper) " << i << endl;
 						pinch(i);
 						affect = true;
-					}
-					else
-					{
+					} else {
 						vector<petri::iterator> np = next(p);
 						vector<petri::iterator> pn = prev(n);
 
-						if (p.size() == 1 && n.size() == 1 && (np.size() == 1 || pn.size() == 1))
-						{
+						if (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1)) {
 							if (debug) cout << "\tpinching vacuous transition " << i << endl;
 							pinch(i);
 							affect = true;
-						}
-						else
-						{
+						} else {
 							vector<petri::iterator> nn = next(n);
 							vector<petri::iterator> nnp = next(np);
 							vector<petri::iterator> pp = prev(p);
 							vector<petri::iterator> ppn = prev(pn);
 
-							if ((n.size() == 1 && nn.size() == 1 && nnp.size() == 1 && np.size() == 1) ||
-								(p.size() == 1 && pp.size() == 1 && ppn.size() == 1 && pn.size() == 1))
-							{
+							if ((n.size() == 1 and nn.size() == 1 and nnp.size() == 1 and np.size() == 1) or
+								(p.size() == 1 and pp.size() == 1 and ppn.size() == 1 and pn.size() == 1)) {
 								if (debug) cout << "\tpinching vacuous transition " << i << endl;
 								pinch(i);
 								affect = true;
@@ -2266,14 +2178,19 @@ struct graph
 					}
 				}
 
-				if (!affect)
+				if (!affect) {
 					i++;
-				else
+				} else {
 					change = true;
+				}
 			}
 
-			for (petri::iterator i(place::type, 0); i < (int)places.size() && !change; )
-			{
+			for (petri::iterator i(place::type, 0); i < (int)places.size() and not change; ) {
+				if (not is_valid(i)) {
+					i++;
+					continue;
+				}
+
 				bool i_is_reset = is_reset(i);
 
 				vector<petri::iterator> n = next(i);
@@ -2286,8 +2203,7 @@ struct graph
 
 				// We know a place will never be marked if it is not in the initial marking and it has no input arcs.
 				// This means that its output transitions will never fire.
-				if (p.size() == 0 && (!i_is_reset || n.size() == 0))
-				{
+				if (p.size() == 0 and (not i_is_reset or n.size() == 0)) {
 					if (debug) cout << "\terasing place with no input arcs " << i << " -> " << to_string(n) << endl;
 					erase(n);
 					erase(i);
@@ -2295,8 +2211,11 @@ struct graph
 				}
 
 				// Check to see if there are any excess places whose existence doesn't affect the behavior of the circuit
-				for (petri::iterator j = i+1; j < (int)places.size(); )
-				{
+				for (petri::iterator j = i+1; j < (int)places.size(); ) {
+					if (not is_valid(j)) {
+						j++;
+						continue;
+					}
 					bool j_is_reset = is_reset(j);
 
 					vector<petri::iterator> n2 = next(j);
@@ -2305,20 +2224,20 @@ struct graph
 					sort(n2.begin(), n2.end());
 					sort(p2.begin(), p2.end());
 
-					if (n == n2 && p == p2 && i_is_reset == j_is_reset)
-					{
+					if (n == n2 and p == p2 and i_is_reset == j_is_reset) {
 						if (debug) cout << "\terasing redundant place " << j << endl;
 						erase(j);
 						affect = true;
-					}
-					else
+					} else {
 						j++;
+					}
 				}
 
-				if (!affect)
+				if (!affect) {
 					i++;
-				else
+				} else {
 					change = true;
+				}
 			}
 
 			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
@@ -2329,8 +2248,9 @@ struct graph
 				vector<vector<petri::iterator> > n, p;
 				vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
 
-				for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; i++)
-				{
+				for (petri::iterator i(transition::type, 0); i < (int)transitions.size() and not change; i++) {
+					if (not is_valid(i)) continue;
+
 					n.push_back(next(i));
 					p.push_back(prev(i));
 
@@ -2339,25 +2259,23 @@ struct graph
 
 					nx.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
 					px.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
-					for (int j = 0; j < (int)n.back().size(); j++)
-					{
+					for (int j = 0; j < (int)n.back().size(); j++) {
 						nx.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n.back()[j]), next(n.back()[j])));
 						sort(nx.back().back().first.begin(), nx.back().back().first.end());
 						sort(nx.back().back().second.begin(), nx.back().back().second.end());
 					}
-					for (int j = 0; j < (int)p.back().size(); j++)
-					{
+					for (int j = 0; j < (int)p.back().size(); j++) {
 						px.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p.back()[j]), next(p.back()[j])));
 						sort(px.back().back().first.begin(), px.back().back().first.end());
 						sort(px.back().back().second.begin(), px.back().back().second.end());
 					}
 
-					for (petri::iterator j = i-1; j >= 0 && !change; j--)
-					{
+					for (petri::iterator j = i-1; j >= 0 and not change; j--) {
+						if (not is_valid(j)) continue;
+
 						// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
 						// share all of the same input and output places.
-						if (n[j.index] == n[i.index] && p[j.index] == p[i.index])
-						{
+						if (n[j.index] == n[i.index] and p[j.index] == p[i.index]) {
 							if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
 							transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
 							erase(i);
@@ -2367,8 +2285,9 @@ struct graph
 						// Find internally parallel transitions. A pair of transitions A and B are internally parallel if
 						// they are the same type, have disjoint sets of input and output places that share a single input
 						// or output transition and have no output or input transitions other than A or B.
-						else if (vector_intersection_size(n[i.index], n[j.index]) == 0 && vector_intersection_size(p[i.index], p[j.index]) == 0 && nx[i.index] == nx[j.index] && px[i.index] == px[j.index])
-						{
+						else if (vector_intersection_size(n[i.index], n[j.index]) == 0
+							and vector_intersection_size(p[i.index], p[j.index]) == 0
+							and nx[i.index] == nx[j.index] and px[i.index] == px[j.index]) {
 							if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
 							transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
 							vector<petri::iterator> tocut;
@@ -2393,7 +2312,7 @@ struct graph
 	virtual bool is_floating(petri::iterator n) const {
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < (int)arcs[i].size(); j++) {
-				if (arcs[i][j].from == n || arcs[i][j].to == n) {
+				if (arcs[i][j].from == n or arcs[i][j].to == n) {
 					return false;
 				}
 			}
@@ -2719,6 +2638,8 @@ struct graph
 		vector<petri::iterator> v0p, v1p;
 		for (int j = 0; j < 2; j++) {
 			for (auto i = begin(j); i != end(j); i++) {
+				if (not is_valid(i)) continue;
+
 				if (find(v1.begin(), v1.end(), i) == v1.end() and is(parallel, {i}, v0)) {
 					v0p.push_back(i);
 				}
@@ -3019,12 +2940,12 @@ struct graph
 		nodes.sort();
 		if (other.empty()) {
 			for (auto i = begin(place::type); i != end(place::type); i++) {
-				if (is(composition, {i}, nodes)) {
+				if (is_valid(i) and is(composition, {i}, nodes)) {
 					other.push_back(i);
 				}
 			}
 			for (auto i = begin(transition::type); i != end(transition::type); i++) {
-				if (is(composition, {i}, nodes)) {
+				if (is_valid(i) and is(composition, {i}, nodes)) {
 					other.push_back(i);
 				}
 			}
@@ -3118,7 +3039,7 @@ struct graph
 
 	virtual vector<petri::iterator> add_redundant(vector<petri::iterator> p) {
 		for (auto i = begin(place::type); i != end(place::type); i++) {
-			if (is_redundant_to(i, p)) {
+			if (is_valid(i) and is_redundant_to(i, p)) {
 				p.push_back(i);
 			}
 		}
@@ -3129,7 +3050,7 @@ struct graph
 
 	virtual void erase_redundant() {
 		for (auto i = rbegin(place::type); i != rend(place::type); i--) {
-			if (is_redundant(i)) {
+			if (is_valid(i) and is_redundant(i)) {
 				//erase(i);
 			}
 		}
@@ -3185,8 +3106,12 @@ struct graph
 
 	virtual void print() const {
 		for (int i = 0; i < (int)places.size(); i++) {
+			if (not places.is_valid(i)) continue;
+
 			cout << "p" << i << ": " << places[i] << " p" << ::to_string(places[i].splits[place::type]) << " t" << ::to_string(places[i].splits[transition::type]) << "{";
 			for (int j = 0; j < (int)places.size(); j++) {
+				if (not places.is_valid(j)) continue;
+
 				if (distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) >= 0) {
 					cout << "->p" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) << " ";
 				}
@@ -3196,6 +3121,8 @@ struct graph
 			}
 
 			for (int j = 0; j < (int)transitions.size(); j++) {
+				if (not transitions.is_valid(j)) continue;
+
 				if (distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) >= 0) {
 					cout << "->t" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) << " ";
 				}
@@ -3206,9 +3133,13 @@ struct graph
 			cout << "}" << endl;
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
+			if (not transitions.is_valid(i)) continue;
+
 			cout << "t" << i << ": " << transitions[i] << " p" << ::to_string(transitions[i].splits[place::type]) << " t" << ::to_string(transitions[i].splits[transition::type]) << "{";
 
 			for (int j = 0; j < (int)places.size(); j++) {
+				if (not places.is_valid(j)) continue;
+
 				if (distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) >= 0) {
 					cout << "->p" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) << " ";
 				}
@@ -3218,6 +3149,8 @@ struct graph
 			}
 
 			for (int j = 0; j < (int)transitions.size(); j++) {
+				if (not transitions.is_valid(j)) continue;
+
 				if (distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j), false) >= 0) {
 					cout << "->t" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j)) << " ";
 				}
