@@ -319,6 +319,8 @@ path_set trace(graph<place, transition, token, state> &g, petri::bound from, vec
 		// clean up and fill out the precached "next" lists for the
 		// remaining nodes.
 		for (auto i = g.begin(type); i != g.end(type); i++) {
+			if (not g.is_valid(i)) continue;
+
 			if (n[i.type][i.index].empty()) {
 				n[i.type][i.index] = g.next(i);
 			}

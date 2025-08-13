@@ -431,6 +431,8 @@ struct graph
 			map<petri::iterator, split_group> blocked;
 			for (int type = 0; type < 2; type++) {
 				for (petri::iterator to = begin(type); to != end(type); to++) {
+					if (not is_valid(to)) continue;
+
 					bool isDisabled = false;
 					bool isEnabled = false;
 					split_group toSplit = get_split_group(composition, to, split);
@@ -661,6 +663,8 @@ struct graph
 
 			// add splits from graph structure at the first branch nodes after each split
 			for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
+				if (not is_valid(i)) continue;
+
 				compute_split_group(composition, i.index, next(i));
 			}
 
@@ -668,6 +672,8 @@ struct graph
 			if (composition == choice) {
 				set<int> covered;
 				for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
+					if (not is_valid(i)) continue;
+
 					if (split_is_covered(i, next(i))) {
 						covered.insert(i.index);
 					}
@@ -675,6 +681,8 @@ struct graph
 
 				for (int type = 0; type < 2; type++) {
 					for (petri::iterator i = begin(type); i != end(type); i++) {
+						if (not is_valid(i)) continue;
+
 						vector<split_group> *groups = split_groups_iter(choice, i);
 						for (int j = (int)groups->size()-1; j >= 0; j--) {
 							auto pos = groups->begin()+j;
@@ -3029,6 +3037,8 @@ struct graph
 
 	virtual bool is_redundant(petri::iterator p0) {
 		for (auto i = begin(place::type); i != end(place::type); i++) {
+			if (not is_valid(i)) continue;
+
 			if (is_redundant_to(p0, i)) {
 				//cout << p0 << " is redundant to " << i << endl;
 				return true;
