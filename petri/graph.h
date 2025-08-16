@@ -2,7 +2,6 @@
 
 #include <array>
 
-#include <arithmetic/expression.h>
 #include <common/standard.h>
 #include <common/message.h>
 #include <common/text.h>
@@ -713,6 +712,25 @@ struct graph
 
 	virtual petri::iterator rend_arc(int type) const {
 		return petri::iterator(type, -1);
+	}
+
+	virtual const arc& arc_at(petri::iterator arc_iter) const {
+		return this->arcs[arc_iter.type][arc_iter.index];
+	}
+
+	virtual arc arc_at(petri::iterator arc_iter) {
+		return this->arcs[arc_iter.type][arc_iter.index];
+	}
+
+	virtual petri::iterator arc_between(petri::iterator from, petri::iterator to) const {
+		for (petri::iterator &out_arc : this->out(from)) {
+			if (this->arc_at(out_arc).to == to) {
+					return out_arc;
+			}
+		}
+
+		// Arc not found
+		return petri::iterator();
 	}
 
 	vector<petri::iterator> get_places() const {
@@ -3305,7 +3323,7 @@ struct graph
 		//TODO: durr, you gotta start bottom-up
 		while (monopartite_split_projection.size() > 1) {
 
-			// For each merge, concatenate the predicates, then concatenate the transition sequences (even dropping the sequence&split from their respective maps)
+			// Flatten one level of nesting split-places
 			for (const petri::iterator &place_to_merge : monopartite_split_projection[dominator]) {
 
 				// Skip circular self-references
@@ -3317,12 +3335,11 @@ struct graph
 				for (const petri::iterator &in_transition : this->prev(place_to_merge)) {
 					cout << "in_transition> " << in_transition.to_string() << endl << endl;
 					for (const auto &[parent_sequence_head, parent_sequence] : transition_sequences) {
-						//TODO: maybe if(in_transition != parent_sequence_head) { continue; }
+						// Concatenate the predicates, then concatenate the transition sequences (even dropping the sequence&split from their respective maps)
 
-						if (parent_sequence.empty()) {
+						if (parent_sequence.empty() && parent_sequence_head == in_transition) {
 							// Found a lone parent head/predicate with no body to merge with!
 							//TODO: Don'tRepeatYourself: copied from the more involved sequence concatenation after
-							if (parent_sequence_head == in_transition) {
 								arithmetic::Expression parent_predicate = this->transitions[parent_sequence_head.index].guard;
 
 								for (const petri::iterator &child_transition : this->next(place_to_merge)) {
@@ -3333,10 +3350,11 @@ struct graph
 									cout << "P_predicate> " << parent_predicate.to_string();
 									cout << "C_predicate> " << child_predicate.to_string();
 
+									// Concatenate the predicates
 									//TODO: logical <-> bitwise decision needed?
 									arithmetic::Expression merged_predicate = parent_predicate && child_predicate;
 									cout << "M_predicate> " << merged_predicate.to_string() << endl;
-									merged_predicate.minimize(); //TODO: !!! What petri::graph vars/etc need to be updated on modification (e.g. info deleted & added)
+									//merged_predicate.minimize(); //TODO: !!! What petri::graph vars/etc need to be updated on modification (e.g. info deleted & added)
 
 									cout << "(empty parent_body)> ";
 									vector<petri::iterator> child_sequence = transition_sequences[child_transition];
@@ -3362,15 +3380,15 @@ struct graph
 									std::copy(new_sequence.begin(), new_sequence.end(), std::ostream_iterator<petri::iterator>(cout, " "));
 									cout << endl << endl;
 
+									// Attach new sequence/branch where parent used to be
 									this->connect(new_head, new_sequence.front());
 									this->connect(new_sequence.back(), dominator);
 								}
 							}
-
 							continue;
 						}
 
-						// Found a full parent (head/predicate & body) to flatten/concatente!
+						// Found a full parent (head/predicate AND body > 0) to flatten/concatente!
 						//TODO: merge_transition_sequences or something more composable would be a great DRY helper function
 						if (parent_sequence.back() == in_transition) {
 							//TODO: is transition.guard unique to chp::transition and not petri?? ah, piped in through template
@@ -3384,6 +3402,7 @@ struct graph
 								cout << "P_predicate> " << parent_predicate.to_string();
 								cout << "C_predicate> " << child_predicate.to_string();
 
+								// Concatenate the predicates
 								//TODO: logical <-> bitwise decision needed?
 								arithmetic::Expression merged_predicate = parent_predicate && child_predicate;
 								cout << "M_predicate> " << merged_predicate.to_string() << endl;
@@ -3391,6 +3410,7 @@ struct graph
 								//TODO: petri/tests/graph.cpp::flatten
 								//TODO: merge branches with logically-equivalent predicates
 
+								// Concatenate the transition sequences
 								//TODO: be mindful of what labels/etc are duplicated/copied or referenced
 								vector<petri::iterator> merged_sequence(parent_sequence);
 								vector<petri::iterator> child_sequence = transition_sequences[child_transition];
@@ -3419,6 +3439,7 @@ struct graph
 								std::copy(new_sequence.begin(), new_sequence.end(), std::ostream_iterator<petri::iterator>(cout, " "));
 								cout << endl << endl;
 
+									// Attach new sequence/branch where parent used to be
 								this->connect(new_head, new_sequence.front());
 								//TODO: only connect if monopartite projection terminates or include dominator
 								this->connect(new_sequence.back(), dominator);
