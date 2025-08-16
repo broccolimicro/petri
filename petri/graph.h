@@ -3233,6 +3233,42 @@ struct graph
 			}
 		}
 	}
-};
 
+	//TODO: virtual void unzip_backwards(petri::iterator from, petri::iterator to) {}
+	virtual petri::iterator unzip_forwards(petri::iterator node) {
+		//TODO: support more than simple linear path to unzip
+		vector<petri::iterator> parents = this->prev(node);
+		if (parents.size() < 2) { return node; }	// Nothing to unzip!
+
+		//TODO: support depths greater than 1
+		vector<petri::iterator> children = this->next(node);
+		if (children.size() < 1) { return node; }  // Nowhere to unzip!
+
+		//TODO: assumes completely connected in single direction (all children point to single grandchild)
+		// "cousin" is neighbor-in-kind (e.g. place->place)
+		vector<petri::iterator> out_cousins = this->next(children[0]);
+		petri::iterator &out_cousin = out_cousins[0];
+
+		for (auto parent = std::next(parents.begin()); parent != parents.end(); parent++) {
+			petri::iterator parent_out_arc = this->arc_between(*parent, node);
+			//TODO: verify arc_between return is valid: if (parent_out_arc == petri::iterator()) {}
+			this->erase_arc(parent_out_arc);
+			this->mark_modified();
+
+			//TODO: careful, don't duplicate the MARKING on this one
+			petri::iterator duplicate_node = this->copy(node);
+			this->connect(*parent, duplicate_node);
+
+			for (const petri::iterator &child : children) {
+				petri::iterator duplicate_child = this->copy(child);
+				this->connect(duplicate_node, duplicate_child);
+				this->connect(duplicate_child, out_cousin);
+			}
+		}
+
+		return out_cousin;
+	}
+
+	virtual std::vector<std::vector<size_t>> split_dominance() { return vector<vector<size_t>>(); }
+};
 }
