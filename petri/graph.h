@@ -6,6 +6,7 @@
 #include <common/message.h>
 #include <common/text.h>
 #include <common/index_vector.h>
+#include <common/mapping.h>
 
 #include "state.h"
 #include "iterator.h"
@@ -2040,8 +2041,8 @@ struct graph
 		return s0;
 	}
 
-	virtual mapping merge(const graph<place, transition, token, state> &g) {
-		mapping result;
+	virtual Mapping<petri::iterator> merge(const graph<place, transition, token, state> &g) {
+		Mapping<petri::iterator> result(petri::iterator(), false);
 		for (int i = 0; i < (int)g.places.size(); i++) {
 			if (g.places.is_valid(i)) {
 				result.set(petri::iterator(place::type, i), create(g.places[i]));
