@@ -1717,10 +1717,10 @@ struct graph
 
 			if (right[i].type == place::type) {
 				for (int j = 0; j < (int)reset.size(); j++) {
-					for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
+					for (int k = (int)reset[j].tokens.size()-1; k >= 0; k--) {
 						if (reset[j].tokens[k].index == right[i].index) {
-							reset[j].tokens.push_back(reset[j].tokens[k]);
-							reset[j].tokens.back().index = left[i].index;
+							//reset[j].tokens.push_back(reset[j].tokens[k]);
+							reset[j].tokens[k].index = left[i].index;
 						}
 					}
 				}
@@ -2107,14 +2107,14 @@ struct graph
 	//
 	// Returns whether any reductions were successfully performed
 	virtual bool reduce(bool proper_nesting = true, bool aggressive = false, bool debug = false) {
-		if (debug) cout << "starting petri::reduce()" << endl;
+		if (debug) cout << "starting petri::reduce() at " << places.count() << " places and " << transitions.count() << " transitions" << endl;
 
 		bool result = false;
 		bool change = true;
 		while (change) {
 			change = false;
 
-			if (debug) cout << "reducing from " << places.size() << " places and " << transitions.size() << " transitions" << endl;
+			if (debug) cout << "reducing from " << places.count() << " places and " << transitions.count() << " transitions" << endl;
 
 			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; ) {
 				if (not is_valid(i)) {
@@ -2313,7 +2313,7 @@ struct graph
 			result = (result or change);
 		}
 
-		if (debug) cout << "ending petri::reduce()" << endl;
+		if (debug) cout << "ending petri::reduce() at " << places.count() << " places and " << transitions.count() << " transitions" << endl;
 
 		return result;
 	}
