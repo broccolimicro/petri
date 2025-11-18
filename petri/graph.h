@@ -2144,7 +2144,7 @@ struct graph
 	}
 
 	// TODO(edward.bingham) I need to find vacuous loops and simplify them
-	virtual bool eraseVacuousLoops() {
+	virtual bool remove_vacuous_loops() {
 		if (reset.empty()) {
 			return false;
 		}
@@ -2213,6 +2213,167 @@ struct graph
 		}
 		return not result.empty();
 	}
+
+	virtual bool remove_infeasible(bool debug=false) {
+		bool affect = false;
+
+		// A transition will never be enabled if it is infeasible.
+		// These transitions may be removed while preserving proper nesting, token flow
+		// stability, non interference, and deadlock freedom. At this point, it is not
+		// possible for this transition to be in the source list.
+		for (petri::iterator i(transition::type, 0); i < (int)transitions.size(); i++) {
+			if (not is_valid(i)) continue;
+
+			if (transitions[i.index].is_infeasible()) {
+				if (debug) cout << "\terasing infeasible transition " << i << endl;
+				erase(i);
+				affect = true;
+				continue;
+			}
+
+			vector<petri::iterator> n = next(i, true);
+			vector<petri::iterator> p = prev(i, true);
+
+			// If it doesn't have any input places, then we need to add one.
+			if (p.empty()) {
+				if (debug) cout << "\tno input places for " << i << ", adding one" << endl;
+				p.push_back(create(place::type));
+				connect(p, i);
+				affect = true;
+			}
+
+			// If it doesn't have any output places, then we need to add one.
+			if (n.empty()) {
+				if (debug) cout << "\tno output places for " << i << ", adding one" << endl;
+				n.push_back(create(place::type));
+				connect(i, n);
+				affect = true;
+			}
+		}
+
+		// We know a place will never be marked if it is not in the initial marking
+		// and it has no input arcs. This means that its output transitions will
+		// never fire.
+		for (petri::iterator i(place::type, 0); i < (int)places.size(); i++) {
+			if (not is_valid(i)) continue;
+
+			vector<petri::iterator> n = next(i, true);
+			vector<petri::iterator> p = prev(i, true);
+
+			if (p.empty() and (n.empty() or not is_reset(i))) {
+				if (debug) cout << "\terasing place with no input arcs " << i << " -> " << to_string(n) << endl;
+				erase(n);
+				erase(i);
+				affect = true;
+			}
+		}
+
+		return affect;
+	}
+
+	// Vacuous transitions may be pinched while preserving token flow, stability,
+	// non interference, and deadlock freedom. However, proper nesting is not
+	// necessarily preserved. We have to take special precautions if we want to
+	// preserver proper nesting.
+	virtual bool pinch_vacuous(bool proper_nesting=true, bool debug=false) {
+		bool affect = false;
+		for (petri::iterator i(transition::type, 0); i < (int)transitions.size(); i++) {
+			if (not is_valid(i) or not transitions[i.index].is_vacuous()) {
+				continue;
+			}
+
+			vector<petri::iterator> n = next(i, true);
+			vector<petri::iterator> p = prev(i, true);
+			vector<petri::iterator> np = next(p, true);
+			vector<petri::iterator> pn = prev(n, true);
+			vector<petri::iterator> nn = next(n, true);
+			vector<petri::iterator> pp = prev(p, true);
+
+			vector<petri::iterator> c0 = ::vector_intersection(np, pn);
+			vector<petri::iterator> c1 = ::vector_intersection(nn, pp);
+			c0.insert(c0.end(), c1.begin(), c1.end());
+			bool loop = false;
+			for (auto j = c0.begin(); j != c0.end() and not loop; j++) {
+				loop = *j != i;
+			}
+			if (loop) {
+				continue;
+			}
+			
+			if (not proper_nesting
+				or (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1))
+				or (n.size() == 1 and nn.size() == 1 and next(np).size() == 1 and np.size() == 1)
+				or (p.size() == 1 and pp.size() == 1 and prev(pn).size() == 1 and pn.size() == 1)) {
+				if (debug) cout << "\tpinching vacuous transition " << i << endl;
+				pinch(i);
+				affect = true;
+			}
+		}
+		return affect;
+	}
+
+	virtual bool compose_internal(bool aggressive=false, bool debug=false) {
+		bool affect = false;
+		// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
+		for (petri::iterator i(transition::type, 0); i < (int)transitions.size(); i++) {
+			if (not is_valid(i)) continue;
+
+			vector<petri::iterator> ni = next(i, true);
+			vector<petri::iterator> pi = prev(i, true);
+
+			vector<array<vector<petri::iterator>, 2> > nix, pix;
+			for (auto k = ni.begin(); k != ni.end(); k++) {
+				nix.push_back({prev(*k, true), next(*k, true)});
+			}
+			for (auto k = pi.begin(); k != pi.end(); k++) {
+				pix.push_back({prev(*k, true), next(*k, true)});
+			}
+
+			for (petri::iterator j = i-1; j >= 0; j--) {
+				if (not is_valid(j)) continue;
+
+				vector<petri::iterator> nj = next(j, true);
+				vector<petri::iterator> pj = prev(j, true);
+
+				// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
+				// share all of the same input and output places.
+				if (nj == ni and pj == pi and (aggressive
+						or (transitions[i.index].is_vacuous() and transitions[j.index].is_vacuous()))) {
+					if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
+					transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
+					erase(i);
+					affect = true;
+					break;
+				}
+
+				vector<array<vector<petri::iterator>, 2> > njx, pjx;
+				for (auto k = nj.begin(); k != nj.end(); k++) {
+					njx.push_back({prev(*k, true), next(*k, true)});
+				}
+				for (auto k = pj.begin(); k != pj.end(); k++) {
+					pjx.push_back({prev(*k, true), next(*k, true)});
+				}
+
+				// Find internally parallel transitions. A pair of transitions A and B are internally parallel if
+				// they are the same type, have disjoint sets of input and output places that share a single input
+				// or output transition and have no output or input transitions other than A or B.
+				if (vector_intersection_size(ni, nj) == 0
+					and vector_intersection_size(pi, pj) == 0
+					and nix == njx and pix == pjx
+					and (aggressive
+						or (transitions[i.index].is_vacuous() or transitions[j.index].is_vacuous()))) {
+					if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
+					transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
+					erase(i);
+					erase(ni);
+					erase(pi);
+					affect = true;
+					break;
+				}
+			}
+		}
+		return affect;
+	}
 	
 	// reduce() simplifies the petri net while preserving functional
 	// correctness
@@ -2238,83 +2399,9 @@ struct graph
 
 			if (debug) cout << "reducing from " << places.count() << " places and " << transitions.count() << " transitions" << endl;
 
-			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() && !change; ) {
-				if (not is_valid(i)) {
-					i++;
-					continue;
-				}
-
-				vector<petri::iterator> n = next(i, true);
-				vector<petri::iterator> p = prev(i, true);
-
-				bool affect = false;
-				// If it doesn't have any input places, then we need to add one.
-				if (!affect && p.size() == 0) {
-					if (debug) cout << "\tno input places for " << i << ", adding one" << endl;
-					p.push_back(create(place::type));
-					connect(p, i);
-					affect = true;
-				}
-
-				// If it doesn't have any output places, then we need to add one.
-				if (!affect && n.size() == 0) {
-					if (debug) cout << "\tno output places for " << i << ", adding one" << endl;
-					n.push_back(create(place::type));
-					connect(i, n);
-					affect = true;
-				}
-
-				// A transition will never be enabled if it is infeasible.
-				// These transitions may be removed while preserving proper nesting, token flow
-				// stability, non interference, and deadlock freedom. At this point, it is not
-				// possible for this transition to be in the source list.
-				if (!affect and transitions[i.index].is_infeasible()) {
-					if (debug) cout << "\terasing infeasible transition " << i << endl;
-					erase(i);
-					affect = true;
-				}
-
-				// Vacuous transitions may be pinched while preserving token flow,
-				// stability, non interference, and deadlock freedom. However, proper nesting is not necessarily
-				// preserved. We have to take special precautions if we want to preserver proper nesting.
-				if (!affect and transitions[i.index].is_vacuous()) {
-					vector<petri::iterator> np = next(p, true);
-					vector<petri::iterator> pn = prev(n, true);
-					vector<petri::iterator> nn = next(n, true);
-					vector<petri::iterator> pp = prev(p, true);
-
-					vector<petri::iterator> c0 = ::vector_intersection(np, pn);
-					vector<petri::iterator> c1 = ::vector_intersection(nn, pp);
-					c0.insert(c0.end(), c1.begin(), c1.end());
-					bool loop = false;
-					for (auto j = c0.begin(); j != c0.end() and not loop; j++) {
-						loop = *j != i;
-					}
-					
-					if (not loop) {
-						if (!proper_nesting) {
-							if (debug) cout << "\tpinching vacuous transition (proper) " << i << endl;
-							pinch(i);
-							affect = true;
-						} else if (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1)) {
-							if (debug) cout << "\tpinching vacuous transition " << i << endl;
-							pinch(i);
-							affect = true;
-						} else if ((n.size() == 1 and nn.size() == 1 and next(np).size() == 1 and np.size() == 1) or
-							(p.size() == 1 and pp.size() == 1 and prev(pn).size() == 1 and pn.size() == 1)) {
-							if (debug) cout << "\tpinching vacuous transition " << i << endl;
-							pinch(i);
-							affect = true;
-						}
-					}
-				}
-
-				if (!affect) {
-					i++;
-				} else {
-					change = true;
-				}
-			}
+			change = remove_infeasible(debug) or change;
+			change = pinch_vacuous(proper_nesting, debug) or change;
+			
 
 			for (petri::iterator i(place::type, 0); i < (int)places.size() and not change; ) {
 				if (not is_valid(i)) {
@@ -2328,15 +2415,6 @@ struct graph
 				vector<petri::iterator> p = prev(i, true);
 
 				bool affect = false;
-
-				// We know a place will never be marked if it is not in the initial marking and it has no input arcs.
-				// This means that its output transitions will never fire.
-				if (p.size() == 0 and (not i_is_reset or n.size() == 0)) {
-					if (debug) cout << "\terasing place with no input arcs " << i << " -> " << to_string(n) << endl;
-					erase(n);
-					erase(i);
-					affect = true;
-				}
 
 				// Check to see if there are any excess places whose existence doesn't affect the behavior of the circuit
 				for (petri::iterator j = i+1; j < (int)places.size(); ) {
@@ -2365,58 +2443,9 @@ struct graph
 				}
 			}
 
-			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
-			vector<vector<petri::iterator> > n(transitions.size()), p(transitions.size());
-			vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx(transitions.size()), px(transitions.size());
-
-			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() and not change; i++) {
-				if (not is_valid(i)) continue;
-
-				n[i.index] = next(i, true);
-				p[i.index] = prev(i, true);
-
-				for (int j = 0; j < (int)n[i.index].size(); j++) {
-					nx[i.index].push_back({prev(n[i.index][j], true), next(n[i.index][j], true)});
-				}
-				for (int j = 0; j < (int)p[i.index].size(); j++) {
-					px[i.index].push_back({prev(p[i.index][j], true), next(p[i.index][j], true)});
-				}
-
-				for (petri::iterator j = i-1; j >= 0 and not change; j--) {
-					if (not is_valid(j)) continue;
-
-					// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
-					// share all of the same input and output places.
-					if (n[j.index] == n[i.index] and p[j.index] == p[i.index] and (aggressive or (transitions[i.index].is_vacuous() and transitions[j.index].is_vacuous()))) {
-						if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
-						transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
-						erase(i);
-						change = true;
-					}
-
-					// Find internally parallel transitions. A pair of transitions A and B are internally parallel if
-					// they are the same type, have disjoint sets of input and output places that share a single input
-					// or output transition and have no output or input transitions other than A or B.
-					else if (vector_intersection_size(n[i.index], n[j.index]) == 0
-						and vector_intersection_size(p[i.index], p[j.index]) == 0
-						and nx[i.index] == nx[j.index] and px[i.index] == px[j.index] and (aggressive or (transitions[i.index].is_vacuous() or transitions[j.index].is_vacuous()))) {
-						if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
-						transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
-						vector<petri::iterator> tocut;
-						tocut.push_back(i);
-						tocut.insert(tocut.end(), n[i.index].begin(), n[i.index].end());
-						tocut.insert(tocut.end(), p[i.index].begin(), p[i.index].end());
-						erase(tocut);
-						change = true;
-					}
-				}
-			}
-
-			if (not change) {
-				change = eraseVacuousLoops();
-			}
-
-			result = (result or change);
+			change = compose_internal(aggressive, debug) or change;
+			change = remove_vacuous_loops() or change;
+			result = result or change;
 		}
 
 		if (debug) cout << "ending petri::reduce() at " << places.count() << " places and " << transitions.count() << " transitions" << endl;
