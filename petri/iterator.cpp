@@ -904,6 +904,45 @@ ostream &operator<<(ostream &os, strand r0) {
 	return os;
 }
 
+vector<petri::iterator> find_first_shared(const strand &s0, const strand &s1) {
+	vector<petri::iterator> result;
+	for (size_t i = 0; i < s0.size(); i++) {
+		if (s1.contains(s0[i])) {
+			result.push_back(s0[i]);
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < s1.size(); i++) {
+		if (not result.empty() and s1[i] == result.back()) {
+			break;
+		} else if (s0.contains(s1[i])) {
+			result.push_back(s1[i]);
+			break;
+		}
+	}
+	return result;
+}
+
+vector<petri::iterator> find_last_shared(const strand &s0, const strand &s1) {
+	vector<petri::iterator> result;
+	for (int i = (int)s0.size()-1; i >= 0; i--) {
+		if (s1.contains(s0[i])) {
+			result.push_back(s0[i]);
+			break;
+		}
+	}
+
+	for (int i = (int)s1.size()-1; i >= 0; i--) {
+		if (not result.empty() and s1[i] == result.back()) {
+			break;
+		} else if (s0.contains(s1[i])) {
+			result.push_back(s1[i]);
+			break;
+		}
+	}
+	return result;
+}
 
 }
 

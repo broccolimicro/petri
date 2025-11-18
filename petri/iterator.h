@@ -274,5 +274,7 @@ struct strand {
 
 ostream &operator<<(ostream &os, strand r0);
 
+vector<petri::iterator> find_first_shared(const strand &s0, const strand &s1);
+vector<petri::iterator> find_last_shared(const strand &s0, const strand &s1);
 
 }

@@ -2098,7 +2098,7 @@ struct graph
 		}
 
 		sort(curr.begin(), curr.end());
-		curr.resize(unique(curr.begin(), curr.end()) - curr.begin());
+		curr.erase(unique(curr.begin(), curr.end()), curr.end());
 
 		while (curr.size() > 0) {
 			strand x = curr.back();
@@ -2374,6 +2374,133 @@ struct graph
 		}
 		return affect;
 	}
+
+	vector<strand> compute_strands(set<petri::iterator> from, set<petri::iterator> to, set<petri::iterator> excl=set<petri::iterator>()) {
+		vector<strand> stack;
+		for (auto i = from.begin(); i != from.end(); i++) {
+			stack.push_back(strand({*i}));
+		}
+
+		vector<strand> result;
+		while (not stack.empty()) {
+			strand curr = stack.back();
+			stack.pop_back();
+			if (excl.find(curr.back()) != excl.end()) {
+				continue;
+			} else if (to.find(curr.back()) != to.end()) {
+				result.push_back(curr);
+				continue;
+			}
+
+			vector<petri::iterator> n = next(curr.back());
+			for (auto i = n.begin(); i != n.end(); i++) {
+				if (not curr.contains(*i) and from.find(*i) == from.end()) {
+					stack.push_back(curr);
+					stack.back().push_back(*i);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	bool is_redundant(petri::iterator r) const {
+		// TODO(edward.bingham) check reset
+
+		vector<petri::iterator> from = prev(r, true), to = next(r, true);
+		vector<strand> strands = compute_strands(
+			set(from.begin(), from.end()),
+			set(to.begin(), to.end()),
+			{r});
+
+		// check sequencing constraint
+		if (strands.empty()) {
+			return false;
+		}
+
+		vector<array<petri::iterator, 2> > bounds;
+		for (auto i = strands.begin(); i != strands.end(); i++) {
+			bounds.push_back({i->nodes[0], i->nodes.back()});
+		}
+		sort(bounds.begin(), bounds.end());
+		bounds.erase(unique(bounds.begin(), bounds.end()), bounds.end());
+		if (bounds.size() != from.size()*to.size()) {
+			return false;
+		}
+		bounds.clear();
+
+		// check condition constraint
+		for (auto i = strands.begin(); i != strands.end(); i++) {
+			for (auto j = std::next(i); j != strands.end(); j++) {
+				if (i->back() != j->back()) {
+					bool found = false;
+					vector<petri::iterator> shared = find_last_shared(*i, *j);
+					for (auto k = shared.begin(); k != shared.end() and not found; k++) {
+						if (k->type == r.type) {
+							found = true;
+						}
+					}
+					if (not found) {
+						continue;
+					}
+					
+					if (i->back() < j->back()) {
+						bounds.push_back({i->back(), j->back()});
+					} else {
+						bounds.push_back({j->back(), i->back()});
+					}
+				}
+			}
+		}
+		sort(bounds.begin(), bounds.end());
+		bounds.erase(unique(bounds.begin(), bounds.end()), bounds.end());
+		if (bounds.size() != to.size()*(to.size()-1)) {
+			return false;
+		}
+
+		for (auto i = strands.begin(); i != strands.end(); i++) {
+			for (auto j = std::next(i); j != strands.end(); j++) {
+				if (i->nodes[0] != j->nodes[0]) {
+					bool found = false;
+					vector<petri::iterator> shared = find_first_shared(*i, *j);
+					for (auto k = shared.begin(); k != shared.end() and not found; k++) {
+						if (k->type == r.type) {
+							found = true;
+						}
+					}
+					if (not found) {
+						continue;
+					}
+
+					if (i->nodes[0] < j->nodes[0]) {
+						bounds.push_back({i->nodes[0], j->nodes[0]});
+					} else {
+						bounds.push_back({j->nodes[0], i->nodes[0]});
+					}
+				}
+			}
+		}
+		sort(bounds.begin(), bounds.end());
+		bounds.erase(unique(bounds.begin(), bounds.end()), bounds.end());
+		if (bounds.size() != from.size()*(from.size()-1)) {
+			return false;
+		}
+		return true;
+	}
+
+	virtual bool remove_redundant() {
+		bool affect = false;
+		for (petri::iterator i(place::type, 0); i < (int)places.size(); i++) {
+			if (not is_valid(i)) continue;
+
+			if (is_redundant(i)) {
+				erase(i);
+				affect = true;
+			}
+		}
+
+		return affect;
+	}
 	
 	// reduce() simplifies the petri net while preserving functional
 	// correctness
@@ -2401,48 +2528,7 @@ struct graph
 
 			change = remove_infeasible(debug) or change;
 			change = pinch_vacuous(proper_nesting, debug) or change;
-			
-
-			for (petri::iterator i(place::type, 0); i < (int)places.size() and not change; ) {
-				if (not is_valid(i)) {
-					i++;
-					continue;
-				}
-
-				bool i_is_reset = is_reset(i);
-
-				vector<petri::iterator> n = next(i, true);
-				vector<petri::iterator> p = prev(i, true);
-
-				bool affect = false;
-
-				// Check to see if there are any excess places whose existence doesn't affect the behavior of the circuit
-				for (petri::iterator j = i+1; j < (int)places.size(); ) {
-					if (not is_valid(j)) {
-						j++;
-						continue;
-					}
-					bool j_is_reset = is_reset(j);
-
-					vector<petri::iterator> n2 = next(j, true);
-					vector<petri::iterator> p2 = prev(j, true);
-
-					if (n == n2 and p == p2 and i_is_reset == j_is_reset) {
-						if (debug) cout << "\terasing redundant place " << j << endl;
-						erase(j);
-						affect = true;
-					} else {
-						j++;
-					}
-				}
-
-				if (!affect) {
-					i++;
-				} else {
-					change = true;
-				}
-			}
-
+			change = remove_redundant() or change;
 			change = compose_internal(aggressive, debug) or change;
 			change = remove_vacuous_loops() or change;
 			result = result or change;
