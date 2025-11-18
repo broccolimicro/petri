@@ -1756,6 +1756,7 @@ struct graph
 		}
 		if (sorted) {
 			sort(result.begin(), result.end());
+			result.erase(unique(result.begin(), result.end()), result.end());
 		}
 		return result;
 	}
@@ -1768,6 +1769,7 @@ struct graph
 		}
 		if (sorted) {
 			sort(result.begin(), result.end());
+			result.erase(unique(result.begin(), result.end()), result.end());
 		}
 		return result;
 	}
@@ -1781,6 +1783,7 @@ struct graph
 		}
 		if (sorted) {
 			sort(result.begin(), result.end());
+			result.erase(unique(result.begin(), result.end()), result.end());
 		}
 		return result;
 	}
@@ -1793,6 +1796,7 @@ struct graph
 		}
 		if (sorted) {
 			sort(result.begin(), result.end());
+			result.erase(unique(result.begin(), result.end()), result.end());
 		}
 		return result;
 	}
@@ -3278,14 +3282,6 @@ struct graph
 		sort(p.begin(), p.end());
 		p.erase(unique(p.begin(), p.end()), p.end());
 		return p;
-	}
-
-	virtual void erase_redundant() {
-		for (auto i = rbegin(place::type); i != rend(place::type); i--) {
-			if (is_valid(i) and is_redundant(i)) {
-				//erase(i);
-			}
-		}
 	}
 
 	virtual bool crosses_reset(vector<petri::iterator> pos) {
