@@ -219,7 +219,23 @@ struct graph
 		int result = std::numeric_limits<int>::min();
 		for (int i = 0; i < (int)from.size(); i++) {
 			for (int j = 0; j < (int)to.size(); j++) {
-				result = max(result, distance(from[i], to[j]));
+				int d = distance(from[i], to[j]);
+				if (d >= 0 and d > result) {
+					result = d;
+				}
+			}
+		}
+		return result;
+	}
+
+	virtual int min_distance(vector<petri::iterator> from, vector<petri::iterator> to) const {
+		int result = std::numeric_limits<int>::max();
+		for (int i = 0; i < (int)from.size(); i++) {
+			for (int j = 0; j < (int)to.size(); j++) {
+				int d = distance(from[i], to[j]);
+				if (d >= 0 and d < result) {
+					result = d;
+				}
 			}
 		}
 		return result;
@@ -2062,9 +2078,9 @@ struct graph
 	}
 
 	// Do a depth first search to find all cycles in the graph from the starting node
-	virtual vector<vector<petri::iterator> > cycles(vector<petri::iterator> from) const {
-		vector<vector<petri::iterator> > curr;
-		vector<vector<petri::iterator> > result;
+	virtual vector<strand> cycles(vector<petri::iterator> from, bool sorted=false) const {
+		vector<strand> curr;
+		vector<strand> result;
 		for (auto i = from.begin(); i != from.end(); i++) {
 			curr.push_back({*i});
 		}
@@ -2073,7 +2089,7 @@ struct graph
 		curr.resize(unique(curr.begin(), curr.end()) - curr.begin());
 
 		while (curr.size() > 0) {
-			vector<petri::iterator> x = curr.back();
+			strand x = curr.back();
 			curr.pop_back();
 
 			vector<petri::iterator> n = next(x.back());
@@ -2081,7 +2097,7 @@ struct graph
 				vector<petri::iterator>::iterator loopback = find(x.begin(), x.end(), n[j]);
 				if (loopback != x.end()) {
 					result.push_back(x);
-					result.back().erase(result.back().begin(), result.back().begin() + (loopback - x.begin()));
+					result.back().nodes.erase(result.back().begin(), result.back().begin() + (loopback - x.begin()));
 				} else {
 					curr.push_back(x);
 					curr.back().push_back(n[j]);
@@ -2089,7 +2105,101 @@ struct graph
 			}
 		}
 
+		if (sorted) {
+			for (auto i = result.begin(); i != result.end(); i++) {
+				i->sort();
+			}
+			sort(result.begin(), result.end());
+		}
+
 		return result;
+	}
+
+	petri::region regionFromState(const state &s) const {
+		petri::region result;
+		for (auto t = s.tokens.begin(); t != s.tokens.end(); t++) {
+			result.push_back(petri::iterator(place::type, t->index));
+		}
+		return result;
+	}
+
+	petri::bound boundFromStates(const vector<state> &s) const {
+		petri::bound result;
+		for (auto t = s.begin(); t != s.end(); t++) {
+			result.push_back(regionFromState(*t));
+		}
+		return result;
+	}
+
+	// TODO(edward.bingham) I need to find vacuous loops and simplify them
+	virtual bool eraseVacuousLoops() {
+		if (reset.empty()) {
+			return false;
+		}
+
+		vector<strand> complete = cycles(regionFromState(reset[0]).nodes, true);
+		vector<strand> partial;
+
+		if (complete.empty()) {
+			return false;
+		}
+
+		// a loop is only vacuous if it exists in all reset states.
+		for (size_t i = 1; i < reset.size(); i++) {
+			vector<strand> newLoops = cycles(regionFromState(reset[i]).nodes, true);
+
+			size_t j, k;
+			for (j = 0, k = 0; j < complete.size() and k < newLoops.size();) {
+				if (complete[j] < newLoops[k]) {
+					partial.push_back(complete[j]);
+					complete.erase(complete.begin()+j);
+				} else if (newLoops[k] < complete[j]) {
+					partial.push_back(newLoops[k]);
+					k++;
+				} else {
+					j++;
+					k++;
+				}
+			}
+			partial.insert(partial.end(), complete.begin()+j, complete.end());
+			complete.erase(complete.begin()+j, complete.end());
+			partial.insert(partial.end(), newLoops.begin()+k, newLoops.end());
+			
+			sort(partial.begin(), partial.end());
+			partial.erase(unique(partial.begin(), partial.end()), partial.end());
+
+			if (complete.empty()) {
+				return false;
+			}
+		}
+
+		// look at all complete that are shared across all reset states for which
+		// all transitions are vacuous.
+		std::set<petri::iterator> vacuousNodes;
+		std::set<petri::iterator> activeNodes;
+		for (auto i = partial.begin(); i != partial.end(); i++) {
+			activeNodes.insert(i->begin(), i->end());
+		}
+		for (auto i = complete.begin(); i != complete.end(); i++) {
+			bool isVacuous = true;
+			for (auto j = i->begin(); j != i->end() and isVacuous; j++) {
+				isVacuous = isVacuous and (j->type == place::type or transitions[j->index].is_vacuous());
+			}
+
+			if (isVacuous) {
+				vacuousNodes.insert(i->begin(), i->end());
+			} else {
+				activeNodes.insert(i->begin(), i->end());
+			}
+		}
+
+		// Remove any nodes that don't exist in complete that are not vacuous.
+		std::set<petri::iterator> result;
+		std::set_difference(vacuousNodes.begin(), vacuousNodes.end(), activeNodes.begin(), activeNodes.end(), std::inserter(result, result.end()));
+		for (auto i = result.begin(); i != result.end(); i++) {
+			erase(*i);
+		}
+		return not result.empty();
 	}
 	
 	// reduce() simplifies the petri net while preserving functional
@@ -2159,30 +2269,38 @@ struct graph
 				// stability, non interference, and deadlock freedom. However, proper nesting is not necessarily
 				// preserved. We have to take special precautions if we want to preserver proper nesting.
 				if (!affect and transitions[i.index].is_vacuous()) {
-					if (!proper_nesting) {
-						if (debug) cout << "\tpinching vacuous transition (proper) " << i << endl;
-						pinch(i);
-						affect = true;
-					} else {
-						vector<petri::iterator> np = next(p);
-						vector<petri::iterator> pn = prev(n);
+					vector<petri::iterator> np = next(p);
+					vector<petri::iterator> pn = prev(n);
+					vector<petri::iterator> nn = next(n);
+					vector<petri::iterator> pp = prev(p);
 
-						if (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1)) {
+					sort(np.begin(), np.end());
+					sort(pn.begin(), pn.end());
+					sort(nn.begin(), nn.end());
+					sort(pp.begin(), pp.end());
+
+					vector<petri::iterator> c0 = ::vector_intersection(np, pn);
+					vector<petri::iterator> c1 = ::vector_intersection(nn, pp);
+					c0.insert(c0.end(), c1.begin(), c1.end());
+					bool loop = false;
+					for (auto j = c0.begin(); j != c0.end() and not loop; j++) {
+						loop = *j != i;
+					}
+					
+					if (not loop) {
+						if (!proper_nesting) {
+							if (debug) cout << "\tpinching vacuous transition (proper) " << i << endl;
+							pinch(i);
+							affect = true;
+						} else if (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1)) {
 							if (debug) cout << "\tpinching vacuous transition " << i << endl;
 							pinch(i);
 							affect = true;
-						} else {
-							vector<petri::iterator> nn = next(n);
-							vector<petri::iterator> nnp = next(np);
-							vector<petri::iterator> pp = prev(p);
-							vector<petri::iterator> ppn = prev(pn);
-
-							if ((n.size() == 1 and nn.size() == 1 and nnp.size() == 1 and np.size() == 1) or
-								(p.size() == 1 and pp.size() == 1 and ppn.size() == 1 and pn.size() == 1)) {
-								if (debug) cout << "\tpinching vacuous transition " << i << endl;
-								pinch(i);
-								affect = true;
-							}
+						} else if ((n.size() == 1 and nn.size() == 1 and next(np).size() == 1 and np.size() == 1) or
+							(p.size() == 1 and pp.size() == 1 and prev(pn).size() == 1 and pn.size() == 1)) {
+							if (debug) cout << "\tpinching vacuous transition " << i << endl;
+							pinch(i);
+							affect = true;
 						}
 					}
 				}
@@ -2308,6 +2426,10 @@ struct graph
 						}
 					}
 				}
+			}
+
+			if (not change) {
+				change = eraseVacuousLoops();
 			}
 
 			result = (result or change);

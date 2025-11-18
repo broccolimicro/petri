@@ -683,5 +683,227 @@ ostream &operator<<(ostream &os, segment s0) {
 	return os;
 }
 
+strand::strand() {
+}
+
+strand::strand(std::initializer_list<petri::iterator> nodes) : nodes(nodes) {
+}
+
+strand::~strand() {
+}
+
+strand strand::from_nodes(vector<petri::iterator> nodes) {
+	strand result;
+	result.nodes = nodes;
+	return result;
+}
+
+petri::iterator &strand::operator[](int i) {
+	return nodes[i];
+}
+
+petri::iterator strand::operator[](int i) const {
+	return nodes[i];
+}
+
+bool strand::empty() const {
+	return nodes.empty();
+}
+
+size_t strand::size() const {
+	return nodes.size();
+}
+
+void strand::clear() {
+	nodes.clear();
+}
+
+vector<petri::iterator>::iterator strand::begin() {
+	return nodes.begin();
+}
+
+vector<petri::iterator>::iterator strand::end() {
+	return nodes.end();
+}
+
+vector<petri::iterator>::const_iterator strand::begin() const {
+	return nodes.begin();
+}
+
+vector<petri::iterator>::const_iterator strand::end() const {
+	return nodes.end();
+}
+
+void strand::sort() {
+	std::sort(nodes.begin(), nodes.end());
+	nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
+}
+
+void strand::rsort() {
+	std::sort(nodes.begin(), nodes.end());
+	nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
+	reverse(nodes.begin(), nodes.end());
+}
+
+void strand::push_back(petri::iterator s) {
+	nodes.push_back(s);
+}
+
+petri::iterator strand::pop_back() {
+	petri::iterator result = nodes.back();
+	nodes.pop_back();
+	return result;
+}
+
+petri::iterator &strand::back() {
+	return nodes.back();
+}
+
+petri::iterator strand::back() const {
+	return nodes.back();
+}
+
+void strand::insert(vector<petri::iterator>::iterator at, petri::iterator s) {
+	nodes.insert(at, s);
+}
+
+void strand::append(strand r0) {
+	nodes.insert(nodes.end(), r0.begin(), r0.end());
+}
+
+vector<petri::iterator>::iterator strand::find(petri::iterator i) {
+	return std::find(nodes.begin(), nodes.end(), i);
+}
+
+vector<petri::iterator>::const_iterator strand::find(petri::iterator i) const {
+	return std::find(nodes.begin(), nodes.end(), i);
+}
+
+bool strand::contains(petri::iterator i) const {
+	return std::find(nodes.begin(), nodes.end(), i) != nodes.end();
+}
+
+bool strand::contains(strand r0) const {
+	for (auto i = r0.begin(); i != r0.end(); i++) {
+		if (not contains(*i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool strand::erase(petri::iterator i) {
+	bool found = false;
+	for (int j = (int)nodes.size()-1; j >= 0; j--) {
+		if (nodes[j].type == i.type and nodes[j].index > i.index) {
+			nodes[j].index--;
+		} else if (nodes[j] == i) {
+			nodes.erase(nodes.begin()+j);
+			found = true;
+		}
+	}
+	return found;
+}
+
+bool strand::erase(strand r0, bool rsorted) {
+	if (not rsorted) {
+		r0.rsort();
+	}
+
+	bool found = false;
+	for (auto j = r0.begin(); j != r0.end(); j++) {
+		found = erase(*j) or found;
+	}
+	return found;
+}
+
+bool strand::remap(strand from, strand to, bool rsorted) {
+	if (erase(from, rsorted)) {
+		compose(to);
+		return true;
+	}
+	return false;
+}
+
+strand &strand::compose(strand r0) {
+	nodes.insert(nodes.end(), r0.begin(), r0.end());
+	std::sort(nodes.begin(), nodes.end());
+	nodes.erase(unique(nodes.begin(), nodes.end()), nodes.end());
+	return *this;
+}
+
+vector<petri::iterator> strand::flat() const {
+	return nodes;
+}
+
+bool strand::operator==(strand r0) const {
+	if (nodes.size() != r0.nodes.size()) {
+		return false;
+	}
+	for (int i = 0; i < (int)nodes.size(); i++) {
+		if (nodes[i] != r0.nodes[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool strand::operator!=(strand r0) const {
+	return not (*this == r0);
+}
+
+bool strand::operator<(strand r0) const {
+	int m = (int)min(nodes.size(), r0.nodes.size());
+	for (int i = 0; i < m; i++) {
+		if (nodes[i] != r0.nodes[i]) {
+			return nodes[i] < r0.nodes[i];
+		}
+	}
+	return (nodes.size() < r0.nodes.size());
+}
+
+bool strand::operator>(strand r0) const {
+	return not (*this <= r0);
+}
+
+bool strand::operator<=(strand r0) const {
+	int m = (int)min(nodes.size(), r0.nodes.size());
+	for (int i = 0; i < m; i++) {
+		if (nodes[i] != r0.nodes[i]) {
+			return nodes[i] < r0.nodes[i];
+		}
+	}
+	return (nodes.size() <= r0.nodes.size());
+}
+
+bool strand::operator>=(strand r0) const {
+	return not (*this < r0);
+}
+
+string strand::to_string() const {
+	string result = "(";
+	for (auto i = nodes.begin(); i != nodes.end(); i++) {
+		if (i != nodes.begin()) {
+			result += ", ";
+		}
+		result += i->to_string();
+	}
+	result += ")";
+	return result;
+}
+
+ostream &operator<<(ostream &os, strand r0) {
+	os << "(";
+	for (auto i = r0.nodes.begin(); i != r0.nodes.end(); i++) {
+		if (i != r0.nodes.begin()) {
+			os << ", ";
+		}
+		os << *i;
+	}
+	os << ")";
+	return os;
+}
+
+
 }
 
