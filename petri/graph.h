@@ -371,7 +371,7 @@ struct graph
 				return true;
 			}
 		}
-		
+
 		return false;
 	}
 
@@ -501,7 +501,7 @@ struct graph
 					}
 				}
 			}
-			
+
 			//cout << "enabled: " << ::to_string(enabled) << endl;
 			//cout << "blocked: " << ::to_string(blocked) << endl;
 
@@ -566,11 +566,11 @@ struct graph
 
 		sort(frontier.begin(), frontier.end());
 		frontier.erase(unique(frontier.begin(), frontier.end()), frontier.end());
-	
+
 		//cout << ::to_string(frontier) << endl;
 		//print();
 		//cout << endl << endl;
-	
+
 		// reverse iteration step: walk backward from the identified recursion
 		// points and delete back to the last encountered merge
 
@@ -580,7 +580,7 @@ struct graph
 		while (not todo.empty()) {
 			petri::iterator curr = todo.back();
 			todo.pop_back();
-		
+
 			bool found = false;	
 			vector<split_group> *cgroups = split_groups_iter(composition, curr);
 			if (cgroups != nullptr) {
@@ -937,7 +937,7 @@ struct graph
 		if (n.type != place::type) {
 			return;
 		}
-			
+
 		for (int i = (int)s.tokens.size()-1; i >= 0; i--) {
 			if (s.tokens[i].index == n.index) {
 				s.tokens.erase(s.tokens.begin() + i);
@@ -949,7 +949,7 @@ struct graph
 		if (n.type != place::type) {
 			return;
 		}
-			
+
 		for (int i = 0; i < (int)s.size(); i++) {
 			for (int j = (int)s[i].tokens.size()-1; j >= 0; j--) {
 				if (s[i].tokens[j].index == n.index) {
@@ -993,7 +993,7 @@ struct graph
 		}
 		return link;
 	}
-	
+
 	virtual petri::iterator nest_in(bound to) {
 		if (to.size() == 1u) {
 			return nest_in(to[0]);
@@ -1276,7 +1276,7 @@ struct graph
 		}
 		return result;
 	}
-	
+
 	virtual vector<petri::iterator> copy(vector<petri::iterator> i, int num = 1) {
 		vector<petri::iterator> result;
 		for (int j = 0; j < (int)i.size(); j++) {
@@ -1317,7 +1317,7 @@ struct graph
 		}
 		return petri::iterator();
 	}
-	
+
 	template <class node>
 	petri::iterator push_back(petri::iterator from, node n) {
 		return connect(from, create(n));
@@ -1511,7 +1511,7 @@ struct graph
 		}
 		return petri::iterator();
 	}
-	
+
 	virtual petri::iterator insert_at(petri::region to, transition n) {
 		petri::iterator t = create(n);
 		// TODO(edward.bingham) inputs should be arcs between nodes
@@ -2180,7 +2180,7 @@ struct graph
 			partial.insert(partial.end(), complete.begin()+j, complete.end());
 			complete.erase(complete.begin()+j, complete.end());
 			partial.insert(partial.end(), newLoops.begin()+k, newLoops.end());
-			
+
 			sort(partial.begin(), partial.end());
 			partial.erase(unique(partial.begin(), partial.end()), partial.end());
 
@@ -2303,7 +2303,7 @@ struct graph
 			if (loop) {
 				continue;
 			}
-			
+
 			if (not proper_nesting
 				or (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1))
 				or (n.size() == 1 and nn.size() == 1 and next(np).size() == 1 and np.size() == 1)
@@ -2447,7 +2447,7 @@ struct graph
 					if (not found) {
 						continue;
 					}
-					
+
 					if (i->back() < j->back()) {
 						bounds.push_back({i->back(), j->back()});
 					} else {
@@ -2505,7 +2505,7 @@ struct graph
 
 		return affect;
 	}
-	
+
 	// reduce() simplifies the petri net while preserving functional
 	// correctness
 	//
@@ -2599,7 +2599,7 @@ struct graph
 		if (update and !split_groups_ready) {
 			compute_split_groups();
 		}
- 
+
 		if (node.type == place::type) {
 			return places[node.index].splits[composition];
 		}
@@ -2720,7 +2720,7 @@ struct graph
 		// sometimes composed in choice? - Is there a shared conditional split
 		// with exlusive branches in the group-unioned branch-intersected
 		// conditional split groups of the nodes of each partial?
- 
+
 		// always composed in parallel? - sometimes composed in parallel and not
 		// sometimes composed in choice
 
@@ -2887,7 +2887,7 @@ struct graph
 		if (vector_intersects(v0.flat(), v1.flat())) {
 			return result;
 		}
-		
+
 		if (not is(parallel, v0, v1)) {
 			result.push_back({v0, v1});
 			return result;
@@ -2906,7 +2906,7 @@ struct graph
 				result.back()[1].push_back(*i);
 			}
 		}
-		
+
 		for (auto i = v0p.begin(); i != v0p.end(); i++) {
 			for (auto j = v1p.begin(); j != v1p.end(); j++) {
 				if (*i != *j and not is(parallel, *i, *j)) {
@@ -3122,7 +3122,7 @@ struct graph
 
 					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
 					cout << "groups:" << ::to_string(Bj_groups) << endl;
-					
+
 					// 4. Find the conditional branches that B belongs to that A does
 					// not. Merge, intersect groups, subtract branches A-Bi for each Bi
 					Bj_groups = petri::merge(split_group::INTERSECT, split_group::DIFFERENCE, A_groups, Bj_groups);
@@ -3414,7 +3414,6 @@ struct graph
 			petri::iterator parent_out_arc = this->arc_between(*parent, node);
 			//TODO: verify arc_between return is valid: if (parent_out_arc == petri::iterator()) {}
 			this->erase_arc(parent_out_arc);
-			this->mark_modified();
 
 			//TODO: careful, don't duplicate the MARKING on this one
 			petri::iterator duplicate_node = this->copy(node);
