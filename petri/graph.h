@@ -1747,40 +1747,52 @@ struct graph
 		erase(right, left);
 	}
 
-	virtual vector<petri::iterator> next(petri::iterator n) const {
+	virtual vector<petri::iterator> next(petri::iterator n, bool sorted=false) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
 			if (arcs[n.type][i].from.index == n.index) {
 				result.push_back(arcs[n.type][i].to);
 			}
 		}
+		if (sorted) {
+			sort(result.begin(), result.end());
+		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> next(vector<petri::iterator> n) const {
+	virtual vector<petri::iterator> next(vector<petri::iterator> n, bool sorted=false) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = next(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
 		}
+		if (sorted) {
+			sort(result.begin(), result.end());
+		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev(petri::iterator n) const {
+	virtual vector<petri::iterator> prev(petri::iterator n, bool sorted=false) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)arcs[1-n.type].size(); i++) {
 			if (arcs[1-n.type][i].to.index == n.index) {
 				result.push_back(arcs[1-n.type][i].from);
 			}
 		}
+		if (sorted) {
+			sort(result.begin(), result.end());
+		}
 		return result;
 	}
 
-	virtual vector<petri::iterator> prev(vector<petri::iterator> n) const {
+	virtual vector<petri::iterator> prev(vector<petri::iterator> n, bool sorted=false) const {
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)n.size(); i++) {
 			vector<petri::iterator> temp = prev(n[i]);
 			result.insert(result.end(), temp.begin(), temp.end());
+		}
+		if (sorted) {
+			sort(result.begin(), result.end());
 		}
 		return result;
 	}
@@ -2368,62 +2380,63 @@ struct graph
 			}
 
 			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
-			if (aggressive) {
-				vector<petri::iterator> left;
-				vector<petri::iterator> right;
+			vector<petri::iterator> left;
+			vector<petri::iterator> right;
 
-				vector<vector<petri::iterator> > n, p;
-				vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
+			vector<vector<petri::iterator> > n, p;
+			vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
 
-				for (petri::iterator i(transition::type, 0); i < (int)transitions.size() and not change; i++) {
-					if (not is_valid(i)) continue;
+			n.resize(transitions.size());
+			p.resize(transitions.size());
+			nx.resize(transitions.size());
+			px.resize(transitions.size());
 
-					n.push_back(next(i));
-					p.push_back(prev(i));
+			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() and not change; i++) {
+				if (not is_valid(i)) continue;
 
-					sort(n.back().begin(), n.back().end());
-					sort(p.back().begin(), p.back().end());
+				n[i.index] = next(i);
+				p[i.index] = prev(i);
 
-					nx.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
-					px.push_back(vector<pair<vector<petri::iterator>, vector<petri::iterator> > >());
-					for (int j = 0; j < (int)n.back().size(); j++) {
-						nx.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n.back()[j]), next(n.back()[j])));
-						sort(nx.back().back().first.begin(), nx.back().back().first.end());
-						sort(nx.back().back().second.begin(), nx.back().back().second.end());
+				sort(n[i.index].begin(), n[i.index].end());
+				sort(p[i.index].begin(), p[i.index].end());
+
+				for (int j = 0; j < (int)n[i.index].size(); j++) {
+					nx[i.index].push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n[i.index][j]), next(n[i.index][j])));
+					sort(nx[i.index].back().first.begin(), nx[i.index].back().first.end());
+					sort(nx[i.index].back().second.begin(), nx[i.index].back().second.end());
+				}
+				for (int j = 0; j < (int)p[i.index].size(); j++) {
+					px[i.index].push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p[i.index][j]), next(p[i.index][j])));
+					sort(px[i.index].back().first.begin(), px[i.index].back().first.end());
+					sort(px[i.index].back().second.begin(), px[i.index].back().second.end());
+				}
+
+				for (petri::iterator j = i-1; j >= 0 and not change; j--) {
+					if (not is_valid(j)) continue;
+
+					// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
+					// share all of the same input and output places.
+					if (n[j.index] == n[i.index] and p[j.index] == p[i.index] and (aggressive or (transitions[i.index].is_vacuous() and transitions[j.index].is_vacuous()))) {
+						if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
+						transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
+						erase(i);
+						change = true;
 					}
-					for (int j = 0; j < (int)p.back().size(); j++) {
-						px.back().push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p.back()[j]), next(p.back()[j])));
-						sort(px.back().back().first.begin(), px.back().back().first.end());
-						sort(px.back().back().second.begin(), px.back().back().second.end());
-					}
 
-					for (petri::iterator j = i-1; j >= 0 and not change; j--) {
-						if (not is_valid(j)) continue;
-
-						// Find internally conditioned transitions. Transitions are internally conditioned if they are the same type
-						// share all of the same input and output places.
-						if (n[j.index] == n[i.index] and p[j.index] == p[i.index]) {
-							if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
-							transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
-							erase(i);
-							change = true;
-						}
-
-						// Find internally parallel transitions. A pair of transitions A and B are internally parallel if
-						// they are the same type, have disjoint sets of input and output places that share a single input
-						// or output transition and have no output or input transitions other than A or B.
-						else if (vector_intersection_size(n[i.index], n[j.index]) == 0
-							and vector_intersection_size(p[i.index], p[j.index]) == 0
-							and nx[i.index] == nx[j.index] and px[i.index] == px[j.index]) {
-							if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
-							transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
-							vector<petri::iterator> tocut;
-							tocut.push_back(i);
-							tocut.insert(tocut.end(), n[i.index].begin(), n[i.index].end());
-							tocut.insert(tocut.end(), p[i.index].begin(), p[i.index].end());
-							erase(tocut);
-							change = true;
-						}
+					// Find internally parallel transitions. A pair of transitions A and B are internally parallel if
+					// they are the same type, have disjoint sets of input and output places that share a single input
+					// or output transition and have no output or input transitions other than A or B.
+					else if (vector_intersection_size(n[i.index], n[j.index]) == 0
+						and vector_intersection_size(p[i.index], p[j.index]) == 0
+						and nx[i.index] == nx[j.index] and px[i.index] == px[j.index] and (aggressive or (transitions[i.index].is_vacuous() or transitions[j.index].is_vacuous()))) {
+						if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
+						transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
+						vector<petri::iterator> tocut;
+						tocut.push_back(i);
+						tocut.insert(tocut.end(), n[i.index].begin(), n[i.index].end());
+						tocut.insert(tocut.end(), p[i.index].begin(), p[i.index].end());
+						erase(tocut);
+						change = true;
 					}
 				}
 			}
