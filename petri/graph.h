@@ -65,7 +65,7 @@ struct graph
 
 	mutable bool split_dominance_ready;
 	mutable bool split_groups_ready;
-	mutable bool merge_groups_ready[2];
+	mutable array<bool, 2> merge_groups_ready;
 
 	index_vector<place> places;
 	index_vector<transition> transitions;
