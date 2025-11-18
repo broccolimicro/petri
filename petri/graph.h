@@ -2244,11 +2244,8 @@ struct graph
 					continue;
 				}
 
-				vector<petri::iterator> n = next(i);
-				vector<petri::iterator> p = prev(i);
-
-				sort(n.begin(), n.end());
-				sort(p.begin(), p.end());
+				vector<petri::iterator> n = next(i, true);
+				vector<petri::iterator> p = prev(i, true);
 
 				bool affect = false;
 				// If it doesn't have any input places, then we need to add one.
@@ -2281,15 +2278,10 @@ struct graph
 				// stability, non interference, and deadlock freedom. However, proper nesting is not necessarily
 				// preserved. We have to take special precautions if we want to preserver proper nesting.
 				if (!affect and transitions[i.index].is_vacuous()) {
-					vector<petri::iterator> np = next(p);
-					vector<petri::iterator> pn = prev(n);
-					vector<petri::iterator> nn = next(n);
-					vector<petri::iterator> pp = prev(p);
-
-					sort(np.begin(), np.end());
-					sort(pn.begin(), pn.end());
-					sort(nn.begin(), nn.end());
-					sort(pp.begin(), pp.end());
+					vector<petri::iterator> np = next(p, true);
+					vector<petri::iterator> pn = prev(n, true);
+					vector<petri::iterator> nn = next(n, true);
+					vector<petri::iterator> pp = prev(p, true);
 
 					vector<petri::iterator> c0 = ::vector_intersection(np, pn);
 					vector<petri::iterator> c1 = ::vector_intersection(nn, pp);
@@ -2332,11 +2324,8 @@ struct graph
 
 				bool i_is_reset = is_reset(i);
 
-				vector<petri::iterator> n = next(i);
-				vector<petri::iterator> p = prev(i);
-
-				sort(n.begin(), n.end());
-				sort(p.begin(), p.end());
+				vector<petri::iterator> n = next(i, true);
+				vector<petri::iterator> p = prev(i, true);
 
 				bool affect = false;
 
@@ -2357,11 +2346,8 @@ struct graph
 					}
 					bool j_is_reset = is_reset(j);
 
-					vector<petri::iterator> n2 = next(j);
-					vector<petri::iterator> p2 = prev(j);
-
-					sort(n2.begin(), n2.end());
-					sort(p2.begin(), p2.end());
+					vector<petri::iterator> n2 = next(j, true);
+					vector<petri::iterator> p2 = prev(j, true);
 
 					if (n == n2 and p == p2 and i_is_reset == j_is_reset) {
 						if (debug) cout << "\terasing redundant place " << j << endl;
@@ -2380,35 +2366,20 @@ struct graph
 			}
 
 			// TODO Once internal parallelism stops assuming isochronic forks we can re-enable this for active transitions
-			vector<petri::iterator> left;
-			vector<petri::iterator> right;
-
-			vector<vector<petri::iterator> > n, p;
-			vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx, px;
-
-			n.resize(transitions.size());
-			p.resize(transitions.size());
-			nx.resize(transitions.size());
-			px.resize(transitions.size());
+			vector<vector<petri::iterator> > n(transitions.size()), p(transitions.size());
+			vector<vector<pair<vector<petri::iterator>, vector<petri::iterator> > > > nx(transitions.size()), px(transitions.size());
 
 			for (petri::iterator i(transition::type, 0); i < (int)transitions.size() and not change; i++) {
 				if (not is_valid(i)) continue;
 
-				n[i.index] = next(i);
-				p[i.index] = prev(i);
-
-				sort(n[i.index].begin(), n[i.index].end());
-				sort(p[i.index].begin(), p[i.index].end());
+				n[i.index] = next(i, true);
+				p[i.index] = prev(i, true);
 
 				for (int j = 0; j < (int)n[i.index].size(); j++) {
-					nx[i.index].push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(n[i.index][j]), next(n[i.index][j])));
-					sort(nx[i.index].back().first.begin(), nx[i.index].back().first.end());
-					sort(nx[i.index].back().second.begin(), nx[i.index].back().second.end());
+					nx[i.index].push_back({prev(n[i.index][j], true), next(n[i.index][j], true)});
 				}
 				for (int j = 0; j < (int)p[i.index].size(); j++) {
-					px[i.index].push_back(pair<vector<petri::iterator>, vector<petri::iterator> >(prev(p[i.index][j]), next(p[i.index][j])));
-					sort(px[i.index].back().first.begin(), px[i.index].back().first.end());
-					sort(px[i.index].back().second.begin(), px[i.index].back().second.end());
+					px[i.index].push_back({prev(p[i.index][j], true), next(p[i.index][j], true)});
 				}
 
 				for (petri::iterator j = i-1; j >= 0 and not change; j--) {
