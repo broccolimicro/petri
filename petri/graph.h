@@ -241,6 +241,101 @@ struct graph
 		return result;
 	}
 
+	virtual std::vector<enabled_transition> find_enabled(int toType, std::vector<petri::iterator> tokens) {
+		vector<enabled_transition> result;
+		vector<int> disabled;
+
+		result.reserve(tokens.size()*2);
+		disabled.reserve(transitions.size());
+		for (const arc &a : arcs[1-toType]) {
+			// Check to see if we haven't already determined that this transition can't be enabled
+			auto d = lower_bound(disabled.begin(), disabled.end(), a.to.index);
+			if (d != disabled.end() and *d == a.to.index) {
+				continue;
+			}
+
+			// Find the index of this transition (if any) in the result pool
+			typename vector<enabled_transition>::iterator e = lower_bound(result.begin(), result.end(), enabled_transition(a.to.index));
+			bool e_invalid = (e == result.end() or e->index != a.to.index);
+
+			// Check to see if there is any token at the input place of this arc and make sure that
+			// this token has not already been consumed by this particular transition
+			// Also since we only need one token per arc, we can stop once we've found a token
+			bool found = false;
+			for (int j = 0; j < (int)tokens.size() && !found; j++) {
+				if (a.from == tokens[j] and
+					(e_invalid or find(e->tokens.begin(), e->tokens.end(), j) == e->tokens.end())) {
+					// We are safe to add this to the list of possibly enabled transitions
+					found = true;
+					if (e_invalid) {
+						e = result.insert(e, enabled_transition(a.to.index));
+					}
+
+					e->tokens.push_back(j);
+				}
+			}
+
+			// If we didn't find a token at the input place, then we know that this transition can't
+			// be enabled. So lets remove this from the list of possibly enabled transitions and
+			// remember as much in the disabled list.
+			if (not found and e != result.end()) {
+				disabled.insert(d, a.to.index);
+				if (not e_invalid) {
+					result.erase(e);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	virtual std::vector<enabled_transition> find_renabled(int fromType, std::vector<petri::iterator> tokens) {
+		vector<enabled_transition> result;
+		vector<int> disabled;
+
+		result.reserve(tokens.size()*2);
+		disabled.reserve(transitions.size());
+		for (const arc &a : arcs[fromType]) {
+			// Check to see if we haven't already determined that this transition can't be enabled
+			auto d = lower_bound(disabled.begin(), disabled.end(), a.from.index);
+			if (d != disabled.end() and *d == a.from.index) {
+				continue;
+			}
+
+			// Find the index of this transition (if any) in the result pool
+			typename vector<enabled_transition>::iterator e = lower_bound(result.begin(), result.end(), enabled_transition(a.from.index));
+			bool e_invalid = (e == result.end() or e->index != a.from.index);
+
+			// Check to see if there is any token at the input place of this arc and make sure that
+			// this token has not already been consumed by this particular transition
+			// Also since we only need one token per arc, we can stop once we've found a token
+			bool found = false;
+			for (int j = 0; j < (int)tokens.size() and not found; j++) {
+				if (a.to == tokens[j] and
+					(e_invalid or find(e->tokens.begin(), e->tokens.end(), j) == e->tokens.end())) {
+					// We are safe to add this to the list of possibly enabled transitions
+					found = true;
+					if (e_invalid) {
+						e = result.insert(e, enabled_transition(a.from.index));
+					}
+					e->tokens.push_back(j);
+				}
+			}
+
+			// If we didn't find a token at the input place, then we know that this transition can't
+			// be enabled. So lets remove this from the list of possibly enabled transitions and
+			// remember as much in the disabled list.
+			if (not found) {
+				disabled.insert(d, a.from.index);
+				if (not e_invalid) {
+					result.erase(e);
+				}
+			}
+		}
+
+		return result;
+	}
+
 	virtual bool is_reachable(petri::iterator from, petri::iterator to) const {
 		return (distance(from, to) >= 0);
 	}
@@ -282,6 +377,26 @@ struct graph
 				if (seen.insert(*i).second) {
 					stack.push_back(*i);
 				}
+			}
+		}
+		return false;
+	}
+
+	bool is_split(petri::iterator n) {
+		int count = 0;
+		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
+			if (arcs[n.type][i].from.index == n.index and ++count > 1) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool is_merge(petri::iterator n) {
+		int count = 0;
+		for (int i = 0; i < (int)arcs[1-n.type].size(); i++) {
+			if (arcs[1-n.type][i].to.index == n.index and ++count > 1) {
+				return true;
 			}
 		}
 		return false;

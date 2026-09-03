@@ -47,7 +47,7 @@ struct Tree {
 	index_vector<Transition> transitions;
 	int root;
 
-	Tree::Tree(int index=-1) {
+	Tree(int index=-1) {
 		root = -1;
 		if (index >= 0) {
 			root = nodes.emplace();
@@ -55,12 +55,12 @@ struct Tree {
 		}
 	}
 
-	Tree::Tree(Transition t) {
+	Tree(Transition t) {
 		root = nodes.emplace();
 		nodes[root].procs.push_back(Index(Index::TRANSITION, transitions.insert(t)));
 	}
 
-	Tree::~Tree() {
+	~Tree() {
 	}
 
 	bool isExternal() const {

@@ -7,7 +7,7 @@ Index::Index() {
 	index = -1;
 }
 
-Index::Index(int type, int index) {
+Index::Index(Index::Type type, int index) {
 	this->type = type;
 	this->index = index;
 }
@@ -15,11 +15,11 @@ Index::Index(int type, int index) {
 Index::~Index() {
 }
 
-Node::Node(petri::composition comp) {
+Node::Node(Node::Composition comp) {
 	this->comp = comp;
 }
 
-~Node() {
+Node::~Node() {
 }
 
 }
