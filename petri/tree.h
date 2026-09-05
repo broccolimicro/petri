@@ -67,9 +67,18 @@ struct Tree {
 		return transitions.empty();
 	}
 
-	void compose(Node::Composition comp, const Tree &tree) {
+	Tree<Transition> &loop() {
+		int newRoot = nodes.emplace(Node::LOOP);
+		if (root >= 0) {
+			nodes[newRoot].procs.push_back(Index(Index::NODE, root));
+		}
+		root = newRoot;
+		return *this;
+	}
+
+	Tree<Transition> &compose(Node::Composition comp, const Tree &tree) {
 		if (tree.root < 0) {
-			return;
+			return *this;
 		}
 
 		if (root < 0) {
@@ -109,6 +118,7 @@ struct Tree {
 		}
 
 		nodes[root].procs.push_back(Index(Index::NODE, nMap.map(tree.root)));
+		return *this;
 	}
 };
 

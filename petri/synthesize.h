@@ -36,7 +36,9 @@ bool graph_to_tree(graph<place, Tree<transition>, token, state> &t, const graph<
 			}
 
 			if (p[0] == n[0]) {
-				// TODO(edward.bingham) handle loops
+				Tree<transition> loop = t.transitions[p[0].index].loop();
+				t.erase(i);
+				t.insert_after(p[0], loop);
 				continue;
 			}
 
@@ -63,14 +65,78 @@ bool graph_to_tree(graph<place, Tree<transition>, token, state> &t, const graph<
 		for (petri::iterator i = t.begin(transition::type); i != t.end(transition::type); i++) {
 			if (not t.is_valid(i)) continue;
 
-			std::vector<petri::iterator> p = t.prev(i);
 			std::vector<petri::iterator> n = t.next(i);
-			if (p.size() != 1u or n.size() != 1u) {
+			if (n.size() > 1u) {
+				// handle parallel composition
+				bool found = true;
+				std::vector<petri::iterator> nn;
+				std::vector<petri::iterator> toErase;
+				// loop through split places
+				for (size_t j = 0; j < n.size(); j++) {
+					petri::iterator nj = n[j];
+					if (t.is_merge(nj)) {
+						found = false;
+						break;
+					}
+
+					// step through parallel transitions
+					std::vector<petri::iterator> nnj = t.next(nj);
+					if (nnj.size() != 1u or t.is_merge(nnj[0])) {
+						found = false;
+						break;
+					}
+
+					// step through merge places
+					std::vector<petri::iterator> nnnj = t.next(nnj[0]);
+					if (nnnj.size() != 1u or t.is_merge(nnnj[0])) {
+						found = false;
+						break;
+					}
+
+					// check merge
+					std::vector<petri::iterator> nnnnj = t.next(nnnj[0]);
+					if (nnnnj.size() != 1u) {
+						found = false;
+						break;
+					}
+
+					if (nnnn.empty()) {
+						nnnn.push_back(nnnnj[0]);
+					} else if (nnnn[0] != nnnnj[0]) {
+						found = false;
+						break;
+					}
+
+					if (j != n.size()-1) {
+						toErase.push_back(nj);
+						toErase.push_back(nnj[0]);
+						toErase.push_back(nnnj[0]);
+					}
+					nn.push_back(nnj[0]);
+				}
+
+				if (found) {
+					for (size_t j = 0; j < nnj.size()-1; j++) {
+						t.transitions[nnj.back().index].compose(Node::PARALLEL, t.transitions[nnj[j].index]);
+					}
+					t.erase(toErase);
+					n[0] = n.back();
+					n.erase(n.begin()+1, n.end());
+				}
+			}
+			if (n.size() != 1u) {
+				continue;
+			}
+
+			std::vector<petri::iterator> p = t.prev(i);
+			if (p.size() != 1u) {
 				continue;
 			}
 
 			if (p[0] == n[0]) {
-				// TODO(edward.bingham) handle loops
+				Tree<transition> loop = t.transitions[i.index].loop();
+				t.erase(i);
+				t.insert_after(p[0], loop);
 				continue;
 			}
 
@@ -89,12 +155,33 @@ bool graph_to_tree(graph<place, Tree<transition>, token, state> &t, const graph<
 				erase(pn);
 				found = true;
 			}
-
-			// TODO(edward.bingham) look for parallel composition
 		}
 	}
 
-	// TODO(edward.bingham) fill transitions in trees
+	for (size_t i = 0; i < t.transitions.size(); i++) {
+		if (not t.transitions.is_valid(i)) continue;
+
+		auto &tree = t.transitions[i];
+
+		Mapping<size_t> tmap(-1, false);
+		for (size_t j = 0; j < tree.nodes.size(); j++) {
+			if (not tree.nodes.is_valid(j)) continue;
+
+			auto &node = tree.nodes[j];
+
+			for (auto &proc : node.procs) {
+				if (proc.type != Index::TRANSITION) continue;
+
+				size_t idx = tmap.map(proc.index);
+				if (idx == tmap.undef) {
+					idx = tree.transitions.insert(g.transitions[proc.index]);
+					tmap.set(proc.index, idx);
+				}
+
+				proc.index = idx;
+			}
+		}
+	}
 
 	return t.transitions.count() == 1u;
 }
