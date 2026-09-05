@@ -38,7 +38,7 @@ struct Node {
 };
 
 template <class Transition>
-struct Tree {
+struct Tree : petri::transition {
 	index_vector<Node> nodes;
 
 	// DESIGN(edward.bingham) if transitions is empty, but the graph is filled,
@@ -119,6 +119,64 @@ struct Tree {
 
 		nodes[root].procs.push_back(Index(Index::NODE, nMap.map(tree.root)));
 		return *this;
+	}
+
+	void print() const {
+		if (root < 0) {
+			return;
+		}
+
+		struct Frame {
+			int index;
+			int process;
+		};
+
+		std::vector<Frame> stack(1, {root, 0});
+		while (not stack.empty()) {
+			int curr = stack.size()-1;
+			int index = stack[curr].index;
+			int proc = stack[curr].process;
+
+			if (proc == 0) {
+				if (nodes[index].comp == Node::CHOICE) {
+					printf("[");
+				} else if (nodes[index].comp == Node::PARALLEL) {
+					printf("(");
+				} else if (nodes[index].comp == Node::SEQUENCE) {
+				} else if (nodes[index].comp == Node::LOOP) {
+					printf("*[");
+				}
+			} else if (proc < (int)nodes[index].procs.size()) {
+				if (nodes[index].comp == Node::CHOICE) {
+					printf(":");
+				} else if (nodes[index].comp == Node::PARALLEL) {
+					printf("||");
+				} else if (nodes[index].comp == Node::SEQUENCE) {
+					printf(";");
+				} else if (nodes[index].comp == Node::LOOP) {
+					printf(":");
+				}
+			} else {
+				if (nodes[index].comp == Node::CHOICE) {
+					printf("]");
+				} else if (nodes[index].comp == Node::PARALLEL) {
+					printf(")");
+				} else if (nodes[index].comp == Node::SEQUENCE) {
+				} else if (nodes[index].comp == Node::LOOP) {
+					printf("]");
+				}
+				stack.pop_back();
+				continue;
+			}
+
+			if (nodes[index].procs[proc].type == Index::TRANSITION) {
+				printf("T%d", nodes[index].procs[proc].index);
+			} else if (nodes[index].procs[proc].type == Index::NODE) {
+				stack.push_back({nodes[index].procs[proc].index, 0});
+			}
+
+			stack[curr].process++;
+		}
 	}
 };
 

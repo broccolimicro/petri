@@ -3,7 +3,7 @@
 namespace petri {
 
 template <class process, class place, class transition, class token, class state>
-bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<place, transition, token, state> &g) {
+bool graph_to_tree(graph<place, controlflow::Tree<process>, token, state> &t, const graph<place, transition, token, state> &g) {
 	// first fill the tree
 	t.places = g.places;
 	t.arcs = g.arcs;
@@ -16,7 +16,7 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 		// We want to fill in the transitions for each tree after we've run the
 		// full algorithm. No need to carry that weight around and copy it while
 		// we're iterating. See Tree constructor.
-		t.transitions.emplace_at(i, Tree<process>(i));
+		t.transitions.emplace_at(i, controlflow::Tree<process>(i));
 	}
 
 	// Then iteratively find minimal compositions and merge them into nodes. If
@@ -36,9 +36,10 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 			}
 
 			if (p[0] == n[0]) {
-				Tree<process> loop = t.transitions[p[0].index].loop();
+				controlflow::Tree<process> loop = t.transitions[p[0].index].loop();
 				t.erase(i);
 				t.insert_after(p[0], loop);
+				found = true;
 				continue;
 			}
 
@@ -50,14 +51,14 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 
 			t.transitions[p[0].index].compose(controlflow::Node::SEQUENCE, t.transitions[n[0].index]);
 
-			for (size_t j = 0; j < arcs[n[0].type].size(); j++) {
-				if (arcs[n[0].type][j].from == n[0].index) {
-					arcs[n[0].type][j].from = p[0].index;
+			for (size_t j = 0; j < t.arcs[n[0].type].size(); j++) {
+				if (t.arcs[n[0].type][j].from.index == n[0].index) {
+					t.arcs[n[0].type][j].from.index = p[0].index;
 				}
 			}
 
-			erase(n[0]);
-			erase(i);
+			t.erase(n[0]);
+			t.erase(i);
 			found = true;
 		}
 
@@ -68,42 +69,43 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 			std::vector<petri::iterator> n = t.next(i);
 			if (n.size() > 1u) {
 				// handle parallel composition
-				bool found = true;
+				bool hasParallel = true;
 				std::vector<petri::iterator> nn;
+				petri::iterator merge;
 				std::vector<petri::iterator> toErase;
 				// loop through split places
 				for (size_t j = 0; j < n.size(); j++) {
 					petri::iterator nj = n[j];
 					if (t.is_merge(nj)) {
-						found = false;
+						hasParallel = false;
 						break;
 					}
 
 					// step through parallel transitions
 					std::vector<petri::iterator> nnj = t.next(nj);
 					if (nnj.size() != 1u or t.is_merge(nnj[0])) {
-						found = false;
+						hasParallel = false;
 						break;
 					}
 
 					// step through merge places
 					std::vector<petri::iterator> nnnj = t.next(nnj[0]);
 					if (nnnj.size() != 1u or t.is_merge(nnnj[0])) {
-						found = false;
+						hasParallel = false;
 						break;
 					}
 
 					// check merge
 					std::vector<petri::iterator> nnnnj = t.next(nnnj[0]);
 					if (nnnnj.size() != 1u) {
-						found = false;
+						hasParallel = false;
 						break;
 					}
 
-					if (nnnn.empty()) {
-						nnnn.push_back(nnnnj[0]);
-					} else if (nnnn[0] != nnnnj[0]) {
-						found = false;
+					if (not merge.valid()) {
+						merge = nnnnj[0];
+					} else if (merge != nnnnj[0]) {
+						hasParallel = false;
 						break;
 					}
 
@@ -115,13 +117,14 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 					nn.push_back(nnj[0]);
 				}
 
-				if (found) {
-					for (size_t j = 0; j < nnj.size()-1; j++) {
-						t.transitions[nnj.back().index].compose(Node::PARALLEL, t.transitions[nnj[j].index]);
+				if (hasParallel) {
+					for (size_t j = 0; j < nn.size()-1; j++) {
+						t.transitions[nn.back().index].compose(controlflow::Node::PARALLEL, t.transitions[nn[j].index]);
 					}
 					t.erase(toErase);
 					n[0] = n.back();
 					n.erase(n.begin()+1, n.end());
+					found = true;
 				}
 			}
 			if (n.size() != 1u) {
@@ -134,27 +137,39 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 			}
 
 			if (p[0] == n[0]) {
-				Tree<process> loop = t.transitions[i.index].loop();
+				controlflow::Tree<process> loop = t.transitions[i.index].loop();
 				t.erase(i);
 				t.insert_after(p[0], loop);
+				found = true;
 				continue;
 			}
 
 			std::vector<petri::iterator> pn = t.next(p, true);
 			std::vector<petri::iterator> np = t.prev(n, true);
-			if (pn != np) {
+			if (pn != np or pn.size() <= 1u) {
+				continue;
+			}
+
+			bool hasChoice = true;
+			for (size_t i = 0; i < pn.size() and hasChoice; i++) {
+				hasChoice = not t.is_merge(pn[i]);
+			}
+
+			for (size_t i = 0; i < np.size() and hasChoice; i++) {
+				hasChoice = not t.is_split(np[i]);
+			}
+
+			if (not hasChoice) {
 				continue;
 			}
 
 			// found a conditional composition
-			if (pn.size() > 1u) {
-				for (size_t j = 0; j < pn.size()-1; j++) {
-					t.transitions[pn.back().index].compose(controlflow::Node::CHOICE, t.transitions[pn[j].index]);
-				}
-				pn.pop_back();
-				erase(pn);
-				found = true;
+			for (size_t j = 0; j < pn.size()-1; j++) {
+				t.transitions[pn.back().index].compose(controlflow::Node::CHOICE, t.transitions[pn[j].index]);
 			}
+			pn.pop_back();
+			t.erase(pn);
+			found = true;
 		}
 	}
 
@@ -170,7 +185,7 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 			auto &node = tree.nodes[j];
 
 			for (auto &proc : node.procs) {
-				if (proc.type != Index::TRANSITION) continue;
+				if (proc.type != controlflow::Index::TRANSITION) continue;
 
 				size_t idx = tmap.map(proc.index);
 				if (idx == tmap.undef) {
@@ -187,7 +202,7 @@ bool graph_to_tree(graph<place, Tree<process>, token, state> &t, const graph<pla
 }
 
 template <class process, class place, class transition, class token, class state>
-void tree_to_graph(graph<place, transition, token, state> &g, const Tree<process> &t) {
+void tree_to_graph(graph<place, transition, token, state> &g, const controlflow::Tree<process> &t) {
 	if (t.root < 0) {
 		return;
 	}
@@ -203,10 +218,10 @@ void tree_to_graph(graph<place, transition, token, state> &g, const Tree<process
 		std::vector<petri::segment> segments;
 		bool found = true;
 		for (const auto &proc : t.nodes[stack.back()].procs) {
-			if (proc.type == Index::TRANSITION) {
+			if (proc.type == controlflow::Index::TRANSITION) {
 				petri::iterator it(transition::type, tmap.map(proc.index));
 				segments.push_back(petri::segment({{it}}, {{it}}));
-			} else if (proc.type == Index::NODE) {
+			} else if (proc.type == controlflow::Index::NODE) {
 				auto pos = nodes.find(proc.index);
 				if (pos == nodes.end()) {
 					found = false;
@@ -230,16 +245,16 @@ void tree_to_graph(graph<place, transition, token, state> &g, const Tree<process
 		// about?
 
 		int composition = -1;
-		if (t.nodes[curr].comp == Node::CHOICE) {
+		if (t.nodes[curr].comp == controlflow::Node::CHOICE) {
 			composition = petri::choice;
-		} else if (t.nodes[curr].comp == Node::PARALLEL) {
+		} else if (t.nodes[curr].comp == controlflow::Node::PARALLEL) {
 			composition = petri::parallel;
-		} else if (t.nodes[curr].comp == Node::LOOP) {
+		} else if (t.nodes[curr].comp == controlflow::Node::LOOP) {
 			composition = petri::choice;
 			for (auto &segment : segments) {
 				segment = g.loop(segment);
 			}
-		} else { //if (t.nodes[curr].comp == Node::SEQUENCE) {
+		} else { //if (t.nodes[curr].comp == controlflow::Node::SEQUENCE) {
 			composition = petri::sequence;
 		}
 
