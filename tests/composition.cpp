@@ -306,7 +306,7 @@ TEST(composition, regular_choice) {
 	test_sometimes(g, excludes, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
 	test_sometimes(g, implies, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
 	test_sometimes(g, implies, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
-	
+
 	test_sometimes(g, excludes, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
 	test_sometimes(g, excludes, {p[3]}, {t[5], t[7], p[0], p[2], t[2], t[6]});
 	test_sometimes(g, implies, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
@@ -350,7 +350,7 @@ TEST(composition, choice_parallel) {
 
 	test_always(g, implies, {p[0], p[6]});
 	test_always(g, implies, {p[6], p[0]});
-	
+
 	test_sometimes(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 	test_not_always(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 	test_sometimes(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
@@ -400,7 +400,7 @@ TEST(composition, parallel_choice) {
 	test_always(g, sequence, {t[0], p[4], t[5], p[5], t[6]}, {}, true);
 	test_always(g, choice, {t[1], p[1], t[2]}, {t[3], p[2], t[4]}, true);
 	test_always(g, parallel, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]}, {p[4], t[5], p[5]}, true);
-	
+
 	test_always(g, implies, {t[1], p[1], t[2], p[3], t[6]});
 	test_always(g, implies, {t[3], p[2], t[4], p[3], t[6]});
 	test_always(g, implies, {t[0], p[4], t[5], p[5], t[6]});
@@ -464,7 +464,7 @@ TEST(composition, sequence_choice_parallel) {
 
 	test_always(g, implies, {p[0], p[6]});
 	test_always(g, implies, {p[6], p[0]});
-	
+
 	test_sometimes(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 	test_not_always(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 	test_sometimes(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
@@ -475,7 +475,7 @@ TEST(composition, sequence_choice_parallel) {
 	test_always(g, sequence, {t[6], p[11], t[11], p[12], t[12]}, {}, true);
 	test_always(g, choice, {t[7], p[8], t[8]}, {t[9], p[9], t[10]}, true);
 	test_always(g, parallel, {p[7], t[7], p[8], t[8], t[9], p[9], t[10], p[10]}, {p[11], t[11], p[12]}, true);
-	
+
 	test_always(g, implies, {t[7], p[8], t[8], p[10], t[12]});
 	test_always(g, implies, {t[9], p[9], t[10], p[10], t[12]});
 	test_always(g, implies, {t[6], p[11], t[11], p[12], t[12]});
@@ -532,7 +532,7 @@ TEST(composition, nonproper_choice) {
 	test_always(g, sequence, {p[0], t[3], p[3], t[4], p[5]}, {}, true);
 	test_always(g, sequence, {p[0], p[4], t[5], p[5]}, {}, true);
 	test_sometimes(g, sequence, {t[3], p[3], t[4]}, {p[4], t[5]}, true);
-	
+
 	test_always(g, choice, {t[6]}, {t[3], p[3], t[4], t[1], p[2], t[2]});
 
 	test_always(g, excludes, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
@@ -622,7 +622,7 @@ TEST(composition, shared_parallel) {
 
 	test_sometimes(g, choice, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
 	test_sometimes(g, parallel, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
-	
+
 	test_sometimes(g, choice, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
 	test_sometimes(g, parallel, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
 
@@ -631,13 +631,13 @@ TEST(composition, shared_parallel) {
 	test_always(g, implies, {t[6]}, {p[4], t[3], p[5], t[4], p[6], t[9]});
 	test_always(g, implies, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
 	test_always(g, implies, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]});
-	
+
 	test_always(g, excludes, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]}, true);
 
 	test_sometimes(g, excludes, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
 	test_sometimes(g, implies, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
 	test_always(g, implies, {p[7], t[7], p[8], t[8], p[9]}, {p[4], t[3], p[5], t[4], p[6]});
-	
+
 	test_sometimes(g, excludes, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
 	test_sometimes(g, implies, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
 	test_always(g, implies, {p[1], t[1], p[2], t[2], p[3]}, {p[4], t[3], p[5], t[4], p[6]});
@@ -681,7 +681,7 @@ TEST(composition, shared_choice) {
 	test_always(g, implies, {t[1], p[1], t[2], p[2], t[3]});
 	test_always(g, implies, {t[4], p[3], t[5], p[4], t[6]});
 	test_always(g, implies, {t[7], p[7], t[8], p[8], t[9]});
-	
+
 	// TODO(edward.bingham) I think this may require recursive logic... which
 	// parallel branches is this node a part of in which conditions?
 	//test_always(g, implies, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
@@ -723,7 +723,7 @@ TEST(composition, regular_choice_parallel) {
 	test_always(g, parallel, {p[1], t[1]}, {p[3], t[2]}, true);
 	test_always(g, parallel, {p[4], t[3]}, {p[6], t[5]}, true);
 	test_always(g, parallel, {p[2]}, {p[5]}, true);
-	
+
 	test_always(g, choice, {p[1], t[1]}, {p[4], t[3]}, true);
 	test_always(g, choice, {p[1], t[1]}, {p[6], t[5]}, true);
 	test_always(g, choice, {p[3], t[2]}, {p[4], t[3]}, true);
@@ -738,7 +738,7 @@ TEST(composition, regular_choice_parallel) {
 	test_always(g, implies, {p[1], t[1]}, {p[3], t[2]}, true);
 	test_always(g, implies, {p[4], t[3]}, {p[6], t[5]}, true);
 	test_always(g, implies, {p[2]}, {p[5]}, true);
-	
+
 	test_always(g, excludes, {p[1], t[1]}, {p[4], t[3]}, true);
 	test_always(g, excludes, {p[1], t[1]}, {p[6], t[5]}, true);
 	test_always(g, excludes, {p[3], t[2]}, {p[4], t[3]}, true);
@@ -787,7 +787,7 @@ TEST(composition, regular_parallel_choice) {
 
 	test_always(g, choice, {t[1], p[1], t[2]}, {t[3], p[2], t[5]}, true);
 	test_always(g, choice, {t[4], p[3], t[2]}, {t[6], p[5], t[5]}, true);
-	
+
 	test_always(g, parallel, {t[1], p[1]}, {t[4], p[3]}, true);
 	test_always(g, parallel, {t[3], p[2]}, {t[6], p[5]}, true);
 	test_always(g, parallel, {p[0]}, {p[4]}, true);
@@ -1237,7 +1237,7 @@ TEST(composition, compose_m1x2) {
 	EXPECT_TRUE(connected(g, p[0], t[12]));
 	EXPECT_TRUE(connected(g, t[12], p[1]));
 	EXPECT_TRUE(connected(g, t[0], p[1]));
-	
+
 	EXPECT_TRUE(connected(g, p[2], t[13]));
 	EXPECT_TRUE(connected(g, t[1], p[12]));
 	EXPECT_TRUE(connected(g, p[12], t[13]));
@@ -1247,25 +1247,25 @@ TEST(composition, compose_m1x2) {
 	EXPECT_TRUE(connected(g, t[14], p[13]));
 	EXPECT_TRUE(connected(g, t[2], p[13]));
 	EXPECT_TRUE(connected(g, p[13], t[3]));
-	
+
 	EXPECT_TRUE(connected(g, p[5], t[5]));
 	EXPECT_TRUE(connected(g, t[4], p[14]));
 	EXPECT_TRUE(connected(g, p[14], t[5]));
-	
+
 	EXPECT_TRUE(connected(g, p[6], t[15]));
 	EXPECT_TRUE(connected(g, t[15], p[7]));
 	EXPECT_TRUE(connected(g, p[6], t[6]));
-	
+
 	EXPECT_TRUE(connected(g, p[8], t[16]));
 	EXPECT_TRUE(connected(g, t[16], p[9]));
 	EXPECT_TRUE(connected(g, t[16], p[15]));
 	EXPECT_TRUE(connected(g, p[15], t[7]));
-	
+
 	EXPECT_TRUE(connected(g, t[8], p[16]));
 	EXPECT_TRUE(connected(g, p[16], t[17]));
 	EXPECT_TRUE(connected(g, p[16], t[9]));
 	EXPECT_TRUE(connected(g, t[17], p[10]));
-	
+
 	EXPECT_TRUE(connected(g, t[10], p[11]));
 	EXPECT_TRUE(connected(g, t[10], p[17]));
 	EXPECT_TRUE(connected(g, p[17], t[11]));
@@ -1320,7 +1320,7 @@ TEST(composition, compose_proper_m1x2) {
 	EXPECT_TRUE(connected(g, p[0], t[12]));
 	EXPECT_TRUE(connected(g, t[12], p[1]));
 	EXPECT_TRUE(connected(g, t[0], p[1]));
-	
+
 	EXPECT_TRUE(connected(g, p[2], t[13]));
 	EXPECT_TRUE(connected(g, t[1], p[12]));
 	EXPECT_TRUE(connected(g, p[12], t[13]));
@@ -1330,25 +1330,25 @@ TEST(composition, compose_proper_m1x2) {
 	EXPECT_TRUE(connected(g, t[14], p[13]));
 	EXPECT_TRUE(connected(g, t[2], p[13]));
 	EXPECT_TRUE(connected(g, p[13], t[3]));
-	
+
 	EXPECT_TRUE(connected(g, p[5], t[5]));
 	EXPECT_TRUE(connected(g, t[4], p[14]));
 	EXPECT_TRUE(connected(g, p[14], t[5]));
-	
+
 	EXPECT_TRUE(connected(g, p[6], t[15]));
 	EXPECT_TRUE(connected(g, t[15], p[7]));
 	EXPECT_TRUE(connected(g, p[6], t[6]));
-	
+
 	EXPECT_TRUE(connected(g, p[8], t[16]));
 	EXPECT_TRUE(connected(g, t[16], p[9]));
 	EXPECT_TRUE(connected(g, t[16], p[15]));
 	EXPECT_TRUE(connected(g, p[15], t[7]));
-	
+
 	EXPECT_TRUE(connected(g, t[8], p[16]));
 	EXPECT_TRUE(connected(g, p[16], t[17]));
 	EXPECT_TRUE(connected(g, p[16], t[9]));
 	EXPECT_TRUE(connected(g, t[17], p[10]));
-	
+
 	EXPECT_TRUE(connected(g, t[10], p[11]));
 	EXPECT_TRUE(connected(g, t[10], p[17]));
 	EXPECT_TRUE(connected(g, p[17], t[11]));
@@ -1380,7 +1380,7 @@ TEST(composition, compose_p2_2x2_2) {
 	EXPECT_TRUE(connected(g, p[2], t[3]));
 	EXPECT_TRUE(connected(g, p[3], t[2]));
 	EXPECT_TRUE(connected(g, p[3], t[3]));
-	
+
 	EXPECT_TRUE(connected(g, t[0], p[4]));
 	EXPECT_TRUE(connected(g, t[0], p[5]));
 	EXPECT_TRUE(connected(g, t[1], p[6]));
@@ -1488,11 +1488,11 @@ TEST(composition, compose_proper_m2_2x2_2) {
 	EXPECT_TRUE(connected(g, p[0], t[6]));
 	EXPECT_TRUE(connected(g, p[7], t[6]));
 	EXPECT_TRUE(connected(g, t[0], p[7]));
-	
+
 	EXPECT_TRUE(connected(g, p[1], t[7]));
 	EXPECT_TRUE(connected(g, p[8], t[7]));
 	EXPECT_TRUE(connected(g, t[1], p[8]));
-	
+
 	EXPECT_TRUE(connected(g, t[6], p[6]));
 	EXPECT_TRUE(connected(g, t[7], p[6]));
 	EXPECT_TRUE(connected(g, p[6], t[4]));

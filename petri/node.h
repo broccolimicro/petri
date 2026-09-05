@@ -34,7 +34,7 @@ struct split_group
 		SUBSET_EQUAL = 6,
 		NOT_EQUAL = 7
 	};
-	
+
 	int split; // index of place/transition with split
 	std::vector<int> branch; // index of transitions/places coming out of split
 	int count; // total number of branches out of this split
@@ -58,7 +58,7 @@ struct place
 {
 	place();
 	~place();
-	
+
 	static const int type = 0;
 
 	// sorted, transition index of parallel split -> place index of parallel branch
@@ -75,7 +75,7 @@ struct transition
 {
 	transition();
 	~transition();
-	
+
 	static const int type = 1;
 
 	// sorted, transition index of parallel split -> place index of parallel branch

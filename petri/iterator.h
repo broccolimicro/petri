@@ -58,7 +58,7 @@ struct region {
 	region();
 	region(std::initializer_list<petri::iterator> nodes);
 	~region();
-	
+
 	vector<petri::iterator> nodes;
 
 	// DESIGN(edward.bingham) This isn't a constructor because I explicitly want
@@ -104,7 +104,7 @@ struct region {
 	bool remap(region from, region to, bool rsorted=false);
 
 	region &compose(region r0);
-	
+
 	vector<petri::iterator> flat() const;
 
 	bool operator==(region r0) const;
@@ -151,7 +151,7 @@ struct bound {
 	vector<region>::iterator end();
 	vector<region>::const_iterator begin() const;
 	vector<region>::const_iterator end() const;
-	
+
 	void push_back(region s);
 	region pop_back();
 	region &back();
@@ -216,7 +216,7 @@ struct strand {
 	strand();
 	strand(std::initializer_list<petri::iterator> nodes);
 	~strand();
-	
+
 	vector<petri::iterator> nodes;
 
 	// DESIGN(edward.bingham) This isn't a constructor because I explicitly want
@@ -261,7 +261,7 @@ struct strand {
 	bool remap(strand from, strand to, bool rsorted=false);
 
 	strand &compose(strand r0);
-	
+
 	vector<petri::iterator> flat() const;
 
 	bool operator==(strand r0) const;

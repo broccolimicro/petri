@@ -102,7 +102,7 @@ struct state
 						tokens.push_back(tokens[i]);
 						tokens.back().index = j->index;
 					}
-				}	
+				}
 				tokens.erase(tokens.begin()+i);
 			}
 		}

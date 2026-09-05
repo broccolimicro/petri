@@ -186,7 +186,7 @@ vector<split_group> merge(int group_operation, int branch_operation, vector<spli
 	// split_group::INTERSECT
 	// split_group::UNION
 	// split_group::DIFFERENCE
-	
+
 	vector<split_group> result;
 	int i = 0, j = 0;
 	while (i < (int)g0.size() or j < (int)g1.size()) {
@@ -241,7 +241,7 @@ void merge_inplace(int group_operation, int branch_operation, vector<split_group
 	// split_group::INTERSECT
 	// split_group::UNION
 	// split_group::DIFFERENCE
-	
+
 	int i = 0, j = 0;
 	while (i < (int)g0.size() or j < (int)g1.size()) {
 		while (j < (int)g1.size() and exclude.find(g1[j].split) != exclude.end()) {
