@@ -696,7 +696,7 @@ struct graph
 			petri::iterator curr = todo.back();
 			todo.pop_back();
 
-			bool found = false;	
+			bool found = false;
 			vector<split_group> *cgroups = split_groups_iter(composition, curr);
 			if (cgroups != nullptr) {
 				for (int j = (int)cgroups->size()-1; j >= 0; j--) {
@@ -1244,7 +1244,7 @@ struct graph
 	virtual petri::bound connect(petri::bound from, petri::bound to, bool proper=false) {
 		petri::bound link;
 		if (not proper or (from.size() == 1u and from[0].size() == 1u) or (to.size() == 1u and to[0].size() == 1u)) {
-			if (to.size() > 1u) {	
+			if (to.size() > 1u) {
 				for (auto i = from.begin(); i != from.end(); i++) {
 					for (auto j = i->begin(); j != i->end(); j++) {
 						if (j->type != place::type) {
@@ -2144,6 +2144,26 @@ struct graph
 		return result;
 	}
 
+	virtual segment loop(segment s0, bool proper=false) {
+		if (s0.source.empty() or s0.sink.empty()) {
+			return s0;
+		}
+		mark_modified();
+		connect(s0.sink, s0.source, proper);
+
+		petri::iterator link = create(place::type);
+		connect({{link}}, s0.source);
+		connect(s0.sink, {{link}});
+		s0.sink = petri::bound({{link}});
+		if (not s0.reset.empty()) {
+			s0.source = s0.reset;
+			s0.reset.clear();
+		} else {
+			s0.source = petri::bound({{link}});
+		}
+		return s0;
+	}
+
 	// This function implements graph composition operations that merge
 	// the current Petri net with another one according to one of three fundamental
 	// composition patterns: sequence, choice, or parallel. Each composition type creates
@@ -2199,7 +2219,7 @@ struct graph
 			if (g.transitions.is_valid(i)) {
 				result.set(petri::iterator(transition::type, i), create(g.transitions[i]));
 			}
-		}	
+		}
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < (int)g.arcs[i].size(); j++) {
 				arcs[i].push_back(arc(result.map(g.arcs[i][j].from), result.map(g.arcs[i][j].to)));
@@ -3228,7 +3248,7 @@ struct graph
 
 			cout << "starting search " << ::to_string(nodes[i]) << " " << ::to_string(A_groups) << endl;
 			for (int j = 0; j < (int)nodes.size(); j++) {
-				cout << "checking i=" << i << ":" << ::to_string(nodes[i]) << " and j=" << j << ":" << ::to_string(nodes[j]) << endl;	
+				cout << "checking i=" << i << ":" << ::to_string(nodes[i]) << " and j=" << j << ":" << ::to_string(nodes[j]) << endl;
 				if (i != j and vector_is_subset_of(nodes[i].nodes, nodes[j].nodes)) {
 					cout << "found subset" << endl;
 					// 3. Find the conditional split groups of Bi & ~A union groups, intersect branches.
@@ -3283,7 +3303,7 @@ struct graph
 		}
 
 		return nodes;
-	}	
+	}
 
 	virtual bound partials(int composition, petri::region nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
 		nodes.sort();

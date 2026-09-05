@@ -678,6 +678,10 @@ string segment::to_string() const {
 	return source.to_string() + "..." + sink.to_string() + " @" + reset.to_string();
 }
 
+bool segment::empty() const {
+	return source.empty() and sink.empty() and reset.empty();
+}
+
 ostream &operator<<(ostream &os, segment s0) {
 	os << s0.source << "..." << s0.sink << " @" << s0.reset;
 	return os;

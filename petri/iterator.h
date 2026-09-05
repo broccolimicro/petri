@@ -201,6 +201,8 @@ struct segment {
 
 	void compose(int composition, segment s0);
 
+	bool empty() const;
+
 	string to_string() const;
 };
 
