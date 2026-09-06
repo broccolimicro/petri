@@ -9,25 +9,25 @@
 using namespace petri;
 using namespace std;
 
-string print_splits(const graph<place, transition, token, state<token> > &g, petri::iterator node) {
-	return "t" + ::to_string(g.split_groups_of(parallel, node)) + "p" + ::to_string(g.split_groups_of(choice, node));
+string print_splits(const CompositionAnalysis &a, petri::iterator node) {
+	return "t" + ::to_string(a.splitGroupsOf(Composition::PARALLEL, node)) + "p" + ::to_string(a.splitGroupsOf(Composition::CHOICE, node));
 }
 
-string should_be(const graph<place, transition, token, state<token> > &g, bool be, int composition, petri::iterator a, petri::iterator b) {
+string should_be(const CompositionAnalysis &g, bool be, Composition::Type composition, petri::iterator a, petri::iterator b) {
 	string comp = "sequence";
-	if (composition == parallel) {
+	if (composition == Composition::PARALLEL) {
 		comp = "parallel";
-	} else if (composition == choice) {
+	} else if (composition == Composition::CHOICE) {
 		comp = "choice";
-	} else if (composition == implies) {
+	} else if (composition == Composition::IMPLIES) {
 		comp = "implies";
-	} else if (composition == excludes) {
+	} else if (composition == Composition::EXCLUDES) {
 		comp = "excludes";
 	}
 	return a.to_string() + ":" + print_splits(g, a) + " should " + (not be ? "not " : "") + "be " + comp + " with " + b.to_string() + ":" + print_splits(g, b);
 }
 
-void test_always(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_always(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			if (*i != *j) {
@@ -48,18 +48,18 @@ void test_always(const graph<place, transition, token, state<token> > &g, int co
 			if (composition < 3) {
 				for (int k = 0; k < 3; k++) {
 					if (k != composition) {
-						EXPECT_FALSE(g.is(k, *i, *j)) << should_be(g, false, k, *i, *j);
+						EXPECT_FALSE(g.is((Composition::Type)k, *i, *j)) << should_be(g, false, (Composition::Type)k, *i, *j);
 						if (bidir) {
-							EXPECT_FALSE(g.is(k, *j, *i)) << should_be(g, false, k, *j, *i);
+							EXPECT_FALSE(g.is((Composition::Type)k, *j, *i)) << should_be(g, false, (Composition::Type)k, *j, *i);
 						}
 					}
 				}
 			} else {
 				for (int k = 3; k < 5; k++) {
 					if (k != composition) {
-						EXPECT_FALSE(g.is(k, *i, *j)) << should_be(g, false, k, *i, *j);
+						EXPECT_FALSE(g.is((Composition::Type)k, *i, *j)) << should_be(g, false, (Composition::Type)k, *i, *j);
 						if (bidir) {
-							EXPECT_FALSE(g.is(k, *j, *i)) << should_be(g, false, k, *j, *i);
+							EXPECT_FALSE(g.is((Composition::Type)k, *j, *i)) << should_be(g, false, (Composition::Type)k, *j, *i);
 						}
 					}
 				}
@@ -68,7 +68,7 @@ void test_always(const graph<place, transition, token, state<token> > &g, int co
 	}
 }
 
-void test_sometimes(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_sometimes(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			if (*i != *j) {
@@ -86,7 +86,7 @@ void test_sometimes(const graph<place, transition, token, state<token> > &g, int
 	}
 }
 
-void test_not(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_not(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
@@ -97,7 +97,7 @@ void test_not(const graph<place, transition, token, state<token> > &g, int compo
 	}
 }
 
-void test_not_always(const graph<place, transition, token, state<token> > &g, int composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_not_always(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			EXPECT_FALSE(g.is(composition, *i, *j, true)) << should_be(g, false, composition, *i, *j);
@@ -132,22 +132,22 @@ TEST(composition, always_choice) {
 	g.connect({t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
 	g.connect({p[0], t[2], p[2], t[3], p[3]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, choice, {t[0], p[1], t[1]}, {t[2], p[2], t[3]}, true);
-	test_always(g, sequence, {t[5], p[0], t[0], p[1], t[1], p[3], t[4]}, {}, true);
-	test_always(g, sequence, {t[5], p[0], t[2], p[2], t[3], p[3], t[4]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[0], p[1], t[1]}, {t[2], p[2], t[3]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[5], p[0], t[0], p[1], t[1], p[3], t[4]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[5], p[0], t[2], p[2], t[3], p[3], t[4]}, {}, true);
 
-	test_always(g, implies, {t[0], p[1], t[1], p[3], t[4]});
-	test_always(g, implies, {t[2], p[2], t[3], p[3], t[4]});
-	test_always(g, implies, {t[5], p[0]});
-	test_always(g, implies, {t[1], p[1], t[0], p[0], t[5]});
-	test_always(g, implies, {t[3], p[2], t[2], p[0], t[5]});
-	test_always(g, implies, {t[4], p[3]});
-	test_sometimes(g, excludes, {t[5], p[0], t[4], p[3]}, {t[0], p[1], t[1]});
-	test_sometimes(g, excludes, {t[5], p[0], t[4], p[3]}, {t[2], p[2], t[3]});
-	test_sometimes(g, implies, {t[5], p[0], t[4], p[3]}, {t[0], p[1], t[1]});
-	test_sometimes(g, implies, {t[5], p[0], t[4], p[3]}, {t[2], p[2], t[3]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], t[1], p[3], t[4]});
+	test_always(comp, Composition::IMPLIES, {t[2], p[2], t[3], p[3], t[4]});
+	test_always(comp, Composition::IMPLIES, {t[5], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[1], p[1], t[0], p[0], t[5]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[2], t[2], p[0], t[5]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[3]});
+	test_sometimes(comp, Composition::EXCLUDES, {t[5], p[0], t[4], p[3]}, {t[0], p[1], t[1]});
+	test_sometimes(comp, Composition::EXCLUDES, {t[5], p[0], t[4], p[3]}, {t[2], p[2], t[3]});
+	test_sometimes(comp, Composition::IMPLIES, {t[5], p[0], t[4], p[3]}, {t[0], p[1], t[1]});
+	test_sometimes(comp, Composition::IMPLIES, {t[5], p[0], t[4], p[3]}, {t[2], p[2], t[3]});
 }
 
 TEST(composition, always_parallel) {
@@ -165,18 +165,18 @@ TEST(composition, always_parallel) {
 	g.connect({p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
 	g.connect({t[0], p[2], t[2], p[3], t[3]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, parallel, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
-	test_always(g, sequence, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
-	test_always(g, sequence, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
 
-	test_always(g, implies, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
-	test_always(g, implies, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
-	test_always(g, implies, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
-	test_not(g, excludes, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
-	test_not(g, excludes, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
-	test_not(g, excludes, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
+	test_always(comp, Composition::IMPLIES, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
+	test_not(comp, Composition::EXCLUDES, {p[5], t[0], p[0], t[1], p[1], t[3], p[4]}, {}, true);
+	test_not(comp, Composition::EXCLUDES, {p[5], t[0], p[2], t[2], p[3], t[3], p[4]}, {}, true);
+	test_not(comp, Composition::EXCLUDES, {p[0], t[1], p[1]}, {p[2], t[2], p[3]}, true);
 }
 
 TEST(composition, regular_interleaved) {
@@ -202,21 +202,21 @@ TEST(composition, regular_interleaved) {
 
 	g.reset.push_back(state<token>({token(p[0].index), token(p[2].index)}));
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1]}, {}, true);
-	test_always(g, sequence, {p[2], t[2], p[3], t[3]}, {}, true);
-	test_always(g, sequence, {p[0], t[2], p[1], t[1]}, {}, true);
-	test_always(g, sequence, {p[2], t[0], p[3], t[3]}, {}, true);
-	test_always(g, parallel, {p[1], t[1], p[0]}, {p[3], t[3], p[2]}, true);
-	test_always(g, choice, {t[0]}, {t[2]}, true);
-	test_not(g, parallel, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[2], t[2], p[3], t[3]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[2], p[1], t[1]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[2], t[0], p[3], t[3]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], t[1], p[0]}, {p[3], t[3], p[2]}, true);
+	test_always(comp, Composition::CHOICE, {t[0]}, {t[2]}, true);
+	test_not(comp, Composition::PARALLEL, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
 
-	test_always(g, implies, {p[0], p[1], t[1]}, {}, true);
-	test_always(g, implies, {p[2], p[3], t[3]}, {}, true);
-	test_always(g, implies, {t[0], t[2]}, {p[1], t[1], p[0], p[3], t[3], p[2]});
-	test_sometimes(g, implies, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
-	test_sometimes(g, excludes, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
+	test_always(comp, Composition::IMPLIES, {p[0], p[1], t[1]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {p[2], p[3], t[3]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], t[2]}, {p[1], t[1], p[0], p[3], t[3], p[2]});
+	test_sometimes(comp, Composition::IMPLIES, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[1], t[1], p[0], p[3], t[3], p[2]}, {t[0], t[2]});
 }
 
 TEST(composition, regular_parallel) {
@@ -241,26 +241,26 @@ TEST(composition, regular_parallel) {
 
 	g.reset.push_back(state<token>({token(p[1].index), token(p[3].index), token(p[5].index), token(p[7].index)}));
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {t[0], p[0], t[1], p[1]}, {}, true);
-	test_always(g, sequence, {t[2], p[6], t[3], p[7]}, {}, true);
-	test_always(g, sequence, {t[0], p[2], t[3], p[5]}, {}, true);
-	test_always(g, sequence, {t[2], p[4], t[1], p[3]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], t[1], p[1]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[2], p[6], t[3], p[7]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[2], t[3], p[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[2], p[4], t[1], p[3]}, {}, true);
 
-	test_always(g, parallel, {t[0]}, {t[2]}, true);
-	test_always(g, parallel, {t[1]}, {t[3]}, true);
-	test_always(g, parallel, {p[0], p[2], p[4], p[6]}, {}, true);
-	test_always(g, parallel, {p[1], p[3], p[5], p[7]}, {}, true);
-	test_always(g, parallel, {p[5], p[1], t[0], p[0], p[2]}, {t[2]}, true);
-	test_always(g, parallel, {t[0]}, {p[3], p[7], t[2], p[4], p[6]}, true);
-	test_always(g, parallel, {p[0], p[4], t[1], p[1], p[3]}, {t[3]}, true);
-	test_always(g, parallel, {t[1]}, {p[2], p[6], t[3], p[5], p[7]}, true);
+	test_always(comp, Composition::PARALLEL, {t[0]}, {t[2]}, true);
+	test_always(comp, Composition::PARALLEL, {t[1]}, {t[3]}, true);
+	test_always(comp, Composition::PARALLEL, {p[0], p[2], p[4], p[6]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], p[3], p[5], p[7]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[5], p[1], t[0], p[0], p[2]}, {t[2]}, true);
+	test_always(comp, Composition::PARALLEL, {t[0]}, {p[3], p[7], t[2], p[4], p[6]}, true);
+	test_always(comp, Composition::PARALLEL, {p[0], p[4], t[1], p[1], p[3]}, {t[3]}, true);
+	test_always(comp, Composition::PARALLEL, {t[1]}, {p[2], p[6], t[3], p[5], p[7]}, true);
 
-	test_always(g, implies, {t[0], p[0], t[1], p[1]}, {}, true);
-	test_always(g, implies, {t[2], p[6], t[3], p[7]}, {}, true);
-	test_always(g, implies, {t[0], p[2], t[3], p[5]}, {}, true);
-	test_always(g, implies, {t[2], p[4], t[1], p[3]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[0], t[1], p[1]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[2], p[6], t[3], p[7]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[2], t[3], p[5]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[2], p[4], t[1], p[3]}, {}, true);
 }
 
 TEST(composition, regular_choice) {
@@ -286,31 +286,31 @@ TEST(composition, regular_choice) {
 	g.reset.push_back(state<token>({token(p[0].index)}));
 	g.reset.push_back(state<token>({token(p[2].index)}));
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1]}, {}, true);
-	test_always(g, sequence, {p[0], t[2], p[3], t[5]}, {}, true);
-	test_always(g, sequence, {p[2], t[4], p[1], t[3]}, {}, true);
-	test_always(g, sequence, {p[2], t[6], p[3], t[7]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[2], p[3], t[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[2], t[4], p[1], t[3]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[2], t[6], p[3], t[7]}, {}, true);
 
-	test_always(g, choice, {p[0]}, {p[2]}, true);
-	test_always(g, choice, {p[1]}, {p[3]}, true);
-	test_always(g, choice, {t[0], t[2], t[4], t[6]}, {}, true);
-	test_always(g, choice, {t[1], t[3], t[5], t[7]}, {}, true);
-	test_always(g, choice, {t[5], t[1], p[0], t[0], t[2]}, {p[2]}, true);
-	test_always(g, choice, {p[0]}, {t[3], t[7], p[2], t[4], t[6]}, true);
-	test_always(g, choice, {t[0], t[4], p[1], t[1], t[3]}, {p[3]}, true);
-	test_always(g, choice, {p[1]}, {t[2], t[6], p[3], t[5], t[7]}, true);
+	test_always(comp, Composition::CHOICE, {p[0]}, {p[2]}, true);
+	test_always(comp, Composition::CHOICE, {p[1]}, {p[3]}, true);
+	test_always(comp, Composition::CHOICE, {t[0], t[2], t[4], t[6]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[1], t[3], t[5], t[7]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[5], t[1], p[0], t[0], t[2]}, {p[2]}, true);
+	test_always(comp, Composition::CHOICE, {p[0]}, {t[3], t[7], p[2], t[4], t[6]}, true);
+	test_always(comp, Composition::CHOICE, {t[0], t[4], p[1], t[1], t[3]}, {p[3]}, true);
+	test_always(comp, Composition::CHOICE, {p[1]}, {t[2], t[6], p[3], t[5], t[7]}, true);
 
-	test_sometimes(g, excludes, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
-	test_sometimes(g, excludes, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
-	test_sometimes(g, implies, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
-	test_sometimes(g, implies, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
+	test_sometimes(comp, Composition::IMPLIES, {p[0]}, {t[0], t[2], p[1], p[3], t[1], t[5]});
+	test_sometimes(comp, Composition::IMPLIES, {p[2]}, {t[4], t[6], p[1], p[3], t[3], t[7]});
 
-	test_sometimes(g, excludes, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
-	test_sometimes(g, excludes, {p[3]}, {t[5], t[7], p[0], p[2], t[2], t[6]});
-	test_sometimes(g, implies, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
-	test_sometimes(g, implies, {p[3]}, {t[5], t[7], p[0], p[2], t[2], t[6]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[3]}, {t[5], t[7], p[0], p[2], t[2], t[6]});
+	test_sometimes(comp, Composition::IMPLIES, {p[1]}, {t[1], t[3], p[0], p[2], t[0], t[4]});
+	test_sometimes(comp, Composition::IMPLIES, {p[3]}, {t[5], t[7], p[0], p[2], t[2], t[6]});
 }
 
 TEST(composition, choice_parallel) {
@@ -331,46 +331,46 @@ TEST(composition, choice_parallel) {
 	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
 	g.connect({p[0], t[4], p[5], t[5], p[6]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]}, {}, true);
-	test_always(g, sequence, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]}, {}, true);
-	test_always(g, sequence, {p[0], t[4], p[5], t[5], p[6]}, {}, true);
-	test_always(g, parallel, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
-	test_always(g, choice, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[4], p[5], t[5], p[6]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
+	test_always(comp, Composition::CHOICE, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
 
-	test_always(g, implies, {t[0], p[1], t[1], p[2], t[3], p[6]});
-	test_always(g, implies, {t[3], p[2], t[1], p[1], t[0], p[0]});
-	test_always(g, implies, {t[0], p[3], t[2], p[4], t[3], p[6]});
-	test_always(g, implies, {t[3], p[4], t[2], p[3], t[0], p[0]});
-	test_always(g, implies, {t[4], p[5], t[5], p[6]});
-	test_always(g, implies, {t[5], p[5], t[4], p[0]});
-	test_always(g, implies, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
-	test_always(g, excludes, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], t[1], p[2], t[3], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[2], t[1], p[1], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[3], t[2], p[4], t[3], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[4], t[2], p[3], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[5], t[5], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[5], p[5], t[4], p[0]});
+	test_always(comp, Composition::IMPLIES, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
 
-	test_always(g, implies, {p[0], p[6]});
-	test_always(g, implies, {p[6], p[0]});
+	test_always(comp, Composition::IMPLIES, {p[0], p[6]});
+	test_always(comp, Composition::IMPLIES, {p[6], p[0]});
 
-	test_sometimes(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_not_always(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_sometimes(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_not_always(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_sometimes(comp, Composition::IMPLIES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_not_always(comp, Composition::EXCLUDES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_not_always(comp, Composition::IMPLIES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 
 
 	// TODO(edward.bingham) write separate tests for this, and add index priority
 	// to understand not just sequencing, but order as well.
 
-	// EXPECT_TRUE(g.is(sequence, {p[1], p[3]}, {t[1], t[2]}, true));
+	// EXPECT_TRUE(g.is(Composition::SEQUENCE, {p[1], p[3]}, {t[1], t[2]}, true));
 	// EXPECT_FALSE(g.is(parallel, {p[1], p[3]}, {t[1], t[2]}));
 	// EXPECT_FALSE(g.is(choice, {p[1], p[3]}, {t[1], t[2]}, true));
 	// EXPECT_TRUE(g.is(choice, {p[1], p[3]}, {t[1], t[2]}));
 
-	// EXPECT_TRUE(g.is(sequence, {p[1], p[3]}, {p[2], p[4]}, true));
+	// EXPECT_TRUE(g.is(Composition::SEQUENCE, {p[1], p[3]}, {p[2], p[4]}, true));
 	// EXPECT_FALSE(g.is(parallel, {p[1], p[3]}, {p[2], p[4]}));
 	// EXPECT_FALSE(g.is(choice, {p[1], p[3]}, {p[2], p[4]}, true));
 	// EXPECT_TRUE(g.is(choice, {p[1], p[3]}, {p[2], p[4]}));
 
-	// EXPECT_FALSE(g.is(sequence, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_FALSE(g.is(Composition::SEQUENCE, {p[1], p[4]}, {p[2], p[3]}));
 	// EXPECT_TRUE(g.is(choice, {p[1], p[4]}, {p[2], p[3]}, true));
 	// EXPECT_FALSE(g.is(parallel, {p[1], p[4]}, {p[2], p[3]}));
 }
@@ -393,31 +393,31 @@ TEST(composition, parallel_choice) {
 	g.connect({p[0], t[3], p[2], t[4], p[3], t[6]});
 	g.connect({t[0], p[4], t[5], p[5], t[6]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[2], p[3], t[6]}, {}, true);
-	test_always(g, sequence, {t[0], p[0], t[3], p[2], t[4], p[3], t[6]}, {}, true);
-	test_always(g, sequence, {t[0], p[4], t[5], p[5], t[6]}, {}, true);
-	test_always(g, choice, {t[1], p[1], t[2]}, {t[3], p[2], t[4]}, true);
-	test_always(g, parallel, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]}, {p[4], t[5], p[5]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], t[1], p[1], t[2], p[3], t[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], t[3], p[2], t[4], p[3], t[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[4], t[5], p[5], t[6]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[1], p[1], t[2]}, {t[3], p[2], t[4]}, true);
+	test_always(comp, Composition::PARALLEL, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]}, {p[4], t[5], p[5]}, true);
 
-	test_always(g, implies, {t[1], p[1], t[2], p[3], t[6]});
-	test_always(g, implies, {t[3], p[2], t[4], p[3], t[6]});
-	test_always(g, implies, {t[0], p[4], t[5], p[5], t[6]});
-	test_always(g, excludes, {t[1], p[1], t[2]}, {t[3], p[2], t[4]}, true);
-	test_always(g, implies, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]}, {p[4], t[5], p[5]});
-	test_always(g, implies, {p[4], t[5], p[5]}, {p[0], p[3]});
-	test_sometimes(g, implies, {p[4], t[5], p[5]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
-	test_sometimes(g, excludes, {p[4], t[5], p[5]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
+	test_always(comp, Composition::IMPLIES, {t[1], p[1], t[2], p[3], t[6]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[2], t[4], p[3], t[6]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[4], t[5], p[5], t[6]});
+	test_always(comp, Composition::EXCLUDES, {t[1], p[1], t[2]}, {t[3], p[2], t[4]}, true);
+	test_always(comp, Composition::IMPLIES, {p[0], t[1], p[1], t[2], t[3], p[2], t[4], p[3]}, {p[4], t[5], p[5]});
+	test_always(comp, Composition::IMPLIES, {p[4], t[5], p[5]}, {p[0], p[3]});
+	test_sometimes(comp, Composition::IMPLIES, {p[4], t[5], p[5]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[4], t[5], p[5]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
 
-	test_always(g, implies, {t[2], p[1], t[1], p[0], t[0]});
-	test_always(g, implies, {t[4], p[2], t[3], p[0], t[0]});
-	test_always(g, implies, {t[6], p[5], t[5], p[4], t[0]});
-	test_always(g, implies, {t[0], p[0], p[3], t[6]});
-	test_always(g, implies, {t[6], p[3], p[0], t[0]});
+	test_always(comp, Composition::IMPLIES, {t[2], p[1], t[1], p[0], t[0]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[2], t[3], p[0], t[0]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[5], t[5], p[4], t[0]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[0], p[3], t[6]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[3], p[0], t[0]});
 
-	test_sometimes(g, implies, {p[0], p[3]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
-	test_sometimes(g, excludes, {p[0], p[3]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
+	test_sometimes(comp, Composition::IMPLIES, {p[0], p[3]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[0], p[3]}, {t[1], p[1], t[2], t[3], p[2], t[4]});
 }
 
 TEST(composition, sequence_choice_parallel) {
@@ -445,57 +445,57 @@ TEST(composition, sequence_choice_parallel) {
 
 	g.reset.push_back(state<token>({token(p[0].index)}));
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]}, {}, true);
-	test_always(g, sequence, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]}, {}, true);
-	test_always(g, sequence, {p[0], t[4], p[5], t[5], p[6]}, {}, true);
-	test_always(g, parallel, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
-	test_always(g, choice, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[3], p[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[3], t[2], p[4], t[3], p[6]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[4], p[5], t[5], p[6]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
+	test_always(comp, Composition::CHOICE, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
 
-	test_always(g, implies, {t[0], p[1], t[1], p[2], t[3], p[6]});
-	test_always(g, implies, {t[3], p[2], t[1], p[1], t[0], p[0]});
-	test_always(g, implies, {t[0], p[3], t[2], p[4], t[3], p[6]});
-	test_always(g, implies, {t[3], p[4], t[2], p[3], t[0], p[0]});
-	test_always(g, implies, {t[4], p[5], t[5], p[6]});
-	test_always(g, implies, {t[5], p[5], t[4], p[0]});
-	test_always(g, implies, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
-	test_always(g, excludes, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], t[1], p[2], t[3], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[2], t[1], p[1], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[3], t[2], p[4], t[3], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[3], p[4], t[2], p[3], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[5], t[5], p[6]});
+	test_always(comp, Composition::IMPLIES, {t[5], p[5], t[4], p[0]});
+	test_always(comp, Composition::IMPLIES, {p[1], t[1], p[2]}, {p[3], t[2], p[4]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[4], p[5], t[5]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3]}, true);
 
-	test_always(g, implies, {p[0], p[6]});
-	test_always(g, implies, {p[6], p[0]});
+	test_always(comp, Composition::IMPLIES, {p[0], p[6]});
+	test_always(comp, Composition::IMPLIES, {p[6], p[0]});
 
-	test_sometimes(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_not_always(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_sometimes(g, excludes, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
-	test_not_always(g, implies, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_sometimes(comp, Composition::IMPLIES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_not_always(comp, Composition::EXCLUDES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
+	test_not_always(comp, Composition::IMPLIES, {p[0], p[6]}, {t[0], p[1], t[1], p[2], p[3], t[2], p[4], t[3], t[4], p[5], t[5]});
 
-	test_always(g, sequence, {t[6], p[7], t[7], p[8], t[8], p[10], t[12]}, {}, true);
-	test_always(g, sequence, {t[6], p[7], t[9], p[9], t[10], p[10], t[12]}, {}, true);
-	test_always(g, sequence, {t[6], p[11], t[11], p[12], t[12]}, {}, true);
-	test_always(g, choice, {t[7], p[8], t[8]}, {t[9], p[9], t[10]}, true);
-	test_always(g, parallel, {p[7], t[7], p[8], t[8], t[9], p[9], t[10], p[10]}, {p[11], t[11], p[12]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[6], p[7], t[7], p[8], t[8], p[10], t[12]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[6], p[7], t[9], p[9], t[10], p[10], t[12]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[6], p[11], t[11], p[12], t[12]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[7], p[8], t[8]}, {t[9], p[9], t[10]}, true);
+	test_always(comp, Composition::PARALLEL, {p[7], t[7], p[8], t[8], t[9], p[9], t[10], p[10]}, {p[11], t[11], p[12]}, true);
 
-	test_always(g, implies, {t[7], p[8], t[8], p[10], t[12]});
-	test_always(g, implies, {t[9], p[9], t[10], p[10], t[12]});
-	test_always(g, implies, {t[6], p[11], t[11], p[12], t[12]});
-	test_always(g, excludes, {t[7], p[8], t[8]}, {t[9], p[9], t[10]}, true);
-	test_always(g, implies, {p[7], t[7], p[8], t[8], t[9], p[9], t[10], p[10]}, {p[11], t[11], p[12]});
-	test_always(g, implies, {p[11], t[11], p[12]}, {p[7], p[10]});
-	test_sometimes(g, implies, {p[11], t[11], p[12]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
-	test_sometimes(g, excludes, {p[11], t[11], p[12]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
+	test_always(comp, Composition::IMPLIES, {t[7], p[8], t[8], p[10], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[9], p[9], t[10], p[10], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[11], t[11], p[12], t[12]});
+	test_always(comp, Composition::EXCLUDES, {t[7], p[8], t[8]}, {t[9], p[9], t[10]}, true);
+	test_always(comp, Composition::IMPLIES, {p[7], t[7], p[8], t[8], t[9], p[9], t[10], p[10]}, {p[11], t[11], p[12]});
+	test_always(comp, Composition::IMPLIES, {p[11], t[11], p[12]}, {p[7], p[10]});
+	test_sometimes(comp, Composition::IMPLIES, {p[11], t[11], p[12]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[11], t[11], p[12]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
 
-	test_always(g, implies, {t[8], p[8], t[7], p[7], t[12]});
-	test_always(g, implies, {t[10], p[9], t[9], p[7], t[12]});
-	test_always(g, implies, {t[6], p[12], t[11], p[11], t[12]});
-	test_always(g, implies, {t[6], p[7], p[10], t[12]});
-	test_always(g, implies, {t[6], p[10], p[7], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[8], p[8], t[7], p[7], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[10], p[9], t[9], p[7], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[12], t[11], p[11], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[7], p[10], t[12]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[10], p[7], t[12]});
 
-	test_sometimes(g, implies, {p[7], p[10]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
-	test_sometimes(g, excludes, {p[7], p[10]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
+	test_sometimes(comp, Composition::IMPLIES, {p[7], p[10]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[7], p[10]}, {t[7], p[8], t[8], t[9], p[9], t[10]});
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[3], p[6], p[3], t[2], p[4], t[4], p[5], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[10], t[12], t[9], p[9], t[10], p[11], t[11], p[12]}, true);
-	test_sometimes(g, implies, {p[0], t[0], p[1], t[1], p[2], t[3], p[6], p[3], t[2], p[4], t[4], p[5], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[10], t[12], t[9], p[9], t[10], p[11], t[11], p[12]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[3], p[6], p[3], t[2], p[4], t[4], p[5], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[10], t[12], t[9], p[9], t[10], p[11], t[11], p[12]}, true);
+	test_sometimes(comp, Composition::IMPLIES, {p[0], t[0], p[1], t[1], p[2], t[3], p[6], p[3], t[2], p[4], t[4], p[5], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[10], t[12], t[9], p[9], t[10], p[11], t[11], p[12]}, true);
 }
 
 
@@ -517,47 +517,47 @@ TEST(composition, nonproper_choice) {
 	g.connect(p[1], t[6]);
 	g.connect(t[6], p[4]);
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, choice, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
-	test_always(g, choice, {t[1], p[2], t[2]}, {t[6], p[4], t[5]}, true);
+	test_always(comp, Composition::CHOICE, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
+	test_always(comp, Composition::CHOICE, {t[1], p[2], t[2]}, {t[6], p[4], t[5]}, true);
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[2], p[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[2], p[5]}, {}, true);
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[6], p[5]}, {}, true);
-	test_always(g, sequence, {p[0], p[4], t[5], p[5]}, {}, true);
-	test_sometimes(g, sequence, {t[0], p[1], t[6]}, {p[4], t[5]}, true);
-	test_sometimes(g, choice, {t[0], p[1]}, {p[4], t[5]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[6], p[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], p[4], t[5], p[5]}, {}, true);
+	test_sometimes(comp, Composition::SEQUENCE, {t[0], p[1], t[6]}, {p[4], t[5]}, true);
+	test_sometimes(comp, Composition::CHOICE, {t[0], p[1]}, {p[4], t[5]}, true);
 
-	test_always(g, sequence, {p[0], t[3], p[3], t[4], p[5]}, {}, true);
-	test_always(g, sequence, {p[0], p[4], t[5], p[5]}, {}, true);
-	test_sometimes(g, sequence, {t[3], p[3], t[4]}, {p[4], t[5]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[3], p[3], t[4], p[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], p[4], t[5], p[5]}, {}, true);
+	test_sometimes(comp, Composition::SEQUENCE, {t[3], p[3], t[4]}, {p[4], t[5]}, true);
 
-	test_always(g, choice, {t[6]}, {t[3], p[3], t[4], t[1], p[2], t[2]});
+	test_always(comp, Composition::CHOICE, {t[6]}, {t[3], p[3], t[4], t[1], p[2], t[2]});
 
-	test_always(g, excludes, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
-	test_always(g, excludes, {t[1], p[2], t[2]}, {t[6], p[4], t[5]}, true);
-	test_always(g, implies, {t[0], p[1], p[5]});
-	test_always(g, implies, {t[1], p[2], t[2], p[5]});
-	test_always(g, implies, {t[6], p[4], t[5], p[5]});
+	test_always(comp, Composition::EXCLUDES, {t[0], p[1], t[1], p[2], t[2]}, {t[3], p[3], t[4]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[1], p[2], t[2]}, {t[6], p[4], t[5]}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], p[5]});
+	test_always(comp, Composition::IMPLIES, {t[1], p[2], t[2], p[5]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[4], t[5], p[5]});
 
-	test_always(g, implies, {t[2], p[2], t[1], p[1], t[0], p[0]});
-	test_always(g, implies, {t[5], p[4], p[0]});
-	test_always(g, implies, {t[6], p[1], t[0], p[0]});
-	test_always(g, implies, {t[4], p[3], t[3], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[2], p[2], t[1], p[1], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[5], p[4], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[1], t[0], p[0]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[3], t[3], p[0]});
 
 	// TODO(edward.bingham) It should be this rather than what is listed below
-	//test_always(g, implies, {t[3], p[3], t[4], p[4], t[5], p[5]});
-		test_always(g, implies, {t[3], p[3], t[4], p[5]});
-		test_always(g, implies, {p[4], t[5], p[5]});
-		test_sometimes(g, implies, {t[3], p[3], t[4]}, {p[4], t[5]});
+	//test_always(comp, Composition::IMPLIES, {t[3], p[3], t[4], p[4], t[5], p[5]});
+		test_always(comp, Composition::IMPLIES, {t[3], p[3], t[4], p[5]});
+		test_always(comp, Composition::IMPLIES, {p[4], t[5], p[5]});
+		test_sometimes(comp, Composition::IMPLIES, {t[3], p[3], t[4]}, {p[4], t[5]});
 
-	test_sometimes(g, excludes, {t[0], p[1]}, {p[4], t[5]}, true);
-	test_sometimes(g, implies, {t[0], p[1]}, {p[4], t[5]}, true);
+	test_sometimes(comp, Composition::EXCLUDES, {t[0], p[1]}, {p[4], t[5]}, true);
+	test_sometimes(comp, Composition::IMPLIES, {t[0], p[1]}, {p[4], t[5]}, true);
 
-	test_always(g, excludes, {t[6]}, {t[3], p[3], t[4], t[1], p[2], t[2]}, true);
-	test_sometimes(g, implies, {t[0], p[1], p[4], t[5]}, {t[6]});
-	test_sometimes(g, excludes, {t[0], p[1], p[4], t[5]}, {t[6]});
+	test_always(comp, Composition::EXCLUDES, {t[6]}, {t[3], p[3], t[4], t[1], p[2], t[2]}, true);
+	test_sometimes(comp, Composition::IMPLIES, {t[0], p[1], p[4], t[5]}, {t[6]});
+	test_sometimes(comp, Composition::EXCLUDES, {t[0], p[1], p[4], t[5]}, {t[6]});
 }
 
 TEST(composition, nonproper_parallel) {
@@ -578,15 +578,15 @@ TEST(composition, nonproper_parallel) {
 	g.connect(t[1], p[6]);
 	g.connect(p[6], t[4]);
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, parallel, {p[0], t[1], p[1], t[2], p[2], p[6]}, {p[3], t[3], p[4]}, true);
-	test_always(g, parallel, {p[1], t[2], p[2]}, {p[6], t[4], p[5]}, true);
-	test_always(g, sequence, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]}, {}, true);
-	test_always(g, sequence, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]}, {}, true);
-	test_always(g, sequence, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]}, {}, true);
+	test_always(comp, Composition::PARALLEL, {p[0], t[1], p[1], t[2], p[2], p[6]}, {p[3], t[3], p[4]}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], t[2], p[2]}, {p[6], t[4], p[5]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], t[1], p[1], t[2], p[2], t[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[3], t[3], p[4], t[4], p[5], t[5]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], t[1], p[6], t[4], p[5], t[5]}, {}, true);
 
-	test_always(g, implies, {t[0], p[0], t[1], p[1], t[2], p[2], t[5], p[6], p[3], t[3], p[4], t[4], p[5]}, {}, true);
+	test_always(comp, Composition::IMPLIES, {t[0], p[0], t[1], p[1], t[2], p[2], t[5], p[6], p[3], t[3], p[4], t[4], p[5]}, {}, true);
 }
 
 TEST(composition, shared_parallel) {
@@ -611,36 +611,36 @@ TEST(composition, shared_parallel) {
 	g.connect({p[6], t[9], p[10]});
 	g.connect({t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[2], p[3], t[5], p[10]}, {}, true);
-	test_always(g, sequence, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]}, {}, true);
-	test_sometimes(g, sequence, {p[0], t[0], p[4], t[3], p[5], t[4], p[6], t[5], p[10]}, {}, true);
-	test_sometimes(g, sequence, {p[0], t[6], p[4], t[3], p[5], t[4], p[6], t[9], p[10]}, {}, true);
-	test_always(g, sequence, {p[0], t[6], p[7], t[7], p[8], t[8], p[9], t[9], p[10]}, {}, true);
-	test_always(g, choice, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[2], p[3], t[5], p[10]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]}, {}, true);
+	test_sometimes(comp, Composition::SEQUENCE, {p[0], t[0], p[4], t[3], p[5], t[4], p[6], t[5], p[10]}, {}, true);
+	test_sometimes(comp, Composition::SEQUENCE, {p[0], t[6], p[4], t[3], p[5], t[4], p[6], t[9], p[10]}, {}, true);
+	test_always(comp, Composition::SEQUENCE, {p[0], t[6], p[7], t[7], p[8], t[8], p[9], t[9], p[10]}, {}, true);
+	test_always(comp, Composition::CHOICE, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]}, true);
 
-	test_sometimes(g, choice, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
-	test_sometimes(g, parallel, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
+	test_sometimes(comp, Composition::CHOICE, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
+	test_sometimes(comp, Composition::PARALLEL, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
 
-	test_sometimes(g, choice, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
-	test_sometimes(g, parallel, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
+	test_sometimes(comp, Composition::CHOICE, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
+	test_sometimes(comp, Composition::PARALLEL, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
 
-	test_always(g, implies, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]});
-	test_always(g, implies, {t[0]}, {p[4], t[3], p[5], t[4], p[6], t[5]});
-	test_always(g, implies, {t[6]}, {p[4], t[3], p[5], t[4], p[6], t[9]});
-	test_always(g, implies, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
-	test_always(g, implies, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]});
+	test_always(comp, Composition::IMPLIES, {t[0]}, {p[4], t[3], p[5], t[4], p[6], t[5]});
+	test_always(comp, Composition::IMPLIES, {t[6]}, {p[4], t[3], p[5], t[4], p[6], t[9]});
+	test_always(comp, Composition::IMPLIES, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
+	test_always(comp, Composition::IMPLIES, {p[0], p[4], t[3], p[5], t[4], p[6], p[10]});
 
-	test_always(g, excludes, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[0], p[1], t[1], p[2], t[2], p[3], t[5]}, {t[6], p[7], t[7], p[8], t[8], p[9], t[9]}, true);
 
-	test_sometimes(g, excludes, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
-	test_sometimes(g, implies, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
-	test_always(g, implies, {p[7], t[7], p[8], t[8], p[9]}, {p[4], t[3], p[5], t[4], p[6]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
+	test_sometimes(comp, Composition::IMPLIES, {p[4], t[3], p[5], t[4], p[6]}, {p[7], t[7], p[8], t[8], p[9]});
+	test_always(comp, Composition::IMPLIES, {p[7], t[7], p[8], t[8], p[9]}, {p[4], t[3], p[5], t[4], p[6]});
 
-	test_sometimes(g, excludes, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
-	test_sometimes(g, implies, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
-	test_always(g, implies, {p[1], t[1], p[2], t[2], p[3]}, {p[4], t[3], p[5], t[4], p[6]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
+	test_sometimes(comp, Composition::IMPLIES, {p[4], t[3], p[5], t[4], p[6]}, {p[1], t[1], p[2], t[2], p[3]});
+	test_always(comp, Composition::IMPLIES, {p[1], t[1], p[2], t[2], p[3]}, {p[4], t[3], p[5], t[4], p[6]});
 }
 
 TEST(composition, shared_choice) {
@@ -665,29 +665,29 @@ TEST(composition, shared_choice) {
 	g.connect({t[6], p[9], t[10]});
 	g.connect({p[6], t[7], p[7], t[8], p[8], t[9], p[9]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {t[1], p[1], t[2], p[2], t[3]});
-	test_always(g, sequence, {t[4], p[3], t[5], p[4], t[6]});
-	test_always(g, sequence, {t[7], p[7], t[8], p[8], t[9]});
-
-	// TODO(edward.bingham) I think this may require recursive logic... which
-	// parallel branches is this node a part of in which conditions?
-	//test_always(g, parallel, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
-	//test_always(g, parallel, {p[0]}, {p[6]}, true);
-	//test_always(g, parallel, {p[5]}, {p[9]}, true);
-	test_always(g, choice, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
-
-	test_always(g, implies, {t[1], p[1], t[2], p[2], t[3]});
-	test_always(g, implies, {t[4], p[3], t[5], p[4], t[6]});
-	test_always(g, implies, {t[7], p[7], t[8], p[8], t[9]});
+	test_always(comp, Composition::SEQUENCE, {t[1], p[1], t[2], p[2], t[3]});
+	test_always(comp, Composition::SEQUENCE, {t[4], p[3], t[5], p[4], t[6]});
+	test_always(comp, Composition::SEQUENCE, {t[7], p[7], t[8], p[8], t[9]});
 
 	// TODO(edward.bingham) I think this may require recursive logic... which
 	// parallel branches is this node a part of in which conditions?
-	//test_always(g, implies, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
-	//test_always(g, implies, {p[0]}, {p[6]}, true);
-	//test_always(g, implies, {p[5]}, {p[9]}, true);
-	test_always(g, excludes, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
+	//test_always(comp, Composition::PARALLEL, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
+	//test_always(comp, Composition::PARALLEL, {p[0]}, {p[6]}, true);
+	//test_always(comp, Composition::PARALLEL, {p[5]}, {p[9]}, true);
+	test_always(comp, Composition::CHOICE, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
+
+	test_always(comp, Composition::IMPLIES, {t[1], p[1], t[2], p[2], t[3]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[3], t[5], p[4], t[6]});
+	test_always(comp, Composition::IMPLIES, {t[7], p[7], t[8], p[8], t[9]});
+
+	// TODO(edward.bingham) I think this may require recursive logic... which
+	// parallel branches is this node a part of in which conditions?
+	//test_always(comp, Composition::IMPLIES, {t[1], p[1], t[2], p[2], t[3]}, {t[7], p[7], t[8], p[8], t[9]}, true);
+	//test_always(comp, Composition::IMPLIES, {p[0]}, {p[6]}, true);
+	//test_always(comp, Composition::IMPLIES, {p[5]}, {p[9]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[4], p[3], t[5], p[4], t[6]}, {t[7], p[7], t[8], p[8], t[9], t[1], p[1], t[2], p[2], t[3]}, true);
 }
 
 TEST(composition, regular_choice_parallel) {
@@ -713,42 +713,42 @@ TEST(composition, regular_choice_parallel) {
 	g.connect({t[4], p[4], t[3], p[2]});
 	g.connect({p[0], t[4], p[6], t[5], p[5], t[6]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {p[0], t[0], p[1], t[1], p[2], t[6]});
-	test_always(g, sequence, {p[0], t[0], p[3], t[2], p[5], t[6]});
-	test_always(g, sequence, {p[0], t[4], p[4], t[3], p[2], t[6]});
-	test_always(g, sequence, {p[0], t[4], p[6], t[5], p[5], t[6]});
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[1], t[1], p[2], t[6]});
+	test_always(comp, Composition::SEQUENCE, {p[0], t[0], p[3], t[2], p[5], t[6]});
+	test_always(comp, Composition::SEQUENCE, {p[0], t[4], p[4], t[3], p[2], t[6]});
+	test_always(comp, Composition::SEQUENCE, {p[0], t[4], p[6], t[5], p[5], t[6]});
 
-	test_always(g, parallel, {p[1], t[1]}, {p[3], t[2]}, true);
-	test_always(g, parallel, {p[4], t[3]}, {p[6], t[5]}, true);
-	test_always(g, parallel, {p[2]}, {p[5]}, true);
+	test_always(comp, Composition::PARALLEL, {p[1], t[1]}, {p[3], t[2]}, true);
+	test_always(comp, Composition::PARALLEL, {p[4], t[3]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::PARALLEL, {p[2]}, {p[5]}, true);
 
-	test_always(g, choice, {p[1], t[1]}, {p[4], t[3]}, true);
-	test_always(g, choice, {p[1], t[1]}, {p[6], t[5]}, true);
-	test_always(g, choice, {p[3], t[2]}, {p[4], t[3]}, true);
-	test_always(g, choice, {p[3], t[2]}, {p[6], t[5]}, true);
-	test_always(g, choice, {t[0]}, {t[4]}, true);
+	test_always(comp, Composition::CHOICE, {p[1], t[1]}, {p[4], t[3]}, true);
+	test_always(comp, Composition::CHOICE, {p[1], t[1]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::CHOICE, {p[3], t[2]}, {p[4], t[3]}, true);
+	test_always(comp, Composition::CHOICE, {p[3], t[2]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::CHOICE, {t[0]}, {t[4]}, true);
 
-	test_always(g, implies, {t[0], p[1], t[1]});
-	test_always(g, implies, {t[0], p[3], t[2]});
-	test_always(g, implies, {t[4], p[4], t[3]});
-	test_always(g, implies, {t[4], p[6], t[5]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[1], t[1]});
+	test_always(comp, Composition::IMPLIES, {t[0], p[3], t[2]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[4], t[3]});
+	test_always(comp, Composition::IMPLIES, {t[4], p[6], t[5]});
 
-	test_always(g, implies, {p[1], t[1]}, {p[3], t[2]}, true);
-	test_always(g, implies, {p[4], t[3]}, {p[6], t[5]}, true);
-	test_always(g, implies, {p[2]}, {p[5]}, true);
+	test_always(comp, Composition::IMPLIES, {p[1], t[1]}, {p[3], t[2]}, true);
+	test_always(comp, Composition::IMPLIES, {p[4], t[3]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::IMPLIES, {p[2]}, {p[5]}, true);
 
-	test_always(g, excludes, {p[1], t[1]}, {p[4], t[3]}, true);
-	test_always(g, excludes, {p[1], t[1]}, {p[6], t[5]}, true);
-	test_always(g, excludes, {p[3], t[2]}, {p[4], t[3]}, true);
-	test_always(g, excludes, {p[3], t[2]}, {p[6], t[5]}, true);
-	test_always(g, excludes, {t[0]}, {t[4]}, true);
+	test_always(comp, Composition::EXCLUDES, {p[1], t[1]}, {p[4], t[3]}, true);
+	test_always(comp, Composition::EXCLUDES, {p[1], t[1]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::EXCLUDES, {p[3], t[2]}, {p[4], t[3]}, true);
+	test_always(comp, Composition::EXCLUDES, {p[3], t[2]}, {p[6], t[5]}, true);
+	test_always(comp, Composition::EXCLUDES, {t[0]}, {t[4]}, true);
 
-	test_sometimes(g, implies, {p[0]}, {t[0], p[1], t[1], p[3], t[2], t[4], p[4], t[3], p[6], t[5]});
-	test_sometimes(g, excludes, {p[0]}, {t[0], p[1], t[1], p[3], t[2], t[4], p[4], t[3], p[6], t[5]});
-	test_always(g, implies, {p[0]}, {p[2], p[5], t[6]}, true);
-	test_always(g, implies, {p[2], p[5]}, {t[6]}, true);
+	test_sometimes(comp, Composition::IMPLIES, {p[0]}, {t[0], p[1], t[1], p[3], t[2], t[4], p[4], t[3], p[6], t[5]});
+	test_sometimes(comp, Composition::EXCLUDES, {p[0]}, {t[0], p[1], t[1], p[3], t[2], t[4], p[4], t[3], p[6], t[5]});
+	test_always(comp, Composition::IMPLIES, {p[0]}, {p[2], p[5], t[6]}, true);
+	test_always(comp, Composition::IMPLIES, {p[2], p[5]}, {t[6]}, true);
 }
 
 /* This structure violates liveness
@@ -778,28 +778,28 @@ TEST(composition, regular_parallel_choice) {
 	g.connect({p[4], t[4], p[3], t[2]});
 	g.connect({t[0], p[4], t[6], p[5], t[5], p[6]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	test_always(g, sequence, {t[1], p[1], t[2]});
-	test_always(g, sequence, {t[3], p[2], t[5]});
-	test_always(g, sequence, {t[4], p[3], t[2]});
-	test_always(g, sequence, {t[6], p[5], t[5]});
+	test_always(comp, Composition::SEQUENCE, {t[1], p[1], t[2]});
+	test_always(comp, Composition::SEQUENCE, {t[3], p[2], t[5]});
+	test_always(comp, Composition::SEQUENCE, {t[4], p[3], t[2]});
+	test_always(comp, Composition::SEQUENCE, {t[6], p[5], t[5]});
 
-	test_always(g, choice, {t[1], p[1], t[2]}, {t[3], p[2], t[5]}, true);
-	test_always(g, choice, {t[4], p[3], t[2]}, {t[6], p[5], t[5]}, true);
+	test_always(comp, Composition::CHOICE, {t[1], p[1], t[2]}, {t[3], p[2], t[5]}, true);
+	test_always(comp, Composition::CHOICE, {t[4], p[3], t[2]}, {t[6], p[5], t[5]}, true);
 
-	test_always(g, parallel, {t[1], p[1]}, {t[4], p[3]}, true);
-	test_always(g, parallel, {t[3], p[2]}, {t[6], p[5]}, true);
-	test_always(g, parallel, {p[0]}, {p[4]}, true);
+	test_always(comp, Composition::PARALLEL, {t[1], p[1]}, {t[4], p[3]}, true);
+	test_always(comp, Composition::PARALLEL, {t[3], p[2]}, {t[6], p[5]}, true);
+	test_always(comp, Composition::PARALLEL, {p[0]}, {p[4]}, true);
 
-	test_sometimes(g, sequence, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]});
-	test_sometimes(g, sequence, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]});
-	test_sometimes(g, choice, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]});
-	test_sometimes(g, choice, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]});
-	test_not(g, parallel, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]}, true);
-	test_not(g, parallel, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]}, true);
-	test_always(g, sequence, {t[0]}, {p[0], p[4], p[6]}, true);
-	test_always(g, sequence, {t[0], p[0], p[4]}, {p[6]}, true);
+	test_sometimes(comp, Composition::SEQUENCE, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]});
+	test_sometimes(comp, Composition::SEQUENCE, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]});
+	test_sometimes(comp, Composition::CHOICE, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]});
+	test_sometimes(comp, Composition::CHOICE, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]});
+	test_not(comp, Composition::PARALLEL, {p[0]}, {t[1], p[1], t[2], t[3], p[2], t[5]}, true);
+	test_not(comp, Composition::PARALLEL, {p[4]}, {t[4], p[3], t[2], t[6], p[5], t[5]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0]}, {p[0], p[4], p[6]}, true);
+	test_always(comp, Composition::SEQUENCE, {t[0], p[0], p[4]}, {p[6]}, true);
 }*/
 
 TEST(composition, compose_proper_t2_2x2_2) {
@@ -807,7 +807,7 @@ TEST(composition, compose_proper_t2_2x2_2) {
 
 	auto n = g.create(transition(), 8);
 
-	segment result = g.compose(sequence,
+	segment result = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}, {n[2], n[3]}}, {{n[0], n[1]}, {n[2], n[3]}}),
 		segment({{n[4], n[5]}, {n[6], n[7]}}, {{n[4], n[5]}, {n[6], n[7]}}), true);
 
@@ -850,7 +850,7 @@ TEST(composition, compose_t2_2x2_2) {
 
 	auto n = g.create(transition(), 8);
 
-	segment result = g.compose(sequence,
+	segment result = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}, {n[2], n[3]}}, {{n[0], n[1]}, {n[2], n[3]}}),
 		segment({{n[4], n[5]}, {n[6], n[7]}}, {{n[4], n[5]}, {n[6], n[7]}}), false);
 
@@ -898,7 +898,7 @@ TEST(composition, compose_proper_t2_1x2_1) {
 
 	auto n = g.create(transition(), 6);
 
-	segment result = g.compose(sequence,
+	segment result = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}, {n[2]}}, {{n[0], n[1]}, {n[2]}}),
 		segment({{n[3], n[4]}, {n[5]}}, {{n[3], n[4]}, {n[5]}}), true);
 
@@ -931,7 +931,7 @@ TEST(composition, compose_t2_1x2_1) {
 
 	auto n = g.create(transition(), 6);
 
-	segment result = g.compose(sequence,
+	segment result = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}, {n[2]}}, {{n[0], n[1]}, {n[2]}}),
 		segment({{n[3], n[4]}, {n[5]}}, {{n[3], n[4]}, {n[5]}}), false);
 
@@ -973,23 +973,23 @@ TEST(composition, compose_t1x2) {
 
 	auto n = g.create(transition(), 14);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{n[0]}, {n[1]}}, {{n[0]}, {n[1]}}),
 		segment({{n[2]}}, {{n[2]}}), false);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{n[3], n[4]}}, {{n[3], n[4]}}),
 		segment({{n[5]}}, {{n[5]}}), false);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{n[6]}}, {{n[6]}}),
 		segment({{n[7]}, {n[8]}}, {{n[7]}, {n[8]}}), false);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{n[9]}}, {{n[9]}}),
 		segment({{n[10], n[11]}}, {{n[10], n[11]}}), false);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{n[12]}}, {{n[12]}}),
 		segment({{n[13]}}, {{n[13]}}), false);
 
@@ -1028,23 +1028,23 @@ TEST(composition, compose_proper_t1x2) {
 
 	auto n = g.create(transition(), 14);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{n[0]}, {n[1]}}, {{n[0]}, {n[1]}}),
 		segment({{n[2]}}, {{n[2]}}), true);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{n[3], n[4]}}, {{n[3], n[4]}}),
 		segment({{n[5]}}, {{n[5]}}), true);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{n[6]}}, {{n[6]}}),
 		segment({{n[7]}, {n[8]}}, {{n[7]}, {n[8]}}), true);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{n[9]}}, {{n[9]}}),
 		segment({{n[10], n[11]}}, {{n[10], n[11]}}), true);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{n[12]}}, {{n[12]}}),
 		segment({{n[13]}}, {{n[13]}}), true);
 
@@ -1083,23 +1083,23 @@ TEST(composition, compose_p1x2) {
 
 	auto n = g.create(place(), 14);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}}, {{n[0], n[1]}}),
 		segment({{n[2]}}, {{n[2]}}), false);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{n[3]}, {n[4]}}, {{n[3]}, {n[4]}}),
 		segment({{n[5]}}, {{n[5]}}), false);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{n[6]}}, {{n[6]}}),
 		segment({{n[7], n[8]}}, {{n[7], n[8]}}), false);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{n[9]}}, {{n[9]}}),
 		segment({{n[10]}, {n[11]}}, {{n[10]}, {n[11]}}), false);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{n[12]}}, {{n[12]}}),
 		segment({{n[13]}}, {{n[13]}}), false);
 
@@ -1138,23 +1138,23 @@ TEST(composition, compose_proper_p1x2) {
 
 	auto n = g.create(place(), 14);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{n[0], n[1]}}, {{n[0], n[1]}}),
 		segment({{n[2]}}, {{n[2]}}), true);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{n[3]}, {n[4]}}, {{n[3]}, {n[4]}}),
 		segment({{n[5]}}, {{n[5]}}), true);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{n[6]}}, {{n[6]}}),
 		segment({{n[7], n[8]}}, {{n[7], n[8]}}), true);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{n[9]}}, {{n[9]}}),
 		segment({{n[10]}, {n[11]}}, {{n[10]}, {n[11]}}), true);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{n[12]}}, {{n[12]}}),
 		segment({{n[13]}}, {{n[13]}}), true);
 
@@ -1194,35 +1194,35 @@ TEST(composition, compose_m1x2) {
 	auto t = g.create(transition(), 12);
 	auto p = g.create(place(), 12);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0]}, {t[0]}}, {{p[0]}, {t[0]}}),
 		segment({{p[1]}}, {{p[1]}}), false);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{p[2], t[1]}}, {{p[2], t[1]}}),
 		segment({{p[3]}}, {{p[3]}}), false);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{p[4]}, {t[2]}}, {{p[4]}, {t[2]}}),
 		segment({{t[3]}}, {{t[3]}}), false);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{p[5], t[4]}}, {{p[5], t[4]}}),
 		segment({{t[5]}}, {{t[5]}}), false);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{p[6]}}, {{p[6]}}),
 		segment({{p[7]}, {t[6]}}, {{p[7]}, {t[6]}}), false);
 
-	segment r5 = g.compose(sequence,
+	segment r5 = g.compose(Composition::SEQUENCE,
 		segment({{p[8]}}, {{p[8]}}),
 		segment({{p[9], t[7]}}, {{p[9], t[7]}}), false);
 
-	segment r6 = g.compose(sequence,
+	segment r6 = g.compose(Composition::SEQUENCE,
 		segment({{t[8]}}, {{t[8]}}),
 		segment({{p[10]}, {t[9]}}, {{p[10]}, {t[9]}}), false);
 
-	segment r7 = g.compose(sequence,
+	segment r7 = g.compose(Composition::SEQUENCE,
 		segment({{t[10]}}, {{t[10]}}),
 		segment({{p[11], t[11]}}, {{p[11], t[11]}}), false);
 
@@ -1277,35 +1277,35 @@ TEST(composition, compose_proper_m1x2) {
 	auto t = g.create(transition(), 12);
 	auto p = g.create(place(), 12);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0]}, {t[0]}}, {{p[0]}, {t[0]}}),
 		segment({{p[1]}}, {{p[1]}}), true);
 
-	segment r1 = g.compose(sequence,
+	segment r1 = g.compose(Composition::SEQUENCE,
 		segment({{p[2], t[1]}}, {{p[2], t[1]}}),
 		segment({{p[3]}}, {{p[3]}}), true);
 
-	segment r2 = g.compose(sequence,
+	segment r2 = g.compose(Composition::SEQUENCE,
 		segment({{p[4]}, {t[2]}}, {{p[4]}, {t[2]}}),
 		segment({{t[3]}}, {{t[3]}}), true);
 
-	segment r3 = g.compose(sequence,
+	segment r3 = g.compose(Composition::SEQUENCE,
 		segment({{p[5], t[4]}}, {{p[5], t[4]}}),
 		segment({{t[5]}}, {{t[5]}}), true);
 
-	segment r4 = g.compose(sequence,
+	segment r4 = g.compose(Composition::SEQUENCE,
 		segment({{p[6]}}, {{p[6]}}),
 		segment({{p[7]}, {t[6]}}, {{p[7]}, {t[6]}}), true);
 
-	segment r5 = g.compose(sequence,
+	segment r5 = g.compose(Composition::SEQUENCE,
 		segment({{p[8]}}, {{p[8]}}),
 		segment({{p[9], t[7]}}, {{p[9], t[7]}}), true);
 
-	segment r6 = g.compose(sequence,
+	segment r6 = g.compose(Composition::SEQUENCE,
 		segment({{t[8]}}, {{t[8]}}),
 		segment({{p[10]}, {t[9]}}, {{p[10]}, {t[9]}}), true);
 
-	segment r7 = g.compose(sequence,
+	segment r7 = g.compose(Composition::SEQUENCE,
 		segment({{t[10]}}, {{t[10]}}),
 		segment({{p[11], t[11]}}, {{p[11], t[11]}}), true);
 
@@ -1359,7 +1359,7 @@ TEST(composition, compose_p2_2x2_2) {
 
 	auto p = g.create(place(), 8);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0], p[1]}, {p[2], p[3]}}, {{p[0], p[1]}, {p[2], p[3]}}),
 		segment({{p[4], p[5]}, {p[6], p[7]}}, {{p[4], p[5]}, {p[6], p[7]}}), false);
 
@@ -1397,7 +1397,7 @@ TEST(composition, compose_proper_p2_2x2_2) {
 
 	auto p = g.create(place(), 8);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0], p[1]}, {p[2], p[3]}}, {{p[0], p[1]}, {p[2], p[3]}}),
 		segment({{p[4], p[5]}, {p[6], p[7]}}, {{p[4], p[5]}, {p[6], p[7]}}), true);
 
@@ -1431,7 +1431,7 @@ TEST(composition, compose_m2_2x2_2) {
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0], t[0]}, {p[1], t[1]}}, {{p[0], t[0]}, {p[1], t[1]}}),
 		segment({{p[2], t[2]}, {p[3], t[3]}}, {{p[2], t[2]}, {p[3], t[3]}}), false);
 
@@ -1473,7 +1473,7 @@ TEST(composition, compose_proper_m2_2x2_2) {
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
 
-	segment r0 = g.compose(sequence,
+	segment r0 = g.compose(Composition::SEQUENCE,
 		segment({{p[0], t[0]}, {p[1], t[1]}}, {{p[0], t[0]}, {p[1], t[1]}}),
 		segment({{p[2], t[2]}, {p[3], t[3]}}, {{p[2], t[2]}, {p[3], t[3]}}), true);
 

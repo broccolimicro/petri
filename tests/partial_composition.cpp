@@ -32,24 +32,24 @@ TEST(partial_composition, parallel_choice) {
 	g.connect({t[0], p[4], t[5], p[5], t[6], p[7], t[9]});
 	g.connect({p[4], t[7], p[6], t[8], p[7]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	EXPECT_TRUE(g.is(choice, {p[1], p[5]}, {p[2], p[6]}));
-	EXPECT_TRUE(g.is(choice, {p[1], p[5]}, {p[2], p[5]}));
-	EXPECT_FALSE(g.is(parallel, {p[1], p[5]}, {p[2], p[6]}));
-	EXPECT_FALSE(g.is(parallel, {p[1], p[5]}, {p[2], p[5]}));
-	EXPECT_FALSE(g.is(sequence, {p[1], p[5]}, {p[2], p[6]}));
-	EXPECT_FALSE(g.is(sequence, {p[1], p[5]}, {p[2], p[5]}));
-	EXPECT_TRUE(g.is(sequence, {p[0], p[4]}, {p[3], p[7]}));
-	EXPECT_FALSE(g.is(choice, {p[0], p[4]}, {p[3], p[7]}));
-	EXPECT_FALSE(g.is(parallel, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_TRUE(comp.is(Composition::CHOICE, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_TRUE(comp.is(Composition::CHOICE, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(comp.is(Composition::PARALLEL, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_FALSE(comp.is(Composition::PARALLEL, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(comp.is(Composition::SEQUENCE, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_FALSE(comp.is(Composition::SEQUENCE, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_TRUE(comp.is(Composition::SEQUENCE, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_FALSE(comp.is(Composition::CHOICE, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_FALSE(comp.is(Composition::PARALLEL, {p[0], p[4]}, {p[3], p[7]}));
 
-	EXPECT_TRUE(g.is(excludes, {p[1], p[5]}, {p[2], p[6]}));
-	EXPECT_TRUE(g.is(excludes, {p[1], p[5]}, {p[2], p[5]}));
-	EXPECT_FALSE(g.is(implies, {p[1], p[5]}, {p[2], p[6]}));
-	EXPECT_FALSE(g.is(implies, {p[1], p[5]}, {p[2], p[5]}));
-	EXPECT_FALSE(g.is(excludes, {p[0], p[4]}, {p[3], p[7]}));
-	EXPECT_TRUE(g.is(implies, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_TRUE(comp.is(Composition::EXCLUDES, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_TRUE(comp.is(Composition::EXCLUDES, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(comp.is(Composition::IMPLIES, {p[1], p[5]}, {p[2], p[6]}));
+	EXPECT_FALSE(comp.is(Composition::IMPLIES, {p[1], p[5]}, {p[2], p[5]}));
+	EXPECT_FALSE(comp.is(Composition::EXCLUDES, {p[0], p[4]}, {p[3], p[7]}));
+	EXPECT_TRUE(comp.is(Composition::IMPLIES, {p[0], p[4]}, {p[3], p[7]}));
 }
 
 TEST(partial_composition, parallel_parallel) {
@@ -75,43 +75,43 @@ TEST(partial_composition, parallel_parallel) {
 	g.connect({t[0], p[6], t[5], p[7], t[6], p[8], t[8], p[11], t[9]});
 	g.connect({t[5], p[9], t[7], p[10], t[8]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	EXPECT_TRUE (g.is(parallel, {t[2], t[3]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(choice,   {t[2], t[3]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(sequence, {t[2], t[3]}, {t[6], t[7]}, true, true));
-	EXPECT_TRUE (g.is(parallel, {t[2], t[6]}, {t[3], t[7]}, true, true));
-	EXPECT_FALSE(g.is(choice,   {t[2], t[6]}, {t[3], t[7]}, true, true));
-	EXPECT_FALSE(g.is(sequence, {t[2], t[6]}, {t[3], t[7]}, true, true));
-	EXPECT_TRUE (g.is(parallel, {t[2], t[6]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(choice,   {t[2], t[6]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(sequence, {t[2], t[6]}, {t[6], t[7]}, true, true));
-
-	// TODO(edward.bingham) Need to be able to determine ordering before I can
-	// answer these questions for cross orderings.
-	// EXPECT_TRUE(g.is(choice, {p[1], p[4]}, {p[2], p[3]}));
-	// EXPECT_FALSE(g.is(parallel, {p[1], p[4]}, {p[2], p[3]}));
-	// EXPECT_FALSE(g.is(sequence, {p[1], p[4]}, {p[2], p[3]}));
-
-	EXPECT_TRUE(g.is(sequence, {p[1], p[3]}, {p[2], p[4]}, true, true));
-	EXPECT_FALSE(g.is(choice, {p[1], p[3]}, {p[2], p[4]}, true, true));
-	EXPECT_FALSE(g.is(parallel, {p[1], p[3]}, {p[2], p[4]}, true, true));
-
-
-	EXPECT_TRUE (g.is(implies, {t[2], t[3]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(excludes,   {t[2], t[3]}, {t[6], t[7]}, true, true));
-	EXPECT_TRUE (g.is(implies, {t[2], t[6]}, {t[3], t[7]}, true, true));
-	EXPECT_FALSE(g.is(excludes,   {t[2], t[6]}, {t[3], t[7]}, true, true));
-	EXPECT_TRUE (g.is(implies, {t[2], t[6]}, {t[6], t[7]}, true, true));
-	EXPECT_FALSE(g.is(excludes,   {t[2], t[6]}, {t[6], t[7]}, true, true));
+	EXPECT_TRUE (comp.is(Composition::PARALLEL, {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::CHOICE,   {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::SEQUENCE, {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_TRUE (comp.is(Composition::PARALLEL, {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::CHOICE,   {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::SEQUENCE, {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_TRUE (comp.is(Composition::PARALLEL, {t[2], t[6]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::CHOICE,   {t[2], t[6]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::SEQUENCE, {t[2], t[6]}, {t[6], t[7]}, true, true));
 
 	// TODO(edward.bingham) Need to be able to determine ordering before I can
 	// answer these questions for cross orderings.
-	// EXPECT_TRUE(g.is(excludes, {p[1], p[4]}, {p[2], p[3]}));
-	// EXPECT_FALSE(g.is(implies, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_TRUE(comp.is(Composition::CHOICE, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_FALSE(comp.is(Composition::PARALLEL, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_FALSE(comp.is(Composition::SEQUENCE, {p[1], p[4]}, {p[2], p[3]}));
 
-	EXPECT_FALSE(g.is(excludes, {p[1], p[3]}, {p[2], p[4]}, true, true));
-	EXPECT_TRUE(g.is(implies, {p[1], p[3]}, {p[2], p[4]}, true, true));
+	EXPECT_TRUE(comp.is(Composition::SEQUENCE, {p[1], p[3]}, {p[2], p[4]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::CHOICE, {p[1], p[3]}, {p[2], p[4]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::PARALLEL, {p[1], p[3]}, {p[2], p[4]}, true, true));
+
+
+	EXPECT_TRUE (comp.is(Composition::IMPLIES, {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::EXCLUDES,   {t[2], t[3]}, {t[6], t[7]}, true, true));
+	EXPECT_TRUE (comp.is(Composition::IMPLIES, {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::EXCLUDES,   {t[2], t[6]}, {t[3], t[7]}, true, true));
+	EXPECT_TRUE (comp.is(Composition::IMPLIES, {t[2], t[6]}, {t[6], t[7]}, true, true));
+	EXPECT_FALSE(comp.is(Composition::EXCLUDES,   {t[2], t[6]}, {t[6], t[7]}, true, true));
+
+	// TODO(edward.bingham) Need to be able to determine ordering before I can
+	// answer these questions for cross orderings.
+	// EXPECT_TRUE(comp.is(Composition::EXCLUDES, {p[1], p[4]}, {p[2], p[3]}));
+	// EXPECT_FALSE(comp.is(Composition::IMPLIES, {p[1], p[4]}, {p[2], p[3]}));
+
+	EXPECT_FALSE(comp.is(Composition::EXCLUDES, {p[1], p[3]}, {p[2], p[4]}, true, true));
+	EXPECT_TRUE(comp.is(Composition::IMPLIES, {p[1], p[3]}, {p[2], p[4]}, true, true));
 
 }
 

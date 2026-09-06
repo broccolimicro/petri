@@ -3,6 +3,7 @@
 #include <common/standard.h>
 #include <common/message.h>
 #include <common/text.h>
+#include <common/index_vector.h>
 
 namespace petri
 {
@@ -278,5 +279,21 @@ ostream &operator<<(ostream &os, strand r0);
 
 vector<petri::iterator> find_first_shared(const strand &s0, const strand &s1);
 vector<petri::iterator> find_last_shared(const strand &s0, const strand &s1);
+
+struct Adjacency {
+	std::array<index_vector<std::vector<petri::iterator> >, 2> p, n;
+	std::vector<std::vector<petri::iterator> > reset;
+
+	const std::vector<petri::iterator> &prev(petri::iterator i) const;
+	const std::vector<petri::iterator> &next(petri::iterator i) const;
+
+	petri::iterator begin(int type) const;
+	petri::iterator end(int type) const;
+	size_t size(int type) const;
+
+	bool isValid(petri::iterator i) const;
+
+	bool precedes(petri::iterator from, petri::iterator to, set<petri::iterator> excl=set<petri::iterator>()) const;
+};
 
 }

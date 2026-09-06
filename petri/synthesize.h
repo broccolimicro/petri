@@ -246,16 +246,16 @@ void tree_to_graph(graph<place, transition, token, state> &g, const controlflow:
 
 		int composition = -1;
 		if (t.nodes[curr].comp == controlflow::Node::CHOICE) {
-			composition = petri::choice;
+			composition = petri::Composition::CHOICE;
 		} else if (t.nodes[curr].comp == controlflow::Node::PARALLEL) {
-			composition = petri::parallel;
+			composition = petri::Composition::PARALLEL;
 		} else if (t.nodes[curr].comp == controlflow::Node::LOOP) {
-			composition = petri::choice;
+			composition = petri::Composition::CHOICE;
 			for (auto &segment : segments) {
 				segment = g.loop(segment);
 			}
 		} else { //if (t.nodes[curr].comp == controlflow::Node::SEQUENCE) {
-			composition = petri::sequence;
+			composition = petri::Composition::SEQUENCE;
 		}
 
 		for (const auto &segment : segments) {

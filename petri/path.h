@@ -2,6 +2,7 @@
 
 #include <common/standard.h>
 #include "graph.h"
+#include "composition.h"
 
 namespace petri
 {
@@ -73,7 +74,7 @@ bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
 		if (p0.hops[i] > p1.hops[i]) {
 			bool found = false;
 			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
-				found = (p1.hops[j] > 0 and g.is(choice, p0.iter(i), p1.iter(j)));
+				found = (p1.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(i), p1.iter(j)));
 			}
 
 			if (not found) {
@@ -82,7 +83,7 @@ bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
 		} else if (p0.hops[i] < p1.hops[i]) {
 			bool found = false;
 			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
-				found = (p0.hops[j] > 0 and g.is(choice, p0.iter(j), p1.iter(i)));
+				found = (p0.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(j), p1.iter(i)));
 			}
 
 			if (not found) {
@@ -104,7 +105,7 @@ bool mergible(graph<place, transition, token, state> &g, const path &p0, const p
 		if (p0.hops[i] > p1.hops[i]) {
 			bool found = false;
 			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
-				found = (p1.hops[j] > 0 and g.is(choice, p0.iter(i), p1.iter(j)));
+				found = (p1.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(i), p1.iter(j)));
 			}
 
 			p0_empty = p0_empty and (found ? p0.hops[i] : p1.hops[i]) == 0;
@@ -112,7 +113,7 @@ bool mergible(graph<place, transition, token, state> &g, const path &p0, const p
 		} else if (p0.hops[i] < p1.hops[i]) {
 			bool found = false;
 			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
-				found = (p0.hops[j] > 0 and g.is(choice, p0.iter(j), p1.iter(i)));
+				found = (p0.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(j), p1.iter(i)));
 			}
 
 			p0_empty = p0_empty and p0.hops[i] == 0;
@@ -269,12 +270,12 @@ path_set trace(graph<place, transition, token, state> &g, petri::bound from, vec
 		// "to" vector by ignoring those branches. The split groups
 		// stored in the graph structure tell us which of those branches
 		// lead to our target node.
-		if (!g.split_groups_ready)
-			g.compute_split_groups();
+		if (!g.SplitGroups_ready)
+			g.compute_SplitGroups();
 
-		vector<split_group> groups;
+		vector<SplitGroup> groups;
 		for (auto i = to.begin(); i != to.end(); i++) {
-			vector<split_group> group;
+			vector<SplitGroup> group;
 			if (i->type == place::type) {
 				group = g.places[i->index].splits[type];
 			} else {

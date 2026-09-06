@@ -11,6 +11,7 @@
 #include "state.h"
 #include "iterator.h"
 #include "node.h"
+#include "composition.h"
 
 namespace petri
 {
@@ -64,8 +65,6 @@ struct graph
 	mutable bool node_distances_ready;
 
 	mutable bool split_dominance_ready;
-	mutable bool split_groups_ready;
-	mutable array<bool, 2> merge_groups_ready;
 
 	index_vector<place> places;
 	index_vector<transition> transitions;
@@ -77,9 +76,6 @@ struct graph
 	{
 		reset_node_distances();
 		split_dominance_ready = false;
-		split_groups_ready = false;
-		merge_groups_ready[0] = false;
-		merge_groups_ready[1] = false;
 	}
 
 	virtual ~graph()
@@ -351,37 +347,6 @@ struct graph
 		return false;
 	}
 
-	virtual bool precedes(petri::iterator from, petri::iterator to, set<petri::iterator> excl=set<petri::iterator>()) const {
-		array<vector<vector<petri::iterator> >, 2> n;
-		n[place::type].resize(places.size());
-		n[transition::type].resize(transitions.size());
-		for (int type = 0; type < 2; type++) {
-			for (int i = 0; i < (int)arcs[type].size(); i++) {
-				n[type][arcs[type][i].from.index].push_back(arcs[type][i].to);
-			}
-		}
-
-		set<petri::iterator> seen = excl;
-		seen.insert(from);
-
-		vector<petri::iterator> stack;
-		stack.push_back(from);
-		while (not stack.empty()) {
-			petri::iterator curr = stack.back();
-			stack.pop_back();
-
-			for (auto i = n[curr.type][curr.index].begin(); i != n[curr.type][curr.index].end(); i++) {
-				if (*i == to) {
-					return true;
-				}
-				if (seen.insert(*i).second) {
-					stack.push_back(*i);
-				}
-			}
-		}
-		return false;
-	}
-
 	bool is_split(petri::iterator n) {
 		int count = 0;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
@@ -402,437 +367,9 @@ struct graph
 		return false;
 	}
 
-	// DESIGN(edward.bingham) In the following structure, p6 and p4 are not real
-	// conditional splits. The real conditional split is where the reset
-	// tokens are placed. If they are placed on p0 and p4, then only the top
-	// two branches will ever be executed, and they will always be executed
-	// in sequence. If they are placed on p4 and p8, then only the bottom two
-	// branches will be executed.
-	// 
-	// =->t0-->p0      ->p1-->t1-->p2      ->p3--=   .
-	//           \    /              \    /          .
-	//            ->t2                ->t3           .
-	//           /    \              /    \          .
-	// =->t4-->p4      ->p5-->t5-->p6      ->p7--=   .
-	//           \    /              \    /          .
-	//            ->t6                ->t7           .
-	//           /    \              /    \          .
-	// =->t8-->p8      ->p9-->t9-->p10     ->p11-=   .
-	//
-	// The same effect happens for non-reset splits as well. If we take the
-	// t0 branch on the p0 split, then we are _guaranteed_ to execute t3, and
-	// if we take the t4 branch on the p0 split, then we are _guaranteed_ to
-	// execute t6. This means that p4 is not a real conditional split. The
-	// choice has already been made.
-	//
-	//          ->p1-->t1-->p2             .
-	//         /              \            .
-	//     ->t0                ->t3        .
-	//    /    \              /    \       .
-	//  p0      ->p3-->t2-->p4      ->p7   .
-	//    \    /              \    /       .
-	//     ->t4                ->t6        .
-	//         \              /            .
-	//          ->p5-->t5-->p6             .
-	//
-	// If each output transition of that split is on a
-	// different branch of another conditional split group found at that split,
-	// then that split is "covered". If a parent split only partially covers
-	// the child split or if there are multiple parent splits that together
-	// cover the child split, then it doesn't count because there still exists
-	// a choice between the ones that are covered and the ones that aren't, or
-	// the ones that are covered by one split and the ones that are covered by
-	// the other. If there are two output transitions that have the same parent
-	// branch, and then another parent branch that covers those two, then it
-	// counts. So, I need to identify a set of parents that hierarchically
-	// break apart the transitions into selection groups. This is like a tree
-	// of splits. Technically each sub split has to also have the parent split
-	// as a parent. otherwise, it's just compressed properly nested choice
-	// split followed by parallel merge.
-	virtual bool split_is_covered(petri::iterator p, vector<petri::iterator> n) const {
-		if (n.size() <= 1) {
-			return true;
-		}
-
-		vector<split_group> groups = split_groups_of(choice, p, false);
-		for (auto group = groups.begin(); group != groups.end(); group++) {
-			bool found = true;
-			vector<vector<petri::iterator> > clusters;
-			clusters.resize(group->count);
-			for (auto j = n.begin(); j != n.end() and found; j++) {
-				vector<split_group> subs = split_groups_of(choice, *j, false);
-				auto pos = find(subs.begin(), subs.end(), group->split);
-				if (pos != subs.end()) {
-					for (auto i = pos->branch.begin(); i != pos->branch.end() and found; i++) {
-						auto idx = find(group->branch.begin(), group->branch.end(), *i);
-						if (idx != group->branch.end()) {
-							clusters[idx-group->branch.begin()].push_back(*j);
-						} else {
-							found = false;
-						}
-					}
-				} else {
-					found = false;
-				}
-			}
-
-			for (auto cluster = clusters.begin(); cluster != clusters.end() and found; cluster++) {
-				if (cluster->size() == n.size() or not split_is_covered(p, *cluster)) {
-					found = false;
-				}
-			}
-
-			if (found) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	// Computes and propagates split-merge relationship information for a specific split point.
-	//
-	// This function analyzes how nodes in the Petri net relate to a specific split point,
-	// identifying which execution branches they belong to. It is fundamental for understanding
-	// concurrent behaviors and choice patterns in the net. The algorithm performs a sophisticated
-	// flow analysis using forward and backward traversal to handle properly nested and non-properly
-	// nested splits and merges.
-	//
-	// The first phase is a forward traversal that propagates branch information from split points,
-	// using a specialized algorithm to resolve complex merge situations. The second phase is a
-	// backward cleanup that removes unnecessary split markings. Together, these phases create a
-	// complete picture of which branches each node belongs to.
-	//
-	// @param composition The composition type to analyze (parallel or choice)
-	// @param split The index of the split node being analyzed
-	// @param init Vector of initial nodes representing the branches of the split
-	virtual void compute_split_group(int composition, int split, vector<petri::iterator> init) const {
-		if (init.size() <= 1) {
-			// there is no split here
-			return;
-		}
-
-		// precache previous places
-		array<vector<vector<petri::iterator> >, 2> p, n;
-		p[place::type].resize(places.size());
-		p[transition::type].resize(transitions.size());
-		n[place::type].resize(places.size());
-		n[transition::type].resize(transitions.size());
-		for (int type = 0; type < 2; type++) {
-			for (int i = 0; i < (int)arcs[type].size(); i++) {
-				n[type][arcs[type][i].from.index].push_back(arcs[type][i].to);
-				p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
-			}
-		}
-		for (int i = 0; i < (int)reset.size(); i++) {
-			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
-				p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
-			}
-		}
-
-		petri::iterator splitNode(
-				composition == parallel ? transition::type : place::type,
-				split);
-
-		vector<petri::iterator> frontier;
-		// TODO(edward.bingham) maybe want to use a "path" here
-		set<petri::iterator> seen;
-		seen.insert(init.begin(), init.end());
-		for (auto i = init.begin(); i != init.end(); i++) {
-			if (i->index >= 0) {
-				set_split_group(composition, *i, split_group(split, init.size(), {i->index}));
-			}
-		}
-
-		// I need to be able to do two things:
-		// 1. continue through a merge
-		// 2. stop when we encounter a node we've already seen
-		// problem is that when we encounter a merge, we visit that merge once for each branch into that merge. This counts as having "already seen" that node.
-		// If we stop and wait for all of the branches of the merge, and we encounter multiple blocked merges, then how do we know which merge to unblock first? Because one of the blocked merges may lead to the next.
-		// unblock the merge that is closest to the split
-
-		// Forward iteration step
-		//cout << "start loop " << split << endl;
-		map<petri::iterator, split_group> enabled;
-		map<petri::iterator, int> order;
-		int orderLevel = 0;
-		do {
-			enabled.clear();
-			//cout << "step " << ::to_string(seen) << endl;
-
-			map<petri::iterator, split_group> blocked;
-			for (int type = 0; type < 2; type++) {
-				for (petri::iterator to = begin(type); to != end(type); to++) {
-					if (not is_valid(to)) continue;
-
-					bool isDisabled = false;
-					bool isEnabled = false;
-					split_group toSplit = get_split_group(composition, to, split);
-					// Ensure that we haven't encountered this split yet.
-					if (toSplit.split != split) {
-						toSplit.split = split;
-						toSplit.count = init.size();
-
-						// Check to make sure we've visited all of the input nodes and
-						// derive the split group for this node.
-						for (auto from = p[to.type][to.index].begin(); from != p[to.type][to.index].end(); from++) {
-							split_group fromSplit = get_split_group(composition, *from, split);
-							if (fromSplit.split != split) {
-								isDisabled = true;
-								if (type == transition::type
-									and (composition == choice
-										or (composition == parallel
-											and compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE,
-												split_groups_of(choice, splitNode, false),
-												split_groups_of(choice, *from, false))))) {
-									toSplit.branch.clear();
-									break;
-								}
-								continue;
-							}
-							isEnabled = true;
-
-							if (from == p[to.type][to.index].begin()
-								or not (to.type == transition::type and composition == choice)) {
-								toSplit.branch.insert(
-									toSplit.branch.end(),
-									fromSplit.branch.begin(),
-									fromSplit.branch.end());
-								sort(toSplit.branch.begin(), toSplit.branch.end());
-								toSplit.branch.erase(unique(toSplit.branch.begin(), toSplit.branch.end()), toSplit.branch.end());
-							} else {
-								toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
-							}
-						}
-
-						// If we've visited at least one of the input nodes, then this
-						// might be a blocked merge. If we've visited all of the input
-						// nodes, then we can make forward progress.
-						if (isEnabled and isDisabled) {
-							blocked.insert({to, toSplit});
-						} else if (isEnabled) {
-							enabled.insert({to, toSplit});
-						}
-					}
-				}
-			}
-
-			//cout << "enabled: " << ::to_string(enabled) << endl;
-			//cout << "blocked: " << ::to_string(blocked) << endl;
-
-			if (enabled.empty() and not blocked.empty()) {
-				// We are stuck at a non-properly nested merge somewhere. We need to
-				// figure out where and then force progression through that merge. We
-				// may be stuck at multiple merges, we need to find the one that
-				// precedes all of the others.
-
-				for (auto i = blocked.begin(); i != blocked.end(); i++) {
-					auto pos = order.find(i->first);
-					if (pos == order.end()) {
-						order.insert({i->first, orderLevel});
-					}
-				}
-				orderLevel++;
-
-				//cout << ::to_string(order) << " " << to_string(seen) << endl;
-				auto first = blocked.begin();
-				for (auto i = ::next(blocked.begin()); i != blocked.end(); i++) {
-					bool AtoB = precedes(i->first, first->first, seen);
-					bool BtoA = precedes(first->first, i->first, seen);
-					if (AtoB and BtoA) {
-						auto orderA = order.find(i->first);
-						auto orderB = order.find(first->first);
-						if (orderB == order.end()
-							or (orderA != order.end() and orderA->second < orderB->second)) {
-							first = i;
-						}
-					} else if (AtoB) {
-						first = i;
-					}
-				}
-				//cout << "forcing " << first->first << endl;
-				enabled.insert(*first);
-			}
-
-			for (auto i = enabled.begin(); i != enabled.end(); i++) {
-				sort(i->second.branch.begin(), i->second.branch.end());
-				i->second.branch.erase(
-					unique(i->second.branch.begin(), i->second.branch.end()),
-					i->second.branch.end());
-				if (n[i->first.type][i->first.index].empty()) {
-					//cout << "ready frontier end adding " << i->first << endl;
-					frontier.push_back(i->first);
-				}
-				for (auto j = n[i->first.type][i->first.index].begin(); j != n[i->first.type][i->first.index].end(); j++) {
-					if (get_split_group(composition, *j, split).split == split) {
-						//cout << "ready frontier loop adding " << i->first << endl;
-						frontier.push_back(i->first);
-					}
-				}
-			}
-
-			for (auto i = enabled.begin(); i != enabled.end(); i++) {
-				// replace the set of groups that exist at this location
-				set_split_group(composition, i->first, i->second);
-				seen.insert(i->first);
-			}
-		} while (not enabled.empty());
-		//cout << "done loop" << endl;
-
-		sort(frontier.begin(), frontier.end());
-		frontier.erase(unique(frontier.begin(), frontier.end()), frontier.end());
-
-		//cout << ::to_string(frontier) << endl;
-		//print();
-		//cout << endl << endl;
-
-		// reverse iteration step: walk backward from the identified recursion
-		// points and delete back to the last encountered merge
-
-		// TODO(edward.bingham) I think this needs to be a breadth-first-search
-		// rather than depth-first-search
-		vector<petri::iterator> todo = frontier;
-		while (not todo.empty()) {
-			petri::iterator curr = todo.back();
-			todo.pop_back();
-
-			bool found = false;
-			vector<split_group> *cgroups = split_groups_iter(composition, curr);
-			if (cgroups != nullptr) {
-				for (int j = (int)cgroups->size()-1; j >= 0; j--) {
-					auto pos = cgroups->begin()+j;
-					if (pos->split == split and (pos->branch.empty() or (int)pos->branch.size() >= pos->count)) {
-						cgroups->erase(pos);
-						found = true;
-						break;
-					}
-				}
-			}
-			if (not found) {
-				continue;
-			}
-
-			bool closed = true;
-			for (auto i = p[curr.type][curr.index].begin(); i != p[curr.type][curr.index].end() and closed; i++) {
-				vector<split_group> groups = split_groups_of(composition, *i, false);
-				for (auto j = groups.begin(); j != groups.end() and closed; j++) {
-					closed = (j->split != split or j->branch.empty() or (int)j->branch.size() >= j->count);
-				}
-			}
-
-			if (closed) {
-				todo.insert(todo.end(), p[curr.type][curr.index].begin(), p[curr.type][curr.index].end());
-				sort(todo.begin(), todo.end());
-				todo.erase(unique(todo.begin(), todo.end()), todo.end());
-			}
-		}
-
-		//cout << "done backtrack" << endl;
-		//print();
-		//cout << endl << endl;
-	}
-
-	// Analyzes and computes all split-merge relationships throughout the Petri net.
-	//
-	// This function serves as the primary coordinator for split group analysis in the net.
-	// It systematically analyzes the structure of the Petri net to identify and catalog all 
-	// conditional (choice) and parallel execution splits. The function first processes choice splits,
-	// which is necessary to provide context for parallel splits analysis, then analyzes parallel
-	// splits. It also handles special cases related to reset states, which represent initial 
-	// markings of the net.
-	//
-	// After identifying potential split points, the function calls compute_split_group for each one,
-	// then performs post-processing to remove "covered" conditional splits - those that don't 
-	// represent true choices because they are predetermined by earlier choices in the net. This
-	// creates a clean, accurate representation of the net's behavioral structure.
-	//
-	// The information computed by this function is essential for higher-level relationship
-	// analysis like determining if nodes are in sequence, choice, or parallel relationships.
-	virtual void compute_split_groups() const {
-		// DESIGN(edward.bingham) Choice must go first, because we use that to
-		// determine whether we're dealing with non-properly nested parallelism or
-		// shared conditional parallel branches. It just so happens that "choice" =
-		// 0 and "parallel" = 1
-		for (int composition = 0; composition < 2; composition++) {
-			// clear previous executions of this function and cache previous places and
-			// transitions as an optimization.
-			for (int i = 0; i < (int)places.size(); i++) {
-				if (places.is_valid(i)) {
-					places[i].splits[composition].clear();
-				}
-			}
-			for (int i = 0; i < (int)transitions.size(); i++) {
-				if (transitions.is_valid(i)) {
-					transitions[i].splits[composition].clear();
-				}
-			}
-
-			// each place belongs to some set of parallel splits (init[place])
-			if (composition == parallel) {
-				// add parallel splits from reset states
-				if (not reset.empty()) {
-					for (int i = 0; i < (int)reset.size(); i++) {
-						vector<petri::iterator> branches;
-						for (auto j = reset[i].tokens.begin(); j != reset[i].tokens.end(); j++) {
-							branches.push_back(petri::iterator(place::type, j->index));
-						}
-						compute_split_group(composition, -i-1, branches);
-					}
-				}
-			} else if (composition == choice) {
-				if (reset.size() > 1) {
-					vector<petri::iterator> branches;
-					for (int i = 0; i < (int)reset.size(); i++) {
-						branches.push_back(petri::iterator(transition::type, -i-1));
-					}
-					compute_split_group(composition, -1, branches);
-				}
-			}
-
-			// A the moment, parallel == transition::type and choice == place::type,
-			// but that's not necessarily guaranteed.
-			int split_type = (composition == parallel ? transition::type : place::type);
-
-			// add splits from graph structure at the first branch nodes after each split
-			for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
-				if (not is_valid(i)) continue;
-
-				compute_split_group(composition, i.index, next(i));
-			}
-
-			// See split_is_covered() for documentation. Remove "covered" conditional splits.
-			if (composition == choice) {
-				set<int> covered;
-				for (petri::iterator i = begin(split_type); i != end(split_type); i++) {
-					if (not is_valid(i)) continue;
-
-					if (split_is_covered(i, next(i))) {
-						covered.insert(i.index);
-					}
-				}
-
-				for (int type = 0; type < 2; type++) {
-					for (petri::iterator i = begin(type); i != end(type); i++) {
-						if (not is_valid(i)) continue;
-
-						vector<split_group> *groups = split_groups_iter(choice, i);
-						for (int j = (int)groups->size()-1; j >= 0; j--) {
-							auto pos = groups->begin()+j;
-							if (covered.find(pos->split) != covered.end()) {
-								groups->erase(pos);
-							}
-						}
-					}
-				}
-			}
-		}
-		split_groups_ready = true;
-	}
-
 	virtual void mark_modified()
 	{
 		node_distances_ready = false;
-		split_groups_ready = false;
 	}
 
 	virtual int size(int type=-1) const {
@@ -1401,7 +938,7 @@ struct graph
 		return result;
 	}
 
-	virtual petri::iterator copy_combine(int composition, petri::iterator i0, petri::iterator i1) {
+	virtual petri::iterator copy_combine(Composition::Type composition, petri::iterator i0, petri::iterator i1) {
 		if (i0.type == place::type and i1.type == place::type) {
 			return create(place::merge(composition, places[i0.index], places[i1.index]));
 		} else if (i0.type == transition::type and i1.type == transition::type) {
@@ -1416,7 +953,7 @@ struct graph
 		return petri::iterator();
 	}
 
-	virtual petri::iterator combine(int composition, petri::iterator i0, petri::iterator i1) {
+	virtual petri::iterator combine(Composition::Type composition, petri::iterator i0, petri::iterator i1) {
 		if (i0.type == place::type and i1.type == place::type) {
 			places[i0.index] = place::merge(composition, places[i0.index], places[i1.index]);
 			return i0;
@@ -1653,9 +1190,9 @@ struct graph
 		return t;
 	}
 
-	virtual petri::iterator duplicate(int composition, petri::iterator i, bool add = true) {
+	virtual petri::iterator duplicate(Composition::Type composition, petri::iterator i, bool add = true) {
 		petri::iterator d = copy(i);
-		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel)) {
+		if ((i.type == transition::type and composition == Composition::CHOICE) or (i.type == place::type and composition == Composition::PARALLEL)) {
 			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
 				if (arcs[i.type][j].from == i) {
 					connect(d, arcs[i.type][j].to);
@@ -1718,13 +1255,13 @@ struct graph
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(int composition, petri::iterator i, int num, bool add = true) {
+	virtual vector<petri::iterator> duplicate(Composition::Type composition, petri::iterator i, int num, bool add = true) {
 		if (num == 0) {
 			return vector<petri::iterator>();
 		}
 
 		vector<petri::iterator> d = copy(i, num-1);
-		if ((i.type == transition::type and composition == choice) or (i.type == place::type and composition == parallel)) {
+		if ((i.type == transition::type and composition == Composition::CHOICE) or (i.type == place::type and composition == Composition::PARALLEL)) {
 			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
 				if (arcs[i.type][j].from == i) {
 					for (int k = 0; k < (int)d.size(); k++) {
@@ -1799,7 +1336,7 @@ struct graph
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(int composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true) {
+	virtual vector<petri::iterator> duplicate(Composition::Type composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true) {
 		vector<petri::iterator> result;
 		result.reserve(n.size()*num);
 		for (int i = 0; i < (int)n.size(); i++) {
@@ -1828,11 +1365,11 @@ struct graph
 	virtual void pinch(petri::iterator n) {
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
-		vector<petri::iterator> left = duplicate(n.type, neighbors.first, neighbors.second.size(), false);
-		vector<petri::iterator> right = duplicate(n.type, neighbors.second, neighbors.first.size(), true);
+		vector<petri::iterator> left = duplicate((Composition::Type)n.type, neighbors.first, neighbors.second.size(), false);
+		vector<petri::iterator> right = duplicate((Composition::Type)n.type, neighbors.second, neighbors.first.size(), true);
 
 		for (int i = 0; i < (int)right.size(); i++) {
-			combine(sequence, left[i], right[i]);
+			combine(Composition::SEQUENCE, left[i], right[i]);
 
 			for (int j = 0; j < (int)arcs[right[i].type].size(); j++) {
 				if (arcs[right[i].type][j].from == right[i]) {
@@ -2175,17 +1712,17 @@ struct graph
 	//   will execute, but not both.
 	// - Parallel: Create a structure where both nets execute concurrently.
 	//
-	// @param composition The composition type to use (sequence, choice, or parallel)
+	// @param composition The composition type to use (Composition::SEQUENCE, choice, or parallel)
 	// @param g The Petri net to merge with the current one
 	// @return A mapping from original nodes to corresponding nodes in the merged net
-	virtual segment compose(int composition, segment s0, segment s1, bool proper=false) {
+	virtual segment compose(Composition::Type composition, segment s0, segment s1, bool proper=false) {
 		mark_modified();
 
 		if (s0.source.empty()) {
 			s0 = s1;
 		} else if (s1.source.empty()) {
 			// skip
-		} else if (composition == sequence) {
+		} else if (composition == Composition::SEQUENCE) {
 			if (s0.sink.empty()) {
 				printf("warning: sequencing creates dead code.\n");
 			} else {
@@ -2479,7 +2016,7 @@ struct graph
 				if (nj == ni and pj == pi and (aggressive
 						or (transitions[i.index].is_vacuous() and transitions[j.index].is_vacuous()))) {
 					if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
-					transitions[j.index] = transition::merge(choice, transitions[i.index], transitions[j.index]);
+					transitions[j.index] = transition::merge(Composition::CHOICE, transitions[i.index], transitions[j.index]);
 					erase(i);
 					affect = true;
 					break;
@@ -2502,7 +2039,7 @@ struct graph
 					and (aggressive
 						or (transitions[i.index].is_vacuous() or transitions[j.index].is_vacuous()))) {
 					if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
-					transitions[j.index] = transition::merge(parallel, transitions[i.index], transitions[j.index]);
+					transitions[j.index] = transition::merge(Composition::PARALLEL, transitions[i.index], transitions[j.index]);
 					erase(i);
 					erase(ni);
 					erase(pi);
@@ -2514,7 +2051,7 @@ struct graph
 		return affect;
 	}
 
-	vector<strand> compute_strands(set<petri::iterator> from, set<petri::iterator> to, set<petri::iterator> excl=set<petri::iterator>()) {
+	vector<strand> compute_strands(set<petri::iterator> from, set<petri::iterator> to, set<petri::iterator> excl=set<petri::iterator>()) const {
 		vector<strand> stack;
 		for (auto i = from.begin(); i != from.end(); i++) {
 			stack.push_back(strand({*i}));
@@ -2689,664 +2226,6 @@ struct graph
 		return true;
 	}
 
-	virtual void set_split_group(int composition, petri::iterator node, split_group g) const {
-		vector<split_group> *groups = split_groups_iter(composition, node);
-		if (groups == nullptr) {
-			return;
-		}
-
-		auto pos = lower_bound(groups->begin(), groups->end(), g.split);
-		if (pos != groups->end() and pos->split == g.split) {
-			*pos = g;
-		} else {
-			groups->insert(pos, g);
-		}
-	}
-
-	virtual split_group get_split_group(int composition, petri::iterator node, int split) const {
-		vector<split_group> groups = split_groups_of(composition, node, false);
-		auto pos = lower_bound(groups.begin(), groups.end(), split);
-		if (pos != groups.end() and pos->split == split) {
-			return *pos;
-		}
-		return split_group();
-	}
-
-	virtual vector<split_group> *split_groups_iter(int composition, petri::iterator node) const {
-		if (node.index < 0) {
-			return nullptr;
-		}
-
-		if (node.type == place::type) {
-			return &places[node.index].splits[composition];
-		}
-		return &transitions[node.index].splits[composition];
-	}
-
-	virtual vector<split_group> split_groups_of(int composition, petri::iterator node, bool update = true) const {
-		if (node.index < 0) {
-			if (node.type == transition::type and composition == choice and (int)reset.size() > 1) {
-				return vector<split_group>(1, split_group(-1, (int)reset.size(), vector<int>(1, node.index)));
-			}
-			return vector<split_group>();
-		}
-
-		if (update and !split_groups_ready) {
-			compute_split_groups();
-		}
-
-		if (node.type == place::type) {
-			return places[node.index].splits[composition];
-		}
-		return transitions[node.index].splits[composition];
-	}
-
-	virtual vector<split_group> split_groups_of(int composition, int group_operation, int branch_operation, vector<petri::iterator> nodes) const {
-		vector<split_group> groups;
-		if (nodes.empty()) {
-			return groups;
-		}
-		groups = split_groups_of(composition, nodes[0]);
-		for (int i = 1; i < (int)nodes.size(); i++) {
-			groups = petri::merge(group_operation, branch_operation, groups, split_groups_of(composition, nodes[i]));
-		}
-		return groups;
-	}
-
-	// a is sometimes in choice with b if firing a does not imply a firing on b
-	// a is always in choice with b if firing a implies b will not fire
-	// a and b are sometimes in bidirectional choice if firing a does not imply a
-	// firing on b **or** visa-versa.
-	virtual bool is_excludes(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
-		if (a == b) {
-			return true;
-		}
-
-		auto ac = split_groups_of(choice, a, update);
-		auto bc = split_groups_of(choice, b, update);
-
-		return compare(split_group::NEGATIVE_DIFFERENCE, split_group::DIFFERENCE, ac, bc)
-			and (not always or not is_implies(a, b, false, update));
-	}
-
-
-	// a is sometimes in choice with b if firing a does not imply a firing on b
-	// a is always in choice with b if firing a implies b will not fire
-	// a and b are sometimes in bidirectional choice if firing a does not imply a
-	// firing on b **or** visa-versa.
-	virtual bool is_implies(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
-		if (a == b) {
-			return true;
-		}
-
-		auto ac = split_groups_of(choice, a, update);
-		auto bc = split_groups_of(choice, b, update);
-
-		return not compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc)
-			and (not always or not is_excludes(a, b, false, update));
-	}
-
-	// a is sometimes in choice with b if firing a does not imply a firing on b
-	// a is always in choice with b if firing a implies b will not fire
-	// a and b are sometimes in bidirectional choice if firing a does not imply a
-	// firing on b **or** visa-versa.
-	virtual bool is_choice(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
-		if (a == b) {
-			return false;
-		}
-
-		auto ac = split_groups_of(choice, a, update);
-		auto bc = split_groups_of(choice, b, update);
-		return (not always and compare(split_group::INTERSECT, split_group::NOT_EQUAL, ac, bc))
-			or (always and compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ac, bc)
-				and not is_parallel(a, b, false, update));
-	}
-
-	// a is sometimes in parallel if there exists a state with both a and b.
-	// This does not imply that all states with one also have the other. This
-	// relationship is bidirectional.
-	virtual bool is_parallel(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
-		if (a == b) {
-			return false;
-		}
-
-		auto ap = split_groups_of(parallel, a, update);
-		auto bp = split_groups_of(parallel, b, update);
-		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, ap, bp)
-			 and (not always or not is_choice(a, b, false, update));
-	}
-
-	virtual bool is_sequence(petri::iterator a, petri::iterator b, bool always=false, bool update=true) const {
-		if (a == b) {
-			return false;
-		}
-
-		auto ap = split_groups_of(parallel, a, update);
-		auto bp = split_groups_of(parallel, b, update);
-		auto ac = split_groups_of(choice, a, update);
-		auto bc = split_groups_of(choice, b, update);
-
-		return compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ap, bp)
-			and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL, ac, bc)
-			and (not always or not is_choice(a, b, false, update));
-	}
-
-	virtual bool is(int composition, petri::iterator a, petri::iterator b, bool always=false, bool bidir=false, bool update=true) const {
-		if (composition == sequence) {
-			return is_sequence(a, b, always, update) and (not bidir or is_sequence(b, a, always, update));
-		} else if (composition == choice) {
-			return is_choice(a, b, always, update);
-		} else if (composition == implies) {
-			return is_implies(a, b, always, update) and (not bidir or is_implies(b, a, always, update));
-		} else if (composition == excludes) {
-			return is_excludes(a, b, always, update) or (bidir and is_excludes(b, a, always, update));
-		}
-		return is_parallel(a, b, always, update);
-	}
-
-	// This assumes that a and b represent partial states. IE, there exists a set
-	// of states which each contain all nodes in a and a set of states which each
-	// contain all nodes in b.
-	virtual bool is(int composition, petri::region a, petri::region b, bool always=false, bool bidir=false) const {
-		// sometimes composed in parallel? - Is there a shared parallel split with
-		// mutually exclusive branches in the group-intersected, branch-unioned
-		// parallel split groups of the nodes of each partial that aren't in the other?
-
-		// sometimes composed in choice? - Is there a shared conditional split
-		// with exlusive branches in the group-unioned branch-intersected
-		// conditional split groups of the nodes of each partial?
-
-		// always composed in parallel? - sometimes composed in parallel and not
-		// sometimes composed in choice
-
-		// always composed in choice? - sometimes composed in choice and not
-		// sometimes composed in parallel
-
-		// e. sometimes composed in sequence? - sequencing direction is meaningless
-		// most of the time since all processes are cycles. It's even difficult to
-		// think about which direction crosses reset because the reset state could
-		// be on a separate conditional branch. A and B are sequenced if for both
-		// parallel and conditional split groups, branches in A are a superset of
-		// the branches in B for all shared groups (or visa versa) of the nodes of
-		// each partial that aren't in the other.
-
-		// f. always composed in sequence? - sometimes composed in sequence and not
-		// sometimes composed in choice
-		//   Is it possible to have nodes composed in sequence sometimes and
-		//   parallel others? If so, then also not composed in parallel sometimes.
-
-		if (composition == parallel or composition == implies) {
-			for (auto i = a.begin(); i != a.end(); i++) {
-				for (auto j = b.begin(); j != b.end(); j++) {
-					if (*i != *j and not is(composition, *i, *j, always, bidir)) {
-						return false;
-					}
-				}
-			}
-			return true;
-		} else if (composition == choice or composition == sequence or composition == excludes) {
-			for (auto i = a.begin(); i != a.end(); i++) {
-				for (auto j = b.begin(); j != b.end(); j++) {
-					if (*i != *j and is(composition, *i, *j, always, bidir)) {
-						return true;
-					}
-				}
-			}
-			return false;
-		}
-		return false;
-
-
-
-		/*if (always) {
-			if (composition == sequence) {
-				return is(sequence, a, b, false) and not is(choice, a, b, false);
-			}
-			return is(composition, a, b, false) and not is(1-composition, a, b, false);
-		}
-
-		sort(a.begin(), a.end());
-		a.erase(unique(a.begin(), a.end()), a.end());
-		sort(b.begin(), b.end());
-		b.erase(unique(b.begin(), b.end()), b.end());
-		vector_symmetric_complement(a, b);
-
-		if (a.empty() or b.empty()) {
-			return false;
-		}
-
-		if (composition == sequence) {
-			cout << "split a: " << ::to_string(split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a)) << endl;
-			cout << "split b: " << ::to_string(split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b)) << endl;
-			cout << "parallel: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a),
-					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b)) << endl;
-			cout << "split a: " << ::to_string(split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a)) << endl;
-			cout << "split b: " << ::to_string(split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)) << endl;
-			cout << "choice: " << compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a),
-					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)) << endl;
-			return (compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a),
-					split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b))
-				and compare(split_group::INTERSECT, split_group::SUBSET_EQUAL,
-					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a),
-					split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b)));
-		}
-
-		vector<split_group> Ga, Gb;
- 		if (composition == parallel) {
-			Ga = split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, a);
-			Gb = split_groups_of(parallel, split_group::INTERSECT, split_group::UNION, b);
-		} else {
-			Ga = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, a);
-			Gb = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, b);
-		}
-
-		return compare(split_group::INTERSECT, split_group::SYMMETRIC_DIFFERENCE, Ga, Gb);*/
-	}
-
-	// Find all partial state pairs (for each node in v0 and v1 respectively) that are ordered (not in parallel).
-	virtual vector<array<petri::bound, 2> > deinterfere_choice(vector<petri::iterator> v0, vector<petri::iterator> v1) {
-		vector<array<petri::bound, 2> > stack;
-		vector<array<petri::bound, 2> > next;
-
-		stack.resize(1);
-		for (int i = 0; i < (int)v0.size(); i++) {
-			stack.back()[0].push_back({v0[i]});
-		}
-		for (int i = 0; i < (int)v1.size(); i++) {
-			stack.back()[1].push_back({v1[i]});
-		}
-		if (stack.back()[0].empty() or stack.back()[1].empty()) {
-			stack.pop_back();
-		}
-		for (int i = 0; i < (int)v0.size(); i++) {
-			while (not stack.empty()) {
-				auto curr = stack.back();
-				stack.pop_back();
-
-				for (int j = 0; j < (int)curr[1].size(); j++) {
-					auto n = deinterfere(curr[0][i], curr[1][j]);
-					for (int k = 0; k < (int)n.size(); k++) {
-						if (not n[k][0].empty() and not n[k][1].empty()) {
-							next.push_back(curr);
-							next.back()[0][i] = n[k][0];
-							next.back()[1][j] = n[k][1];
-						}
-					}
-				}
-			}
-			stack = next;
-			next.clear();
-		}
-
-		return stack;
-	}
-
-	// Identifies configurations where node groups can be sequentially ordered.
-	//
-	// This function finds ways to organize potentially parallel nodes into
-	// sequentially orderable groups by identifying additional nodes that can 
-	// resolve parallelism. It's essential for transformations that need to
-	// convert concurrent behaviors into sequential ones.
-	//
-	// The algorithm analyzes relationship patterns between node sets, particularly
-	// looking for parallel relationships that can be broken by adding specific nodes.
-	// It systematically explores the graph to find nodes that, when added to either 
-	// group, would make the two groups non-parallel, enabling sequential execution.
-	//
-	// This operation is particularly important for state-variable insertion.
-	//
-	// @param v0 First vector of nodes to analyze
-	// @param v1 Second vector of nodes to analyze
-	// @return Vector of possible solutions, each containing two vectors of nodes that can be ordered
-	virtual vector<array<petri::region, 2> > deinterfere(petri::region v0, petri::region v1) {
-		sort(v0.begin(), v0.end());
-		sort(v1.begin(), v1.end());
-		vector<petri::iterator> v0p, v1p;
-		for (int j = 0; j < 2; j++) {
-			for (auto i = begin(j); i != end(j); i++) {
-				if (not is_valid(i)) continue;
-
-				if (find(v1.begin(), v1.end(), i) == v1.end() and is(parallel, {i}, v0)) {
-					v0p.push_back(i);
-				}
-				if (find(v0.begin(), v0.end(), i) == v0.end() and is(parallel, {i}, v1)) {
-					v1p.push_back(i);
-				}
-			}
-		}
-
-		vector<array<petri::region, 2> > result;
-		if (vector_intersects(v0.flat(), v1.flat())) {
-			return result;
-		}
-
-		if (not is(parallel, v0, v1)) {
-			result.push_back({v0, v1});
-			return result;
-		}
-
-		for (auto i = v0p.begin(); i != v0p.end(); i++) {
-			if (not is(parallel, {*i}, v1)) {
-				result.push_back({v0, v1});
-				result.back()[0].push_back(*i);
-			}
-		}
-
-		for (auto i = v1p.begin(); i != v1p.end(); i++) {
-			if (not is(parallel, {*i}, v0)) {
-				result.push_back({v0, v1});
-				result.back()[1].push_back(*i);
-			}
-		}
-
-		for (auto i = v0p.begin(); i != v0p.end(); i++) {
-			for (auto j = v1p.begin(); j != v1p.end(); j++) {
-				if (*i != *j and not is(parallel, *i, *j)) {
-					result.push_back({v0, v1});
-					result.back()[0].push_back(*i);
-					result.back()[1].push_back(*j);
-				}
-			}
-		}
-
-		return result;
-	}
-
-	// select groups nodes into maximal cliques based on specific relationship types
-	//
-	// Nodes can be simultaneously composed in both parallel and conditional.
-	// This function selects nodes into groups based upon a composition operator
-	// (ex. conditional groups of parallel nodes for the "parallel" composition).
-	// If the "strict" flag is set, then this function not only separates nodes
-	// that are not composed as desired, but also separates nodes that are
-	// compared as desired and also composed as not desired. For example, strict
-	// will also separate nodes that are simultaneously composed in parallel and
-	// conditional.
-	//
-	// This function identifies sets of nodes that share specific relationships (like choice,
-	// parallel, sequence, etc.) using the Bron-Kerbosch algorithm to find maximal cliques.
-	// It's a fundamental analysis tool that supports higher-level understanding of the
-	// Petri net's behavioral patterns and structural properties.
-	//
-	// The function operates by constructing an implicit graph where nodes that share the
-	// specified relationship have edges between them, then finding all maximal cliques
-	// in this graph. This provides insight into groups of nodes that have consistent
-	// behavioral relationships.
-	//
-	// The algorithm handles the NP-complete maximal clique problem using an iterative
-	// frame-based approach that efficiently identifies all relationships matching the
-	// specified criteria, with options for strict or relaxed relationship requirements.
-	//
-	// @param composition The relationship type to analyze (parallel, choice, implies, excludes)
-	// @param nodes The set of nodes to analyze for relationships
-	// @param always If true, requires consistent (always) relationships; if false, allows occasional relationships
-	// @param invert If true, inverts the relationship criteria, finding opposite relationships
-	// @return A vector of vectors, where each inner vector contains a maximal clique of related nodes
-	virtual bound select(int composition, vector<petri::iterator> nodes, bool always=false, bool invert=false) {
-		// ~always & ~invert - separate nodes that aren't sometimes composed as requested
-		// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
-		//  always & ~invert - separate nodes that aren't always composed as requested.
-		//                     For example if parallel requested, then this breaks sequence
-		//                     and choice relations.
-		//  always &  invert - separate nodes that are always composed as the opposite of requested
-
-		bound result;
-
-		// This is the problem of identifying all maximal cliques in the
-		// graph constructed using the nodes in "from" as vertices and
-		// creating edges between each pair of parallel nodes. This is an
-		// NP-complete problem and we are solving it using the Bron–Kerbosch
-		// algorithm.
-		struct BronKerboschFrame {
-			vector<petri::iterator> R, P, X;
-		};
-
-		int opposite = composition;
-		if (composition == parallel) {
-			opposite = choice;
-		} else if (composition == choice) {
-			opposite = parallel;
-		} else if (composition == implies) {
-			opposite = excludes;
-		} else if (composition == excludes) {
-			opposite = implies;
-		}
-
-		vector<BronKerboschFrame> frames;
-		frames.push_back(BronKerboschFrame());
-		frames.back().P = nodes;
-
-		while (not frames.empty()) {
-			auto frame = frames.back();
-			frames.pop_back();
-
-			if (frame.P.empty() and frame.X.empty()) {
-				// Then we've found a maximal clique
-				sort(frame.R.begin(), frame.R.end());
-				result.push_back(region::from_nodes(frame.R));
-			} else {
-				// Otherwise, we need to recurse
-				while (not frame.P.empty()) {
-					frames.push_back(frame);
-					frames.back().R.push_back(frame.P.back());
-					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if (frames.back().P[i] == frame.P.back()
-							or (not invert and not is(composition, frames.back().P[i], frame.P.back(), always, true))
-							or (invert and is(opposite, frames.back().P[i], frame.P.back(), always, true))) {
-							frames.back().P.erase(frames.back().P.begin() + i);
-						}
-					}
-					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if (frames.back().X[i] == frame.P.back()
-							or (not invert and not is(composition, frames.back().X[i], frame.P.back(), always, true))
-							or (invert and is(opposite, frames.back().X[i], frame.P.back(), always, true))) {
-							frames.back().X.erase(frames.back().X.begin() + i);
-						}
-					}
-
-					frame.X.push_back(frame.P.back());
-					frame.P.pop_back();
-				}
-			}
-		}
-
-		return result;
-	}
-
-	// Takes a strict selection of nodes (see graph::select() ) and regroups them into all non-strict selections
-	bound group(int composition, bound nodes, bool always=false, bool invert=false) {
-		// ~always & ~invert - group nodes that are sometimes composed as requested
-		// ~always &  invert - group nodes that aren't sometimes composed as the opposite of requested
-		//  always & ~invert - group nodes that are always composed as requested.
-		//  always &  invert - group nodes that aren't always composed as the opposite of requested
-
-		struct BronKerboschFrame {
-			vector<int> R, P, X;
-		};
-
-		int opposite = composition;
-		if (composition == parallel) {
-			opposite = choice;
-		} else if (composition == choice) {
-			opposite = parallel;
-		} else if (composition == implies) {
-			opposite = excludes;
-		} else if (composition == excludes) {
-			opposite = implies;
-		}
-
-		vector<BronKerboschFrame> frames;
-		frames.push_back(BronKerboschFrame());
-		for (int i = 0; i < (int)nodes.size(); i++) {
-			frames.back().P.push_back(i);
-		}
-
-		while (not frames.empty()) {
-			auto frame = frames.back();
-			frames.pop_back();
-
-			if (frame.P.empty() and frame.X.empty()) {
-				// Then we've found a maximal clique
-				if ((int)frame.R.size() > 1) {
-					nodes.push_back(region());
-					for (auto i = frame.R.begin(); i != frame.R.end(); i++) {
-						nodes.back().append(nodes[*i]);
-					}
-					sort(nodes.back().begin(), nodes.back().end());
-				}
-			} else {
-				// Otherwise, we need to recurse
-				while (not frame.P.empty()) {
-					frames.push_back(frame);
-					frames.back().R.push_back(frame.P.back());
-					for (int i = (int)frames.back().P.size()-1; i >= 0; i--) {
-						if (frames.back().P[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().P[i]], nodes[frame.P.back()], always))
-							or (invert and is(opposite, nodes[frames.back().P[i]], nodes[frame.P.back()], always))) {
-							frames.back().P.erase(frames.back().P.begin() + i);
-						}
-					}
-					for (int i = (int)frames.back().X.size()-1; i >= 0; i--) {
-						if (frames.back().X[i] == frame.P.back()
-							or (not invert and not is(composition, nodes[frames.back().X[i]], nodes[frame.P.back()], always))
-							or (invert and is(opposite, nodes[frames.back().X[i]], nodes[frame.P.back()], always))) {
-							frames.back().X.erase(frames.back().X.begin() + i);
-						}
-					}
-
-					frame.X.push_back(frame.P.back());
-					frame.P.pop_back();
-				}
-			}
-		}
-
-		return nodes;
-	}
-
-	bound complete(int composition, bound nodes) {
-		// In this function, we are given conditional groups of parallel
-		// nodes. In some cases, one group may entirely overlap another.
-		// We need to add nodes to differentiate them in the petri net
-		// when we insert transitions.
-
-		// So, given A and B such that A is a subset of B, under which
-		// choices that lead to a state in A don't lead to a state in B?
-		// If a set of choices don't lead to a state in B & ~A, then they
-		// also won't lead to a state in B.
-
-		// If all choices that lead to states in A also lead to states in
-		// B, then we can safely delete A from the list of groups.
-
-		// 1. Find A and all groups [Bi] such that A is a subset of Bi
-		for (int i = (int)nodes.size()-1; i >= 0; i--) {
-			// 2. Find the conditional split groups of A union groups, intersect branches.
-			vector<split_group> A_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, nodes[i]);
-			vector<split_group> B_groups;
-
-			cout << "starting search " << ::to_string(nodes[i]) << " " << ::to_string(A_groups) << endl;
-			for (int j = 0; j < (int)nodes.size(); j++) {
-				cout << "checking i=" << i << ":" << ::to_string(nodes[i]) << " and j=" << j << ":" << ::to_string(nodes[j]) << endl;
-				if (i != j and vector_is_subset_of(nodes[i].nodes, nodes[j].nodes)) {
-					cout << "found subset" << endl;
-					// 3. Find the conditional split groups of Bi & ~A union groups, intersect branches.
-					vector<petri::iterator> Bj = vector_difference(nodes[j].nodes, nodes[i].nodes);
-					cout << "j-i" << ::to_string(Bj) << endl;
-
-					vector<split_group> Bj_groups = split_groups_of(choice, split_group::UNION, split_group::INTERSECT, Bj);
-					cout << "groups:" << ::to_string(Bj_groups) << endl;
-
-					// 4. Find the conditional branches that B belongs to that A does
-					// not. Merge, intersect groups, subtract branches A-Bi for each Bi
-					Bj_groups = petri::merge(split_group::INTERSECT, split_group::DIFFERENCE, A_groups, Bj_groups);
-					cout << "after intersect:" << ::to_string(Bj_groups) << endl;
-
-					// 5. merge, union groups, union branches across all [Bi]
-					B_groups = petri::merge(split_group::UNION, split_group::UNION, B_groups, Bj_groups);
-					cout << "after union:" << ::to_string(B_groups) << endl;
-				}
-			}
-			cout << "done search:" << ::to_string(B_groups) << endl;
-			if (B_groups.empty()) {
-				continue;
-			}
-
-			// 5. Add these transitions to A
-			region A = nodes[i];
-			for (auto group = B_groups.begin(); group != B_groups.end(); group++) {
-				for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {
-					A.push_back(petri::iterator(transition::type, *branch));
-				}
-			}
-			A.sort();
-
-			/*// 6. select conditional groups of parallel transitions from A (not sometimes conditional)
-			vector<vector<petri::iterator> > groups = select(parallel, A, false, true);
-
-			// 7. delete groups that don't include A
-			for (auto group = groups.begin(); group != groups.end(); group++) {
-				if (vector_is_subset_of(nodes[i], *group)) {
-					nodes.push_back(*group);
-				}
-			}*/
-			nodes.push_back(A);
-
-			// TODO(edward.bingham) Do I need to group(parallel, groups, false,
-			// false) and then recurse looking for subsets? How does this interact
-			// with the conditional split bug? Are there other things that I'm
-			// missing here? How do I formally prove that this process creates a full
-			// graph cut of the behavior?
-
-			nodes.regions.erase(nodes.begin() + i);
-		}
-
-		return nodes;
-	}
-
-	virtual bound partials(int composition, petri::region nodes, vector<petri::iterator> other = vector<petri::iterator>()) {
-		nodes.sort();
-		if (other.empty()) {
-			for (auto i = begin(place::type); i != end(place::type); i++) {
-				if (is_valid(i) and is(composition, {i}, nodes)) {
-					other.push_back(i);
-				}
-			}
-			for (auto i = begin(transition::type); i != end(transition::type); i++) {
-				if (is_valid(i) and is(composition, {i}, nodes)) {
-					other.push_back(i);
-				}
-			}
-		}
-
-		// Given the set of nodes in "other" and the set of nodes in "nodes", we
-		// need to find all cliques (maximal or not) in the graph created by
-		// the requested composition relations.
-		bound result;
-		list<pair<petri::region, vector<petri::iterator> > > queue;
-		queue.push_back({nodes, other});
-		while (not queue.empty()) {
-			auto curr = queue.front();
-			queue.pop_front();
-
-			auto k = lower_bound(result.begin(), result.end(), curr.first);
-			if (k == result.end() or *k != curr.first) {
-				result.insert(k, curr.first);
-				for (auto i = curr.second.begin(); i != curr.second.end(); i++) {
-					if (is(composition, {*i}, curr.first)) {
-						queue.push_back(curr);
-						auto j = lower_bound(queue.back().first.begin(), queue.back().first.end(), *i);
-						queue.back().first.insert(j, *i);
-						queue.back().second.erase(queue.back().second.begin() + (i-curr.second.begin()));
-					}
-				}
-			}
-		}
-
-		return result;
-	}
-
 	virtual bool is_reset(petri::iterator i) const {
 		for (int j = 0; j < (int)reset.size(); j++) {
 			for (int k = 0; k < (int)reset[j].tokens.size(); k++) {
@@ -3358,120 +2237,99 @@ struct graph
 		return false;
 	}
 
-	virtual bool is_redundant_to(petri::iterator p0, petri::iterator p1) {
-		if (p0 == p1 or not is(parallel, p0, p1)) {
-			return false;
+	Adjacency adjacency() const {
+		Adjacency result;
+		result.p[place::type].alloc(places.size());
+		result.p[transition::type].alloc(transitions.size());
+		result.n[place::type].alloc(places.size());
+		result.n[transition::type].alloc(transitions.size());
+		for (size_t i = 0; i < places.size(); i++) {
+			if (not places.is_valid(i)) continue;
+			result.n[place::type].emplace_at(i);
+			result.p[place::type].emplace_at(i);
+		}
+		for (size_t i = 0; i < transitions.size(); i++) {
+			if (not transitions.is_valid(i)) continue;
+			result.n[transition::type].emplace_at(i);
+			result.p[transition::type].emplace_at(i);
 		}
 
-		vector<petri::iterator> n = neighbors(p0);
-		for (auto ni = n.begin(); ni != n.end(); ni++) {
-			if (is(parallel, *ni, p1)) {
-				return false;
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				result.n[type][arcs[type][i].from.index].push_back(arcs[type][i].to);
+				result.p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
 			}
 		}
-
-		if (not is_reset(p0)) {
-			if (is_reset(p1)) {
-				return false;
-			}
-			for (auto ri = reset.begin(); ri != reset.end(); ri++) {
-				for (auto rj = ri->tokens.begin(); rj != ri->tokens.end(); rj++) {
-					petri::iterator p(place::type, rj->index);
-					if (p != p0 and p != p1 and is(parallel, p0, p) and is(sequence, p1, p)) {
-						return false;
-					}
-				}
+		for (int i = 0; i < (int)reset.size(); i++) {
+			result.reset.push_back(std::vector<petri::iterator>());
+			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
+				result.p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
+				result.reset.back().push_back(petri::iterator(place::type, reset[i].tokens[j].index));
 			}
 		}
-
-		return true;
+		return result;
 	}
 
-	virtual bool is_redundant_to(petri::iterator p0, vector<petri::iterator> p1) {
-		for (auto i = p1.begin(); i != p1.end(); i++) {
-			if (is_redundant_to(p0, *i)) {
-				return true;
+	Adjacency forwardAdjacency() const {
+		Adjacency result;
+		result.n[place::type].alloc(places.size());
+		result.n[transition::type].alloc(transitions.size());
+		for (size_t i = 0; i < places.size(); i++) {
+			if (not places.is_valid(i)) continue;
+			result.n[place::type].emplace_at(i);
+		}
+		for (size_t i = 0; i < transitions.size(); i++) {
+			if (not transitions.is_valid(i)) continue;
+			result.n[transition::type].emplace_at(i);
+		}
+
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				result.n[type][arcs[type][i].from.index].push_back(arcs[type][i].to);
 			}
 		}
-		return false;
+		for (int i = 0; i < (int)reset.size(); i++) {
+			result.reset.push_back(std::vector<petri::iterator>());
+			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
+				result.reset.back().push_back(petri::iterator(place::type, reset[i].tokens[j].index));
+			}
+		}
+		return result;
 	}
 
-	virtual bool is_redundant(petri::iterator p0) {
-		for (auto i = begin(place::type); i != end(place::type); i++) {
-			if (not is_valid(i)) continue;
+	Adjacency backwardAdjacency() const {
+		Adjacency result;
+		result.p[place::type].alloc(places.size());
+		result.p[transition::type].alloc(transitions.size());
+		for (size_t i = 0; i < places.size(); i++) {
+			if (not places.is_valid(i)) continue;
+			result.p[place::type].emplace_at(i);
+		}
+		for (size_t i = 0; i < transitions.size(); i++) {
+			if (not transitions.is_valid(i)) continue;
+			result.p[transition::type].emplace_at(i);
+		}
 
-			if (is_redundant_to(p0, i)) {
-				//cout << p0 << " is redundant to " << i << endl;
-				return true;
+		for (int type = 0; type < 2; type++) {
+			for (int i = 0; i < (int)arcs[type].size(); i++) {
+				result.p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
 			}
 		}
-		return false;
-	}
-
-	virtual vector<petri::iterator> add_redundant(vector<petri::iterator> p) {
-		for (auto i = begin(place::type); i != end(place::type); i++) {
-			if (is_valid(i) and is_redundant_to(i, p)) {
-				p.push_back(i);
+		for (int i = 0; i < (int)reset.size(); i++) {
+			result.reset.push_back(std::vector<petri::iterator>());
+			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
+				result.p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
+				result.reset.back().push_back(petri::iterator(place::type, reset[i].tokens[j].index));
 			}
 		}
-		sort(p.begin(), p.end());
-		p.erase(unique(p.begin(), p.end()), p.end());
-		return p;
-	}
-
-	virtual bool crosses_reset(vector<petri::iterator> pos) {
-		bool before_reset = false;
-		bool after_reset = false;
-
-		for (auto i = pos.begin(); i != pos.end(); i++) {
-			if (i->type == transition::type) {
-				bool found = false;
-				for (auto group = transitions[i->index].splits[parallel].begin(); group != transitions[i->index].splits[parallel].end() and not found; group++) {
-					found = group->split < 0;
-				}
-				before_reset = before_reset or not found;
-				after_reset = after_reset or found;
-			} else {
-				bool found = false;
-				for (auto group = places[i->index].splits[parallel].begin(); group != places[i->index].splits[parallel].end(); group++) {
-					if (group->split < 0) {
-						found = true;
-						for (auto branch = group->branch.begin(); branch != group->branch.end(); branch++) {
-							if (*branch == i->index) {
-								before_reset = true;
-							} else {
-								after_reset = true;
-							}
-						}
-					}
-				}
-				before_reset = before_reset or not found;
-			}
-		}
-		return before_reset and after_reset;
-	}
-
-	vector<split_group> invert(int composition, vector<split_group> groups) {
-		int split_type = (composition == choice ? place::type : transition::type);
-		for (int i = 0; i < (int)groups.size(); i++) {
-			vector<petri::iterator> n = next(petri::iterator(split_type, groups[i].split));
-			vector<int> branches;
-			for (int j = 0; j < (int)n.size(); j++) {
-				if (find(groups[i].branch.begin(), groups[i].branch.end(), n[j].index) == groups[i].branch.end()) {
-					branches.push_back(n[j].index);
-				}
-			}
-			groups[i].branch.swap(branches);
-			branches.clear();
-		}
-		return groups;
+		return result;
 	}
 
 	virtual void print() const {
 		for (int i = 0; i < (int)places.size(); i++) {
 			if (not places.is_valid(i)) continue;
 
-			cout << "p" << i << ": " << places[i] << " p" << ::to_string(places[i].splits[place::type]) << " t" << ::to_string(places[i].splits[transition::type]) << "{";
+			cout << "p" << i << ": " << places[i] << " p" << "{";
 			for (int j = 0; j < (int)places.size(); j++) {
 				if (not places.is_valid(j)) continue;
 
@@ -3498,7 +2356,7 @@ struct graph
 		for (int i = 0; i < (int)transitions.size(); i++) {
 			if (not transitions.is_valid(i)) continue;
 
-			cout << "t" << i << ": " << transitions[i] << " p" << ::to_string(transitions[i].splits[place::type]) << " t" << ::to_string(transitions[i].splits[transition::type]) << "{";
+			cout << "t" << i << ": " << transitions[i] << "{";
 
 			for (int j = 0; j < (int)places.size(); j++) {
 				if (not places.is_valid(j)) continue;

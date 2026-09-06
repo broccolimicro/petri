@@ -32,43 +32,43 @@ TEST(group, parallel_choice) {
 	g.connect({t[0], p[4], t[5], p[5], t[6], p[7], t[9]});
 	g.connect({p[4], t[7], p[6], t[8], p[7]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, bound({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, bound({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, bound({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(parallel, bound({{p[1]},{p[5]}}), true, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(choice, bound({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(choice, bound({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(choice, bound({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(choice, bound({{p[1]},{p[5]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[5]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[5]}}), true, true));
 
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(parallel, bound({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(parallel, bound({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(parallel, bound({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(parallel, bound({{p[1]},{p[2]}}), true, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, bound({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, bound({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, bound({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(choice, bound({{p[1]},{p[2]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::PARALLEL, bound({{p[1]},{p[2]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::CHOICE, bound({{p[1]},{p[2]}}), true, true));
 
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(implies, bound({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(implies, bound({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(implies, bound({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(implies, bound({{p[1]},{p[5]}}), true, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(excludes, bound({{p[1]},{p[5]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(excludes, bound({{p[1]},{p[5]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[5]}}), g.group(excludes, bound({{p[1]},{p[5]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), g.group(excludes, bound({{p[1]},{p[5]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[5]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[5]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[5]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[5]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[5]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[5]},{p[1],p[5]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[5]}}), true, true));
 
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(implies, bound({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(implies, bound({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(implies, bound({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]}}), g.group(implies, bound({{p[1]},{p[2]}}), true, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(excludes, bound({{p[1]},{p[2]}}), false, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(excludes, bound({{p[1]},{p[2]}}), false, true));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(excludes, bound({{p[1]},{p[2]}}), true, false));
-	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), g.group(excludes, bound({{p[1]},{p[2]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]}}), comp.group(Composition::IMPLIES, bound({{p[1]},{p[2]}}), true, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[2]}}), false, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[2]}}), false, true));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[2]}}), true, false));
+	EXPECT_EQ(bound({{p[1]},{p[2]},{p[1],p[2]}}), comp.group(Composition::EXCLUDES, bound({{p[1]},{p[2]}}), true, true));
 }
 
 TEST(group, choice_parallel) {
@@ -94,41 +94,41 @@ TEST(group, choice_parallel) {
 	g.connect({p[0], t[4], p[5], t[5], p[6], t[7], p[9]});
 	g.connect({t[4], p[7], t[6], p[8], t[7]});
 
-	g.compute_split_groups();
+	CompositionAnalysis comp(g.adjacency());
 
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(parallel, bound({{t[1]},{t[5]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(parallel, bound({{t[1]},{t[5]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(parallel, bound({{t[1]},{t[5]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(parallel, bound({{t[1]},{t[5]}}), true, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, bound({{t[1]},{t[5]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, bound({{t[1]},{t[5]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, bound({{t[1]},{t[5]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(choice, bound({{t[1]},{t[5]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[5]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[5]}}), true, true));
 
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, bound({{t[1]},{t[2]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, bound({{t[1]},{t[2]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, bound({{t[1]},{t[2]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(parallel, bound({{t[1]},{t[2]}}), true, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(choice, bound({{t[1]},{t[2]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(choice, bound({{t[1]},{t[2]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(choice, bound({{t[1]},{t[2]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(choice, bound({{t[1]},{t[2]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::PARALLEL, bound({{t[1]},{t[2]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::CHOICE, bound({{t[1]},{t[2]}}), true, true));
 
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(implies, bound({{t[1]},{t[5]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(implies, bound({{t[1]},{t[5]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(implies, bound({{t[1]},{t[5]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]}}), g.group(implies, bound({{t[1]},{t[5]}}), true, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(excludes, bound({{t[1]},{t[5]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(excludes, bound({{t[1]},{t[5]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(excludes, bound({{t[1]},{t[5]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), g.group(excludes, bound({{t[1]},{t[5]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[5]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[5]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[5]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[5]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[5]},{t[1],t[5]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[5]}}), true, true));
 
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(implies, bound({{t[1]},{t[2]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(implies, bound({{t[1]},{t[2]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(implies, bound({{t[1]},{t[2]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), g.group(implies, bound({{t[1]},{t[2]}}), true, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(excludes, bound({{t[1]},{t[2]}}), false, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(excludes, bound({{t[1]},{t[2]}}), false, true));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(excludes, bound({{t[1]},{t[2]}}), true, false));
-	EXPECT_EQ(bound({{t[1]},{t[2]}}), g.group(excludes, bound({{t[1]},{t[2]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]},{t[1],t[2]}}), comp.group(Composition::IMPLIES, bound({{t[1]},{t[2]}}), true, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[2]}}), false, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[2]}}), false, true));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[2]}}), true, false));
+	EXPECT_EQ(bound({{t[1]},{t[2]}}), comp.group(Composition::EXCLUDES, bound({{t[1]},{t[2]}}), true, true));
 }

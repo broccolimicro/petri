@@ -521,7 +521,7 @@ bool bound::remap(region from, region to, bool rsorted) {
 bound &bound::compose(int composition, region r0) {
 	if (regions.empty()) {
 		regions.push_back(r0);
-	} else if (composition == choice) {
+	} else if (composition == Composition::CHOICE) {
 		if (not contains(r0)) {
 			for (auto j = regions.begin(); j != regions.end(); j++) {
 				if (r0.contains(*j)) {
@@ -531,7 +531,7 @@ bound &bound::compose(int composition, region r0) {
 			}
 			regions.push_back(r0);
 		}
-	} else if (composition == parallel) {
+	} else if (composition == Composition::PARALLEL) {
 		for (auto i = regions.begin(); i != regions.end(); i++) {
 			i->compose(r0);
 		}
@@ -544,17 +544,17 @@ bound &bound::compose(int composition, bound b0) {
 		regions = b0.regions;
 	} else if (b0.regions.empty()) {
 		// skip
-	} else if (composition == choice) {
+	} else if (composition == Composition::CHOICE) {
 		for (auto i = b0.begin(); i != b0.end(); i++) {
 			compose(composition, *i);
 		}
-	} else if (composition == parallel) {
+	} else if (composition == Composition::PARALLEL) {
 		bound b1;
 		for (auto i = regions.begin(); i != regions.end(); i++) {
 			for (auto j = b0.begin(); j != b0.end(); j++) {
 				region r0 = *i;
 				r0.compose(*j);
-				b1.compose(choice, r0);
+				b1.compose(Composition::CHOICE, r0);
 			}
 		}
 		regions = b1.regions;
@@ -946,6 +946,50 @@ vector<petri::iterator> find_last_shared(const strand &s0, const strand &s1) {
 		}
 	}
 	return result;
+}
+
+const std::vector<petri::iterator> &Adjacency::prev(petri::iterator i) const {
+	return p[i.type][i.index];
+}
+
+const std::vector<petri::iterator> &Adjacency::next(petri::iterator i) const {
+	return n[i.type][i.index];
+}
+
+petri::iterator Adjacency::begin(int type) const {
+	return petri::iterator(type, 0);
+}
+
+petri::iterator Adjacency::end(int type) const {
+	return petri::iterator(type, size(type));
+}
+
+size_t Adjacency::size(int type) const {
+	return n[type].size();
+}
+
+bool Adjacency::isValid(petri::iterator i) const {
+	return n[i.type].is_valid(i.index) or p[i.type].is_valid(i.index);
+}
+
+bool Adjacency::precedes(petri::iterator from, petri::iterator to, set<petri::iterator> excl) const {
+	vector<petri::iterator> stack;
+	stack.push_back(from);
+	excl.insert(from);
+	while (not stack.empty()) {
+		petri::iterator curr = stack.back();
+		stack.pop_back();
+
+		for (auto i : next(curr)) {
+			if (i == to) {
+				return true;
+			}
+			if (excl.insert(i).second) {
+				stack.push_back(i);
+			}
+		}
+	}
+	return false;
 }
 
 }
