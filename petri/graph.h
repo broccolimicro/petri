@@ -13,8 +13,7 @@
 #include "node.h"
 #include "composition.h"
 
-namespace petri
-{
+namespace petri {
 
 // An arc represents a directed connection between two nodes in a Petri net
 // It stores references to both the source ('from') and destination ('to') nodes using iterators
@@ -24,8 +23,7 @@ namespace petri
 // - Modeling flow of tokens and control in the Petri net
 // - Defining the topology and connectivity of the net
 // - Supporting graph traversal and reachability analysis
-struct arc
-{
+struct arc {
 	arc();
 	arc(petri::iterator from, petri::iterator to);
 	~arc();
@@ -61,9 +59,6 @@ bool operator!=(arc a0, arc a1);
 template <class place, class transition, class state>
 struct graph
 {
-	mutable vector<int> node_distances;
-	mutable bool node_distances_ready;
-
 	mutable bool split_dominance_ready;
 
 	index_vector<place> places;
@@ -72,15 +67,11 @@ struct graph
 	array<vector<arc>, 2> arcs;
 	vector<state> reset;
 
-	graph()
-	{
-		reset_node_distances();
+	graph() {
 		split_dominance_ready = false;
 	}
 
-	virtual ~graph()
-	{
-
+	virtual ~graph() {
 	}
 
 	bool is_valid(petri::iterator i) const {
@@ -88,153 +79,6 @@ struct graph
 			return places.is_valid(i.index);
 		}
 		return transitions.is_valid(i.index);
-	}
-
-	// Calculate the minimum number of arcs between any two nodes. This data
-	// can be used to determine if one node is reachable from another or as
-	// a way to guide logic minimization heuristics based on what is the
-	// "most recent transition". The result is stored in node_distances in
-	// the following grid pattern:
-	//
-	// p = places.size();
-	// t = transitions.size();
-	//
-	//                              |               from                  |
-	//                              |                |                    |
-	//                              | places         | transitions        |
-	//                              | 0, 1, ..., p-1 | p, p+1, ..., p+t-1 |
-	//    __________________________|________________|____________________|
-	//                0*(p+t)       | from places    | from transitions   |
-	//         places 1*(p+t)       | to places      | to places          |
-	//                ...           |                |                    |
-	//                (p-1)*(p+t)   |                |                    |
-	//    to________________________|________________|____________________|
-	//                (p)*(p+t)     | from places    | from transitions   |
-	//    transitions (p+1)*(p+t)   | to transitions | to transitions     |
-	//                ...           |                |                    |
-	//                (p+t-1)*(p+t) |                |                    |
-	//    __________________________|________________|____________________|
-	virtual void reset_node_distances() const {
-		int nodes = (int)(places.size() + transitions.size());
-		int offset = (int)places.size();
-		node_distances.clear();
-		node_distances.assign(nodes*nodes, std::numeric_limits<int>::min());
-		for (int i = 0; i < (int)places.size(); i++) {
-			node_distances[i*nodes + i] = 0;
-		}
-		for (int i = 0; i < (int)transitions.size(); i++) {
-			node_distances[(offset + i)*nodes + (offset + i)] = 0;
-		}
-		node_distances_ready = false;
-	}
-
-	// Updates the node distance matrix for a specific node position
-	// This calculates minimum arc distances from the given node to all other nodes
-	// Uses a breadth-first search approach to find the shortest paths
-	// Maintains the cached distance data in node_distances
-	// Used in reachability analysis and path calculations
-	virtual void update_node_distances(petri::iterator pos) const {
-		set<petri::iterator> seen;
-
-		array<vector<vector<petri::iterator> >, 2> p;
-		p[place::type].resize(places.size());
-		p[transition::type].resize(transitions.size());
-		for (int type = 0; type < 2; type++) {
-			for (int i = 0; i < (int)arcs[type].size(); i++) {
-				p[1-type][arcs[type][i].to.index].push_back(arcs[type][i].from);
-			}
-		}
-
-		int nodes = (int)(places.size() + transitions.size());
-		int offset = (int)places.size();
-		int posIdx = offset*pos.type + pos.index;
-
-		vector<petri::iterator> stack;
-		stack.push_back(pos);
-		seen.insert(pos);
-		while (not stack.empty()) {
-			petri::iterator curr = stack.back();
-			stack.pop_back();
-
-			int toIdx = offset*curr.type + curr.index;
-			for (auto i = p[curr.type][curr.index].begin(); i != p[curr.type][curr.index].end(); i++) {
-				int fromIdx = offset*i->type + i->index;
-				if (seen.insert(*i).second) {
-					node_distances[posIdx*nodes + fromIdx] = max(node_distances[posIdx*nodes + fromIdx], node_distances[posIdx*nodes + toIdx] + 1);
-					stack.push_back(*i);
-				}
-			}
-		}
-	}
-
-	// Updates the entire node distance matrix for all nodes in the Petri net
-	// Calls update_node_distances for each place and transition
-	// Used to calculate the complete reachability information for the net
-	// This is an expensive operation and is performed only when necessary
-	virtual void update_node_distances() const {
-		// TODO(edward.bingham) This needs to take the max of the node distances
-		// for all of the pre-set nodes. However, doing so triggers an infinite
-		// loop around loops with splits and merges
-
-		// clear the current set of distances
-		if (not node_distances_ready) {
-			reset_node_distances();
-		}
-
-		for (int i = 0; i < (int)places.size(); i++) {
-			if (places.is_valid(i)) {
-				update_node_distances(petri::iterator(place::type, i));
-			}
-		}
-
-		for (int i = 0; i < (int)transitions.size(); i++) {
-			if (transitions.is_valid(i)) {
-				update_node_distances(petri::iterator(transition::type, i));
-			}
-		}
-
-		node_distances_ready = true;
-	}
-
-	virtual int &distance(petri::iterator from, petri::iterator to, bool update = true) const {
-		if (update and not node_distances_ready) {
-			update_node_distances();
-		}
-
-		int nodes = places.size() + transitions.size();
-		int fromIdx = places.size()*from.type + from.index;
-		int toIdx = places.size()*to.type + to.index;
-		int idx = toIdx*nodes + fromIdx;
-		if (idx >= (int)node_distances.size()) {
-			node_distances.resize(nodes*nodes, std::numeric_limits<int>::min());
-		}
-		return node_distances[idx];
-	}
-
-	virtual int distance(vector<petri::iterator> from, vector<petri::iterator> to) const {
-		int result = std::numeric_limits<int>::min();
-		for (int i = 0; i < (int)from.size(); i++) {
-			for (int j = 0; j < (int)to.size(); j++) {
-				int d = distance(from[i], to[j]);
-				if (d >= 0 and d > result) {
-					result = d;
-				}
-			}
-		}
-		return result;
-	}
-
-	virtual int min_distance(vector<petri::iterator> from, vector<petri::iterator> to) const {
-		int result = std::numeric_limits<int>::max();
-		for (int i = 0; i < (int)from.size(); i++) {
-			for (int j = 0; j < (int)to.size(); j++) {
-				int d = distance(from[i], to[j]);
-				if (d >= 0 and d < result) {
-					result = d;
-				}
-			}
-		}
-		return result;
 	}
 
 	virtual std::vector<enabled_transition> find_enabled(int toType, std::vector<petri::iterator> tokens) {
@@ -332,21 +176,6 @@ struct graph
 		return result;
 	}
 
-	virtual bool is_reachable(petri::iterator from, petri::iterator to) const {
-		return (distance(from, to) >= 0);
-	}
-
-	virtual bool is_reachable(vector<petri::iterator> from, vector<petri::iterator> to) const {
-		for (auto i = from.begin(); i != from.end(); i++) {
-			for (auto j = to.begin(); j != to.end(); j++) {
-				if (distance(*i, *j) >= 0) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
 	bool is_split(petri::iterator n) {
 		int count = 0;
 		for (int i = 0; i < (int)arcs[n.type].size(); i++) {
@@ -369,7 +198,6 @@ struct graph
 
 	virtual void mark_modified()
 	{
-		node_distances_ready = false;
 	}
 
 	virtual int size(int type=-1) const {
@@ -2329,57 +2157,12 @@ struct graph
 		for (int i = 0; i < (int)places.size(); i++) {
 			if (not places.is_valid(i)) continue;
 
-			cout << "p" << i << ": " << places[i] << " p" << "{";
-			for (int j = 0; j < (int)places.size(); j++) {
-				if (not places.is_valid(j)) continue;
-
-				if (distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) >= 0) {
-					cout << "->p" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(place::type, j), false) << " ";
-				}
-				if (distance(petri::iterator(place::type, j), petri::iterator(place::type, i), false) >= 0) {
-					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(place::type, i), false) << " ";
-				}
-			}
-
-			for (int j = 0; j < (int)transitions.size(); j++) {
-				if (not transitions.is_valid(j)) continue;
-
-				if (distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) >= 0) {
-					cout << "->t" << j << ":" << distance(petri::iterator(place::type, i), petri::iterator(transition::type, j), false) << " ";
-				}
-				if (distance(petri::iterator(transition::type, j), petri::iterator(place::type, i), false) >= 0) {
-					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(place::type, i), false) << " ";
-				}
-			}
-			cout << "}" << endl;
+			cout << "p" << i << ": " << places[i] << endl;
 		}
 		for (int i = 0; i < (int)transitions.size(); i++) {
 			if (not transitions.is_valid(i)) continue;
 
-			cout << "t" << i << ": " << transitions[i] << "{";
-
-			for (int j = 0; j < (int)places.size(); j++) {
-				if (not places.is_valid(j)) continue;
-
-				if (distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) >= 0) {
-					cout << "->p" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(place::type, j), false) << " ";
-				}
-				if (distance(petri::iterator(place::type, j), petri::iterator(transition::type, i), false) >= 0) {
-					cout << "p" << j << "->:" << distance(petri::iterator(place::type, j), petri::iterator(transition::type, i), false) << " ";
-				}
-			}
-
-			for (int j = 0; j < (int)transitions.size(); j++) {
-				if (not transitions.is_valid(j)) continue;
-
-				if (distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j), false) >= 0) {
-					cout << "->t" << j << ":" << distance(petri::iterator(transition::type, i), petri::iterator(transition::type, j)) << " ";
-				}
-				if (distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i), false) >= 0) {
-					cout << "t" << j << "->:" << distance(petri::iterator(transition::type, j), petri::iterator(transition::type, i), false) << " ";
-				}
-			}
-			cout << "}" << endl;
+			cout << "t" << i << ": " << transitions[i] << endl;
 		}
 		for (int type = 0; type < 2; type++) {
 			for (int i = 0; i < (int)arcs[type].size(); i++) {

@@ -965,7 +965,7 @@ petri::iterator Adjacency::end(int type) const {
 }
 
 size_t Adjacency::size(int type) const {
-	return n[type].size();
+	return std::max(n[type].size(), p[type].size());
 }
 
 bool Adjacency::isValid(petri::iterator i) const {
