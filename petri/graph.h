@@ -196,10 +196,6 @@ struct graph
 		return false;
 	}
 
-	virtual void mark_modified()
-	{
-	}
-
 	virtual int size(int type=-1) const {
 		return type == -1 ? (int)(places.size()+transitions.size()) : (type == place::type ? (int)places.size() : (int)transitions.size());
 	}
@@ -276,24 +272,20 @@ struct graph
 	}
 
 	virtual petri::iterator create_at(place p, int index) {
-		mark_modified();
 		places.emplace_at(index, p);
 		return petri::iterator(place::type, index);
 	}
 
 	virtual petri::iterator create_at(transition t, int index) {
-		mark_modified();
 		transitions.emplace_at(index, t);
 		return petri::iterator(transition::type, index);
 	}
 
 	virtual petri::iterator create(place p) {
-		mark_modified();
 		return petri::iterator(place::type, (int)places.emplace(p));
 	}
 
 	virtual petri::iterator create(transition t) {
-		mark_modified();
 		return petri::iterator(transition::type, (int)transitions.emplace(t));
 	}
 
@@ -307,7 +299,6 @@ struct graph
 	}
 
 	virtual vector<petri::iterator> create(vector<place> p) {
-		mark_modified();
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)p.size(); i++) {
 			result.push_back(petri::iterator(place::type, (int)places.emplace(p[i])));
@@ -316,7 +307,6 @@ struct graph
 	}
 
 	virtual vector<petri::iterator> create(vector<transition> t) {
-		mark_modified();
 		vector<petri::iterator> result;
 		for (int i = 0; i < (int)t.size(); i++) {
 			result.push_back(petri::iterator(transition::type, (int)transitions.emplace(t[i])));
@@ -325,7 +315,6 @@ struct graph
 	}
 
 	virtual vector<petri::iterator> create(place p, int num) {
-		mark_modified();
 		vector<petri::iterator> result;
 		for (int i = 0; i < num; i++) {
 			result.push_back(petri::iterator(place::type, (int)places.emplace(p)));
@@ -334,7 +323,6 @@ struct graph
 	}
 
 	virtual vector<petri::iterator> create(transition t, int num) {
-		mark_modified();
 		vector<petri::iterator> result;
 		for (int i = 0; i < num; i++) {
 			result.push_back(petri::iterator(transition::type, (int)transitions.emplace(t)));
@@ -352,7 +340,6 @@ struct graph
 	}
 
 	virtual pair<vector<petri::iterator>, vector<petri::iterator> > erase(petri::iterator n) {
-		mark_modified();
 		pair<vector<petri::iterator>, vector<petri::iterator> > result;
 		for (int i = (int)arcs[n.type].size()-1; i >= 0; i--) {
 			if (arcs[n.type][i].from.index == n.index) {
@@ -508,7 +495,6 @@ struct graph
 			arcs[from.type].push_back(arc(from, mid));
 			arcs[mid.type].push_back(arc(mid, to));
 		} else {
-			mark_modified();
 			arcs[from.type].push_back(arc(from, to));
 		}
 		return to;
@@ -704,7 +690,6 @@ struct graph
 	}
 
 	virtual void erase_arc(petri::iterator a) {
-		mark_modified();
 		arcs[a.type].erase(arcs[a.type].begin() + a.index);
 	}
 
@@ -1513,7 +1498,6 @@ struct graph
 		if (s0.source.empty() or s0.sink.empty()) {
 			return s0;
 		}
-		mark_modified();
 		connect(s0.sink, s0.source, proper);
 
 		petri::iterator link = create(place::type);
@@ -1544,8 +1528,6 @@ struct graph
 	// @param g The Petri net to merge with the current one
 	// @return A mapping from original nodes to corresponding nodes in the merged net
 	virtual segment compose(Composition::Type composition, segment s0, segment s1, bool proper=false) {
-		mark_modified();
-
 		if (s0.source.empty()) {
 			s0 = s1;
 		} else if (s1.source.empty()) {
