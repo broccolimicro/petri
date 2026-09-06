@@ -9,7 +9,7 @@
 using namespace petri;
 using namespace std;
 
-void check_distance(const graph<place, transition, token, state<token> > &g, int distance, petri::iterator from, petri::iterator to) {
+void check_distance(const graph<place, transition, state<token> > &g, int distance, petri::iterator from, petri::iterator to) {
 	EXPECT_EQ(distance, g.distance(from, to)) << "expected " << from.to_string() << "->" << distance << "->" << to.to_string();
 }
 
@@ -20,7 +20,7 @@ TEST(distance, choice) {
 	//            \               /       .
 	//             ->t2-----------        .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 3);
 	auto t = g.create(transition(), 4);

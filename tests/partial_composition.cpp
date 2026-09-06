@@ -22,7 +22,7 @@ TEST(partial_composition, parallel_choice) {
 	//         \               /          .
 	//          ->t7-->p6-->t8-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 8);
 	auto t = g.create(transition(), 10);
@@ -65,7 +65,7 @@ TEST(partial_composition, parallel_parallel) {
 	//              \               /               .
 	//               ->p9-->t7-->p10                .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 12);
 	auto t = g.create(transition(), 10);

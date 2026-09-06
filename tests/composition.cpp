@@ -108,7 +108,7 @@ void test_not_always(const CompositionAnalysis &g, Composition::Type composition
 	}
 }
 
-bool connected(const graph<place, transition, token, state<token> > &g, petri::iterator from, petri::iterator to) {
+bool connected(const graph<place, transition, state<token> > &g, petri::iterator from, petri::iterator to) {
 	for (int i = 0; i < (int)g.arcs[from.type].size(); i++) {
 		if (g.arcs[from.type][i].from == from and g.arcs[from.type][i].to == to) {
 			return true;
@@ -124,7 +124,7 @@ TEST(composition, always_choice) {
 	//         \               /          .
 	//          ->t2-->p2-->t3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 6);
@@ -157,7 +157,7 @@ TEST(composition, always_parallel) {
 	//         \               /          .
 	//          ->p2-->t2-->p3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 4);
@@ -186,7 +186,7 @@ TEST(composition, regular_interleaved) {
 	//       / \  / \            .
 	//  =->*p2-->t2-->p3-->t3-=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
@@ -228,7 +228,7 @@ TEST(composition, regular_parallel) {
 	//     /      \  /       \    .
 	//  =>t2-->p6-->t3-->*p7-->=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 8);
 	auto t = g.create(transition(), 4);
@@ -272,7 +272,7 @@ TEST(composition, regular_choice) {
 	//     /      \  /      \    .
 	//  =>p2-->t6-->p3-->t7-->=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 8);
@@ -322,7 +322,7 @@ TEST(composition, choice_parallel) {
 	//    \                         /     .
 	//     ->t4-->p5-->t5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -384,7 +384,7 @@ TEST(composition, parallel_choice) {
 	//    \                         /     .
 	//     ->p4-->t5-->p5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -429,7 +429,7 @@ TEST(composition, sequence_choice_parallel) {
 	//     \                         /        \                          /        .
 	//      ->t4-->p5-->t5-----------          ->p11->t11->p12-----------         .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 13);
 	auto t = g.create(transition(), 13);
@@ -506,7 +506,7 @@ TEST(composition, nonproper_choice) {
 	//    \               \         /     .
 	//     ->t3-->p3-->t4-->p4-->t5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -567,7 +567,7 @@ TEST(composition, nonproper_parallel) {
 	//    \               \         /     .
 	//     ->p3-->t3-->p4-->t4-->p5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -600,7 +600,7 @@ TEST(composition, shared_parallel) {
 	//         \                        /            .
 	//          ->p7-->t7-->p8-->t8-->p9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 11);
 	auto t = g.create(transition(), 10);
@@ -654,7 +654,7 @@ TEST(composition, shared_choice) {
 	//         \                        /            .
 	//          ->t7-->p7-->t8-->p8-->t9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 10);
 	auto t = g.create(transition(), 11);
@@ -703,7 +703,7 @@ TEST(composition, regular_choice_parallel) {
 	//          \           /         .
 	//           ->p6-->t5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);
@@ -768,7 +768,7 @@ TEST(composition, regular_parallel_choice) {
 	//          \           /         .
 	//           ->t6-->p5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);
@@ -803,7 +803,7 @@ TEST(composition, regular_parallel_choice) {
 }*/
 
 TEST(composition, compose_proper_t2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 8);
 
@@ -846,7 +846,7 @@ TEST(composition, compose_proper_t2_2x2_2) {
 }
 
 TEST(composition, compose_t2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 8);
 
@@ -894,7 +894,7 @@ TEST(composition, compose_t2_2x2_2) {
 }
 
 TEST(composition, compose_proper_t2_1x2_1) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 6);
 
@@ -927,7 +927,7 @@ TEST(composition, compose_proper_t2_1x2_1) {
 }
 
 TEST(composition, compose_t2_1x2_1) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 6);
 
@@ -969,7 +969,7 @@ TEST(composition, compose_t2_1x2_1) {
 }
 
 TEST(composition, compose_t1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 14);
 
@@ -1024,7 +1024,7 @@ TEST(composition, compose_t1x2) {
 }
 
 TEST(composition, compose_proper_t1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(transition(), 14);
 
@@ -1079,7 +1079,7 @@ TEST(composition, compose_proper_t1x2) {
 }
 
 TEST(composition, compose_p1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(place(), 14);
 
@@ -1134,7 +1134,7 @@ TEST(composition, compose_p1x2) {
 }
 
 TEST(composition, compose_proper_p1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto n = g.create(place(), 14);
 
@@ -1189,7 +1189,7 @@ TEST(composition, compose_proper_p1x2) {
 }
 
 TEST(composition, compose_m1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto t = g.create(transition(), 12);
 	auto p = g.create(place(), 12);
@@ -1272,7 +1272,7 @@ TEST(composition, compose_m1x2) {
 }
 
 TEST(composition, compose_proper_m1x2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto t = g.create(transition(), 12);
 	auto p = g.create(place(), 12);
@@ -1355,7 +1355,7 @@ TEST(composition, compose_proper_m1x2) {
 }
 
 TEST(composition, compose_p2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 8);
 
@@ -1393,7 +1393,7 @@ TEST(composition, compose_p2_2x2_2) {
 }
 
 TEST(composition, compose_proper_p2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 8);
 
@@ -1426,7 +1426,7 @@ TEST(composition, compose_proper_p2_2x2_2) {
 }
 
 TEST(composition, compose_m2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
@@ -1468,7 +1468,7 @@ TEST(composition, compose_m2_2x2_2) {
 }
 
 TEST(composition, compose_proper_m2_2x2_2) {
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);

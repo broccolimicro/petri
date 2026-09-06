@@ -67,7 +67,7 @@ struct path
 };
 
 template <class place, class transition, class token, class state>
-bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
+bool normalize(graph<place, transition, state> &g, path &p0, path &p1) {
 	bool p0_empty = true;
 	bool p1_empty = true;
 	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
@@ -98,7 +98,7 @@ bool normalize(graph<place, transition, token, state> &g, path &p0, path &p1) {
 }
 
 template <class place, class transition, class token, class state>
-bool mergible(graph<place, transition, token, state> &g, const path &p0, const path &p1) {
+bool mergible(graph<place, transition, state> &g, const path &p0, const path &p1) {
 	bool p0_empty = true;
 	bool p1_empty = true;
 	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
@@ -174,7 +174,7 @@ struct path_set
 	path_set &operator*=(const path &p);
 
 	template <class place, class transition, class token, class state>
-	bool normalize(graph<place, transition, token, state> &g) {
+	bool normalize(graph<place, transition, state> &g) {
 		for (auto x = paths.begin(); x != paths.end(); x++) {
 			for (auto y = std::next(x); y != paths.end(); y++) {
 				if (not petri::normalize(g, *x, *y)) {
@@ -189,7 +189,7 @@ struct path_set
 	}
 
 	template <class place, class transition, class token, class state>
-	bool merge(graph<place, transition, token, state> &g, path_set p1)
+	bool merge(graph<place, transition, state> &g, path_set p1)
 	{
 		for (auto x = paths.begin(); x != paths.end(); x++) {
 			for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
@@ -207,7 +207,7 @@ struct path_set
 };
 
 template <class place, class transition, class token, class state>
-bool mergible(graph<place, transition, token, state> &g, const path_set &p0, const path_set &p1)
+bool mergible(graph<place, transition, state> &g, const path_set &p0, const path_set &p1)
 {
 	for (auto x = p0.paths.begin(); x != p0.paths.end(); x++) {
 		for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
@@ -236,7 +236,7 @@ path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
 template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, token, state> &g, petri::bound from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
+path_set trace(graph<place, transition, state> &g, petri::bound from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
 	if (from.empty() or to.empty()) {
 		return path_set(g.places.size(), g.transitions.size());
 	}

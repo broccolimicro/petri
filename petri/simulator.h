@@ -21,7 +21,7 @@ struct simulator
 		base = NULL;
 	}
 
-	simulator(graph<place, transition, token, state> *base, state initial)
+	simulator(graph<place, transition, state> *base, state initial)
 	{
 		//cout << "Reset" << endl;
 		this->base = base;
@@ -35,7 +35,7 @@ struct simulator
 
 	}
 
-	graph<place, transition, token, state> *base;
+	graph<place, transition, state> *base;
 
 	vector<token> tokens;
 	vector<enabled_transition> ready;

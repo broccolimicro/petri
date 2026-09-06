@@ -15,7 +15,7 @@ using namespace std;
 TEST(select, sequence) {
 	//  =-t0-->p0-->t1-->p1-->t2-->p2-=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 3);
 	auto t = g.create(transition(), 4);
@@ -68,7 +68,7 @@ TEST(select, always_choice) {
 	//         \               /          .
 	//          ->t2-->p2-->t3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 6);
@@ -141,7 +141,7 @@ TEST(select, always_parallel) {
 	//         \               /          .
 	//          ->p2-->t2-->p3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 4);
@@ -213,7 +213,7 @@ TEST(select, regular_interleaved) {
 	//       / \  / \            .
 	//  =->*p2-->t2-->p3-->t3-=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
@@ -314,7 +314,7 @@ TEST(select, choice_parallel) {
 	//    \                         /     .
 	//     ->t4-->p5-->t5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -371,7 +371,7 @@ TEST(select, parallel_choice) {
 	//    \                         /     .
 	//     ->p4-->t5-->p5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -426,7 +426,7 @@ TEST(select, nonproper_choice) {
 	//    \               \         /     .
 	//     ->t3-->p3-->t4-->p4-->t5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -483,7 +483,7 @@ TEST(select, nonproper_parallel) {
 	//    \               \         /     .
 	//     ->p3-->t3-->p4-->t4-->p5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -549,7 +549,7 @@ TEST(select, shared_parallel) {
 	//         \                        /            .
 	//          ->p7-->t7-->p8-->t8-->p9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 11);
 	auto t = g.create(transition(), 10);
@@ -575,7 +575,7 @@ TEST(select, shared_choice) {
 	//         \                        /            .
 	//          ->t7-->p7-->t8-->p8-->t9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 10);
 	auto t = g.create(transition(), 11);
@@ -603,7 +603,7 @@ TEST(select, regular_choice_parallel) {
 	//          \           /         .
 	//           ->p6-->t5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);
@@ -651,7 +651,7 @@ TEST(select, compressed_parallel_choice) {
 	//          \           /         .
 	//           ->t6-->p5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);

@@ -11,8 +11,8 @@
 using namespace petri;
 using namespace std;
 
-void run_test(const graph<place, transition, token, state<token> > &g, bool isProper) {
-	graph<place, controlflow::Tree<transition>, token, state<token> > tree;
+void run_test(const graph<place, transition, state<token> > &g, bool isProper) {
+	graph<place, controlflow::Tree<transition>, state<token> > tree;
 	EXPECT_EQ(graph_to_tree(tree, g), isProper);
 
 	tree.print();
@@ -32,7 +32,7 @@ TEST(controlflow, always_choice) {
 	//         \               /          .
 	//          ->t2-->p2-->t3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 6);
@@ -50,7 +50,7 @@ TEST(controlflow, always_parallel) {
 	//         \               /          .
 	//          ->p2-->t2-->p3-           .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 4);
@@ -70,7 +70,7 @@ TEST(controlflow, choice_parallel) {
 	//    \                         /     .
 	//     ->t4-->p5-->t5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -91,7 +91,7 @@ TEST(controlflow, parallel_choice) {
 	//    \                         /     .
 	//     ->p4-->t5-->p5-----------      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -112,7 +112,7 @@ TEST(controlflow, sequence_choice_parallel) {
 	//     \                         /        \                          /        .
 	//      ->t4-->p5-->t5-----------          ->p11->t11->p12-----------         .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 13);
 	auto t = g.create(transition(), 13);
@@ -138,7 +138,7 @@ TEST(controlflow, regular_interleaved) {
 	//       / \  / \            .
 	//  =->*p2-->t2-->p3-->t3-=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 4);
@@ -166,7 +166,7 @@ TEST(controlflow, regular_parallel) {
 	//     /      \  /       \    .
 	//  =>t2-->p6-->t3-->*p7-->=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 8);
 	auto t = g.create(transition(), 4);
@@ -191,7 +191,7 @@ TEST(controlflow, regular_choice) {
 	//     /      \  /      \    .
 	//  =>p2-->t6-->p3-->t7-->=  .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 4);
 	auto t = g.create(transition(), 8);
@@ -215,7 +215,7 @@ TEST(controlflow, nonproper_choice) {
 	//    \               \         /     .
 	//     ->t3-->p3-->t4-->p4-->t5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 6);
 	auto t = g.create(transition(), 7);
@@ -236,7 +236,7 @@ TEST(controlflow, nonproper_parallel) {
 	//    \               \         /     .
 	//     ->p3-->t3-->p4-->t4-->p5-      .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 6);
@@ -261,7 +261,7 @@ TEST(controlflow, shared_parallel) {
 	//         \                        /            .
 	//          ->p7-->t7-->p8-->t8-->p9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 11);
 	auto t = g.create(transition(), 10);
@@ -286,7 +286,7 @@ TEST(controlflow, shared_choice) {
 	//         \                        /            .
 	//          ->t7-->p7-->t8-->p8-->t9             .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 10);
 	auto t = g.create(transition(), 11);
@@ -313,7 +313,7 @@ TEST(controlflow, regular_choice_parallel) {
 	//          \           /         .
 	//           ->p6-->t5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);
@@ -343,7 +343,7 @@ TEST(controlflow, regular_parallel_choice) {
 	//          \           /         .
 	//           ->t6-->p5--          .
 
-	graph<place, transition, token, state<token> > g;
+	graph<place, transition, state<token> > g;
 
 	auto p = g.create(place(), 7);
 	auto t = g.create(transition(), 7);

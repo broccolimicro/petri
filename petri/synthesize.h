@@ -2,8 +2,8 @@
 
 namespace petri {
 
-template <class process, class place, class transition, class token, class state>
-bool graph_to_tree(graph<place, controlflow::Tree<process>, token, state> &t, const graph<place, transition, token, state> &g) {
+template <class process, class place, class transition, class state>
+bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const graph<place, transition, state> &g) {
 	// first fill the tree
 	t.places = g.places;
 	t.arcs = g.arcs;
@@ -201,8 +201,8 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, token, state> &t, co
 	return t.transitions.count() == 1u;
 }
 
-template <class process, class place, class transition, class token, class state>
-void tree_to_graph(graph<place, transition, token, state> &g, const controlflow::Tree<process> &t) {
+template <class process, class place, class transition, class state>
+void tree_to_graph(graph<place, transition, state> &g, const controlflow::Tree<process> &t) {
 	if (t.root < 0) {
 		return;
 	}

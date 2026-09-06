@@ -58,7 +58,7 @@ bool operator!=(arc a0, arc a1);
 // - Relationship analysis between nodes (parallelism, choice, sequence)
 // - Graph transformations and reductions
 // - Split group analysis for understanding choice and parallel execution patterns
-template <class place, class transition, class token, class state>
+template <class place, class transition, class state>
 struct graph
 {
 	mutable vector<int> node_distances;
@@ -1745,7 +1745,7 @@ struct graph
 		return s0;
 	}
 
-	virtual Mapping<petri::iterator> merge(const graph<place, transition, token, state> &g) {
+	virtual Mapping<petri::iterator> merge(const graph<place, transition, state> &g) {
 		Mapping<petri::iterator> result(petri::iterator(), false);
 		for (int i = 0; i < (int)g.places.size(); i++) {
 			if (g.places.is_valid(i)) {
