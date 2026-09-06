@@ -5,17 +5,20 @@
 #include <common/text.h>
 #include <common/index_vector.h>
 
-namespace petri
-{
+namespace petri {
 
-struct iterator
-{
-	iterator();
-	iterator(int type, int index);
-	~iterator();
+struct iterator {
+	enum Type {
+		PLACE = 0,
+		TRANSITION = 1,
+	};
 
 	int type;
 	int index;
+
+	iterator();
+	iterator(int type, int index);
+	~iterator();
 
 	iterator &operator=(iterator i);
 	iterator &operator--();
@@ -56,11 +59,11 @@ ostream &operator<<(ostream &os, iterator i);
 // from a vector<petri::iterator> which has no constraint about what nodes may
 // coexist in the collection.
 struct region {
+	vector<petri::iterator> nodes;
+
 	region();
 	region(std::initializer_list<petri::iterator> nodes);
 	~region();
-
-	vector<petri::iterator> nodes;
 
 	// DESIGN(edward.bingham) This isn't a constructor because I explicitly want
 	// to separate the vector<petri::iterator> type from the bound and the
@@ -124,13 +127,13 @@ ostream &operator<<(ostream &os, region r0);
 // region or another. There is no constraint about compositions of nodes across
 // regions in the collection.
 struct bound {
+	vector<region> regions;
+
 	bound();
 	bound(initializer_list<initializer_list<petri::iterator> > regions);
 	bound(std::initializer_list<region> regions);
 	bound(vector<region> regions);
 	~bound();
-
-	vector<region> regions;
 
 	// DESIGN(edward.bingham) This isn't a constructor because I explicitly want
 	// to separate the vector<petri::iterator> type from the bound and the
@@ -185,13 +188,13 @@ struct bound {
 ostream &operator<<(ostream &os, bound b0);
 
 struct segment {
-	segment();
-	segment(bound source, bound sink);
-	~segment();
-
 	bound source;
 	bound sink;
 	bound reset;
+
+	segment();
+	segment(bound source, bound sink);
+	~segment();
 
 	void clear();
 
@@ -214,11 +217,11 @@ ostream &operator<<(ostream &os, segment s0);
 // that this is a structural sequence, *not* a temporal sequence.
 // A temporal sequence would be called a "trace".
 struct strand {
+	vector<petri::iterator> nodes;
+
 	strand();
 	strand(std::initializer_list<petri::iterator> nodes);
 	~strand();
-
-	vector<petri::iterator> nodes;
 
 	// DESIGN(edward.bingham) This isn't a constructor because I explicitly want
 	// to separate the vector<petri::iterator> type from the strand. Some things just return a flat list of nodes that don't correspond
