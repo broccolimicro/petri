@@ -57,10 +57,7 @@ bool operator!=(arc a0, arc a1);
 // - Graph transformations and reductions
 // - Split group analysis for understanding choice and parallel execution patterns
 template <class place, class transition, class state>
-struct graph
-{
-	mutable bool split_dominance_ready;
-
+struct graph {
 	index_vector<place> places;
 	index_vector<transition> transitions;
 	// index by from.type
@@ -68,7 +65,6 @@ struct graph
 	vector<state> reset;
 
 	graph() {
-		split_dominance_ready = false;
 	}
 
 	virtual ~graph() {
@@ -2186,7 +2182,6 @@ struct graph
 
 		return out_cousin;
 	}
-
-	virtual std::vector<std::vector<size_t>> split_dominance() { return vector<vector<size_t>>(); }
 };
+
 }

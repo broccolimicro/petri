@@ -114,13 +114,13 @@ struct simulator
 		ready = result;
 		if (ready.empty() and allow_incomplete) {
 			// Find a transition that has no preceding transitions
-			for (int i = 0; i < (int)disabled.size(); i++) {
+			for (size_t i = 0; i < disabled.size(); i++) {
 				bool found = true;
-				for (int j = 0; j < (int)disabled.size(); j++) {
-					if (j != i and base->is(parallel,
+				for (size_t j = 0; j < disabled.size(); j++) {
+					if (j != i and base->is(Composition::PARALLEL,
 							iterator(place::type, tokens[disabled[i].tokens[0]].index),
 							iterator(transition::type, disabled[j].index)
-						) and not base->is(parallel,
+						) and not base->is(Composition::PARALLEL,
 							iterator(transition::type, disabled[i].index),
 							iterator(transition::type, disabled[j].index)
 						)) {
