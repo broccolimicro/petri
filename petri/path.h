@@ -1,7 +1,7 @@
 #pragma once
 
 #include <common/standard.h>
-#include "graph.h"
+#include "iterator.h"
 #include "composition.h"
 
 namespace petri
@@ -66,66 +66,8 @@ struct path
 	int operator[](petri::iterator i) const;
 };
 
-template <class place, class transition, class token, class state>
-bool normalize(graph<place, transition, state> &g, path &p0, path &p1) {
-	bool p0_empty = true;
-	bool p1_empty = true;
-	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
-		if (p0.hops[i] > p1.hops[i]) {
-			bool found = false;
-			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
-				found = (p1.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(i), p1.iter(j)));
-			}
-
-			if (not found) {
-				p0.hops[i] = p1.hops[i];
-			}
-		} else if (p0.hops[i] < p1.hops[i]) {
-			bool found = false;
-			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
-				found = (p0.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(j), p1.iter(i)));
-			}
-
-			if (not found) {
-				p1.hops[i] = p0.hops[i];
-			}
-		}
-		p0_empty = p0_empty and p0.hops[i] == 0;
-		p1_empty = p1_empty and p1.hops[i] == 0;
-	}
-
-	return not p0_empty and not p1_empty;
-}
-
-template <class place, class transition, class token, class state>
-bool mergible(graph<place, transition, state> &g, const path &p0, const path &p1) {
-	bool p0_empty = true;
-	bool p1_empty = true;
-	for (int i = 0; i < (int)p0.hops.size() and i < (int)p1.hops.size(); i++) {
-		if (p0.hops[i] > p1.hops[i]) {
-			bool found = false;
-			for (int j = 0; j < (int)p1.hops.size() and not found; j++) {
-				found = (p1.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(i), p1.iter(j)));
-			}
-
-			p0_empty = p0_empty and (found ? p0.hops[i] : p1.hops[i]) == 0;
-			p1_empty = p1_empty and p1.hops[i] == 0;
-		} else if (p0.hops[i] < p1.hops[i]) {
-			bool found = false;
-			for (int j = 0; j < (int)p0.hops.size() and not found; j++) {
-				found = (p0.hops[j] > 0 and g.is(Composition::CHOICE, p0.iter(j), p1.iter(i)));
-			}
-
-			p0_empty = p0_empty and p0.hops[i] == 0;
-			p1_empty = p1_empty and (found ? p1.hops[i] : p0.hops[i]) == 0;
-		} else {
-			p0_empty = p0_empty and p0.hops[i] == 0;
-			p1_empty = p1_empty and p1.hops[i] == 0;
-		}
-	}
-
-	return not p0_empty and not p1_empty;
-}
+bool normalize(const CompositionAnalysis &comp, path &p0, path &p1);
+bool mergible(const CompositionAnalysis &comp, const path &p0, const path &p1);
 
 // A path set helps to manage multiple paths from one place or region to
 // another to ensure the state variable insertion algorithm is able to cut them
@@ -173,52 +115,11 @@ struct path_set
 	path_set &operator+=(const path_set &p);
 	path_set &operator*=(const path &p);
 
-	template <class place, class transition, class token, class state>
-	bool normalize(graph<place, transition, state> &g) {
-		for (auto x = paths.begin(); x != paths.end(); x++) {
-			for (auto y = std::next(x); y != paths.end(); y++) {
-				if (not petri::normalize(g, *x, *y)) {
-					clear();
-					return false;
-				}
-			}
-		}
-
-		repair();
-		return true;
-	}
-
-	template <class place, class transition, class token, class state>
-	bool merge(graph<place, transition, state> &g, path_set p1)
-	{
-		for (auto x = paths.begin(); x != paths.end(); x++) {
-			for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
-				if (not petri::normalize(g, *x, *y)) {
-					clear();
-					return false;
-				}
-			}
-		}
-
-		paths.insert(paths.end(), p1.paths.begin(), p1.paths.end());
-		repair();
-		return true;
-	}
+	bool normalize(const CompositionAnalysis &comp);
+	bool merge(const CompositionAnalysis &comp, path_set p1);
 };
 
-template <class place, class transition, class token, class state>
-bool mergible(graph<place, transition, state> &g, const path_set &p0, const path_set &p1)
-{
-	for (auto x = p0.paths.begin(); x != p0.paths.end(); x++) {
-		for (auto y = p1.paths.begin(); y != p1.paths.end(); y++) {
-			if (not petri::mergible(g, *x, *y)) {
-				return false;
-			}
-		}
-	}
-
-	return true;
-}
+bool mergible(const CompositionAnalysis &comp, const path_set &p0, const path_set &p1);
 
 ostream &operator<<(ostream &os, const path &p);
 
@@ -235,180 +136,7 @@ path_set operator&(path_set p0, path_set p1);
 path_set operator*(path_set p0, path p1);
 path_set operator*(path p0, path_set p1);
 
-template <class place, class transition, class token, class state>
-path_set trace(graph<place, transition, state> &g, petri::bound from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false) {
-	if (from.empty() or to.empty()) {
-		return path_set(g.places.size(), g.transitions.size());
-	}
-
-	path_set result(g.places.size(), g.transitions.size());
-	// each item in the stack is a pair
-	// The first element in the pair represents the frontier of the
-	// trace. When the frontier is empty, we have completed the trace.
-	// The second element in the pair is the path we've traced. Any
-	// frontier node that encounters one of our targets gets placed
-	// into the path's "to" list. If the trace completes and there are
-	// no elements in the path's "to" list, then there was no path
-	// found.
-
-	vector<pair<region, path> > stack;
-	// initialize the stack. To do this, we break the from list into conditional
-	// groups of parallel nodes. Nodes that are in sequence with eachother should
-	// be treated as conditional as well.
-	for (auto partial = from.begin(); partial != from.end(); partial++) {
-		stack.push_back(pair<region, path>(*partial, path(g.places.size(), g.transitions.size())));
-		stack.back().second.from = partial->flat();
-	}
-
-	// precache "next" list for all nodes in graph to accelerate
-	// computation.
-	array<vector<vector<petri::iterator> >, 2> n;
-	for (int type = 0; type < 2; type++) {
-		n[type].resize(g.size(type), vector<petri::iterator>());
-
-		// cut off sections of graph that don't lead to a node in the
-		// "to" vector by ignoring those branches. The split groups
-		// stored in the graph structure tell us which of those branches
-		// lead to our target node.
-		if (!g.SplitGroups_ready)
-			g.compute_SplitGroups();
-
-		vector<SplitGroup> groups;
-		for (auto i = to.begin(); i != to.end(); i++) {
-			vector<SplitGroup> group;
-			if (i->type == place::type) {
-				group = g.places[i->index].splits[type];
-			} else {
-				group = g.transitions[i->index].splits[type];
-			}
-			// only cut off a branch if it is cut off in all of the split groups
-			if (i == to.begin()) {
-				groups = group;
-				continue;
-			}
-
-			int j = ((int)group.size())-1;
-			int k = ((int)groups.size())-1;
-			while (j >= 0 and k >= 0) {
-				if (group[j].split == groups[k].split) {
-					groups[k].branch.insert(groups[k].branch.end(), group[j].branch.begin(), group[j].branch.end());
-					sort(groups[k].branch.begin(), groups[k].branch.end());
-					groups[k].branch.erase(unique(groups[k].branch.begin(), groups[k].branch.end()), groups[k].branch.end());
-					j--;
-					k--;
-				} else if (group[j].split > groups[k].split) {
-					j--;
-				} else {
-					groups.erase(groups.begin() + k);
-					k--;
-				}
-			}
-
-			if (k >= 0) {
-				groups.erase(groups.begin(), groups.begin() + k + 1);
-			}
-		}
-
-		for (auto j = groups.begin(); j != groups.end(); j++) {
-			if (j->split >= 0) {
-				for (auto k = j->branch.begin(); k != j->branch.end(); k++) {
-					n[type][j->split].push_back(petri::iterator(1-type, *k));
-				}
-			}
-		}
-
-		// clean up and fill out the precached "next" lists for the
-		// remaining nodes.
-		for (auto i = g.begin(type); i != g.end(type); i++) {
-			if (not g.is_valid(i)) continue;
-
-			if (n[i.type][i.index].empty()) {
-				n[i.type][i.index] = g.next(i);
-			}
-		}
-	}
-
-	// This is an optimization. Make it easier to identify from/to nodes
-	path fromCount(g.places.size(), g.transitions.size());
-	path toCount(g.places.size(), g.transitions.size());
-	for (auto i = from.begin(); i != from.end(); i++) {
-		for (auto j = i->begin(); j != i->end(); j++) {
-			fromCount.set(*j);
-		}
-	}
-	for (auto i = to.begin(); i != to.end(); i++) {
-		toCount.set(*i);
-	}
-
-	while (not stack.empty()) {
-		auto curr = stack.back();
-		stack.pop_back();
-
-		petri::iterator pos = curr.first.pop_back();
-
-		if (pos.type == transition::type) {
-			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
-				if (toCount[*i] > 0) {
-					if (curr.second[*i] == 0) {
-						curr.second.to.push_back(*i);
-					}
-				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
-					curr.first.push_back(*i);
-					curr.second.set(*i);
-				}
-			}
-			if (curr.first.empty()) {
-				if (not curr.second.to.empty()) {
-					if (mark_from) {
-						for (auto i = curr.second.from.begin(); i != curr.second.from.end(); i++) {
-							curr.second.set(*i, 1);
-						}
-					}
-					if (mark_to) {
-						for (auto i = curr.second.to.begin(); i != curr.second.to.end(); i++) {
-							curr.second.set(*i, 1);
-						}
-					}
-					result.push(curr.second);
-				}
-			} else {
-				stack.push_back(curr);
-			}
-		}	else {
-			for (auto i = n[pos.type][pos.index].begin(); i != n[pos.type][pos.index].end(); i++) {
-				pair<region, path> copy = curr;
-				if (toCount[*i] > 0) {
-					if (copy.second[*i] == 0) {
-						copy.second.to.push_back(*i);
-					}
-					copy.second.set(*i);
-				} else if (curr.second[*i] == 0 and fromCount[*i] == 0) {
-					copy.second.set(*i);
-					copy.first.push_back(*i);
-				}
-				if (copy.first.empty()) {
-					if (not copy.second.to.empty()) {
-						if (mark_from) {
-							for (auto i = copy.second.from.begin(); i != copy.second.from.end(); i++) {
-								copy.second.set(*i, 1);
-							}
-						}
-						if (mark_to) {
-							for (auto i = copy.second.to.begin(); i != copy.second.to.end(); i++) {
-								copy.second.set(*i, 1);
-							}
-						}
-						result.push(copy.second);
-					}
-				} else {
-					stack.push_back(copy);
-				}
-			}
-		}
-	}
-
-	return result;
-}
+path_set trace(const Adjacency &adj, const CompositionAnalysis &comp, petri::bound from, vector<petri::iterator> to, bool mark_from=false, bool mark_to=false);
 
 }
 
