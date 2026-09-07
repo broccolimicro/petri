@@ -8,24 +8,22 @@
 
 namespace petri {
 
-struct place
-{
+struct place {
+	static const int type = 0;
+
 	place();
 	~place();
-
-	static const int type = 0;
 
 	static place merge(int composition, const place &p0, const place &p1);
 };
 
 ostream &operator<<(ostream &os, const place &p);
 
-struct transition
-{
+struct transition {
+	static const int type = 1;
+
 	transition();
 	~transition();
-
-	static const int type = 1;
 
 	bool is_infeasible();
 	bool is_vacuous();
