@@ -23,17 +23,17 @@ struct Index {
 };
 
 struct Node {
-	enum Composition {
+	enum Type {
 		CHOICE = 0,
 		PARALLEL = 1, 
 		SEQUENCE = 2,
 		LOOP = 3,
 	};
 
-	Composition comp;
+	Type type;
 	std::vector<Index> procs;
 
-	Node(Composition comp=SEQUENCE);
+	Node(Type type=SEQUENCE);
 	~Node();
 };
 
@@ -76,15 +76,33 @@ struct Tree : petri::transition {
 		return *this;
 	}
 
-	Tree<Transition> &compose(Node::Composition comp, const Tree &tree) {
-		if (tree.root < 0) {
+	bool mergeable(petri::Composition composition, const Tree<Transition> &t1) const {
+		return composition == petri::CHOICE
+			or composition == petri::PARALLEL
+			or composition == petri::SEQUENCE;
+	}
+
+	Tree<Transition> &merge(petri::Composition composition, const Tree<Transition> &t1) {
+		if (t1.root < 0) {
+			return *this;
+		}
+
+		Node::Type type = Node::SEQUENCE;
+		if (composition == petri::CHOICE) {
+			type = Node::CHOICE;
+		} else if (composition == petri::PARALLEL) {
+			type = Node::PARALLEL;
+		} else if (composition == petri::SEQUENCE) {
+			type = Node::SEQUENCE;
+		} else {
+			internal("", "unsupported composition for tree merge", __FILE__, __LINE__);
 			return *this;
 		}
 
 		if (root < 0) {
-			root = nodes.emplace(comp);
-		} else if (nodes[root].comp != comp) {
-			int newRoot = nodes.emplace(comp);
+			root = nodes.emplace(type);
+		} else if (nodes[root].type != type) {
+			int newRoot = nodes.emplace(type);
 			nodes[newRoot].procs.push_back(Index(Index::NODE, root));
 			root = newRoot;
 		}
@@ -92,19 +110,19 @@ struct Tree : petri::transition {
 		Mapping<int> tMap(-1, true);
 		Mapping<int> nMap(-1, false);
 		// insert all transitions and nodes
-		if (not isExternal() and not tree.isExternal()) {
+		if (not isExternal() and not t1.isExternal()) {
 			// transitions are internally indexed, need to remap them
 			tMap.identity = false;
 
-			for (size_t i = 0; i < tree.transitions.size(); i++) {
-				if (tree.transitions.is_valid(i)) {
-					tMap.set(i, transitions.insert(tree.transitions[i]));
+			for (size_t i = 0; i < t1.transitions.size(); i++) {
+				if (t1.transitions.is_valid(i)) {
+					tMap.set(i, transitions.insert(t1.transitions[i]));
 				}
 			}
 		}
 
-		for (size_t i = 0; i < tree.nodes.size(); i++) {
-			nMap.set(i, nodes.insert(tree.nodes[i]));
+		for (size_t i = 0; i < t1.nodes.size(); i++) {
+			nMap.set(i, nodes.insert(t1.nodes[i]));
 		}
 
 		for (const auto &p : nMap.fwd) {
@@ -117,7 +135,7 @@ struct Tree : petri::transition {
 			}
 		}
 
-		nodes[root].procs.push_back(Index(Index::NODE, nMap.map(tree.root)));
+		nodes[root].procs.push_back(Index(Index::NODE, nMap.map(t1.root)));
 		return *this;
 	}
 
@@ -138,31 +156,31 @@ struct Tree : petri::transition {
 			int proc = stack[curr].process;
 
 			if (proc == 0) {
-				if (nodes[index].comp == Node::CHOICE) {
+				if (nodes[index].type == Node::CHOICE) {
 					printf("[");
-				} else if (nodes[index].comp == Node::PARALLEL) {
+				} else if (nodes[index].type == Node::PARALLEL) {
 					printf("(");
-				} else if (nodes[index].comp == Node::SEQUENCE) {
-				} else if (nodes[index].comp == Node::LOOP) {
+				} else if (nodes[index].type == Node::SEQUENCE) {
+				} else if (nodes[index].type == Node::LOOP) {
 					printf("*[");
 				}
 			} else if (proc < (int)nodes[index].procs.size()) {
-				if (nodes[index].comp == Node::CHOICE) {
+				if (nodes[index].type == Node::CHOICE) {
 					printf(":");
-				} else if (nodes[index].comp == Node::PARALLEL) {
+				} else if (nodes[index].type == Node::PARALLEL) {
 					printf("||");
-				} else if (nodes[index].comp == Node::SEQUENCE) {
+				} else if (nodes[index].type == Node::SEQUENCE) {
 					printf(";");
-				} else if (nodes[index].comp == Node::LOOP) {
+				} else if (nodes[index].type == Node::LOOP) {
 					printf(":");
 				}
 			} else {
-				if (nodes[index].comp == Node::CHOICE) {
+				if (nodes[index].type == Node::CHOICE) {
 					printf("]");
-				} else if (nodes[index].comp == Node::PARALLEL) {
+				} else if (nodes[index].type == Node::PARALLEL) {
 					printf(")");
-				} else if (nodes[index].comp == Node::SEQUENCE) {
-				} else if (nodes[index].comp == Node::LOOP) {
+				} else if (nodes[index].type == Node::SEQUENCE) {
+				} else if (nodes[index].type == Node::LOOP) {
 					printf("]");
 				}
 				stack.pop_back();

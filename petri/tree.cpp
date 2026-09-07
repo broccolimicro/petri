@@ -15,8 +15,8 @@ Index::Index(Index::Type type, int index) {
 Index::~Index() {
 }
 
-Node::Node(Node::Composition comp) {
-	this->comp = comp;
+Node::Node(Node::Type type) {
+	this->type = type;
 }
 
 Node::~Node() {

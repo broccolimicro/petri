@@ -49,7 +49,7 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 				continue;
 			}
 
-			t.transitions[p[0].index].compose(controlflow::Node::SEQUENCE, t.transitions[n[0].index]);
+			t.transitions[p[0].index].merge(petri::SEQUENCE, t.transitions[n[0].index]);
 
 			for (size_t j = 0; j < t.arcs[n[0].type].size(); j++) {
 				if (t.arcs[n[0].type][j].from.index == n[0].index) {
@@ -119,7 +119,7 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 
 				if (hasParallel) {
 					for (size_t j = 0; j < nn.size()-1; j++) {
-						t.transitions[nn.back().index].compose(controlflow::Node::PARALLEL, t.transitions[nn[j].index]);
+						t.transitions[nn.back().index].merge(petri::PARALLEL, t.transitions[nn[j].index]);
 					}
 					t.erase(toErase);
 					n[0] = n.back();
@@ -165,7 +165,7 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 
 			// found a conditional composition
 			for (size_t j = 0; j < pn.size()-1; j++) {
-				t.transitions[pn.back().index].compose(controlflow::Node::CHOICE, t.transitions[pn[j].index]);
+				t.transitions[pn.back().index].merge(petri::CHOICE, t.transitions[pn[j].index]);
 			}
 			pn.pop_back();
 			t.erase(pn);
@@ -259,7 +259,7 @@ void tree_to_graph(graph<place, transition, state> &g, const controlflow::Tree<p
 		}
 
 		for (const auto &segment : segments) {
-			result = g.compose(composition, result, segment, true);
+			result = g.merge(composition, result, segment, true);
 		}
 		nodes.insert({curr, result});
 	}

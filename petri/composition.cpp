@@ -285,19 +285,6 @@ void mergeInplace(int group_operation, int branch_operation, vector<SplitGroup> 
 	}
 }
 
-Composition::Type Composition::invert(Composition::Type t) {
-	if (t == Composition::PARALLEL) {
-		return Composition::CHOICE;
-	} else if (t == Composition::CHOICE) {
-		return Composition::PARALLEL;
-	} else if (t == Composition::IMPLIES) {
-		return Composition::EXCLUDES;
-	} else if (t == Composition::EXCLUDES) {
-		return Composition::IMPLIES;
-	}
-	return t;
-}
-
 CompositionAnalysis::CompositionAnalysis() {
 }
 
@@ -437,7 +424,7 @@ bool CompositionAnalysis::splitIsCovered(petri::iterator p, vector<petri::iterat
 // @param composition The composition type to analyze (parallel or choice)
 // @param split The index of the split node being analyzed
 // @param init Vector of initial nodes representing the branches of the split
-void CompositionAnalysis::build(const Adjacency &g, Composition::Type composition, int split, vector<petri::iterator> init) {
+void CompositionAnalysis::build(const Adjacency &g, Composition composition, int split, vector<petri::iterator> init) {
 	if (init.size() <= 1) {
 		// there is no split here
 		return;
@@ -688,7 +675,7 @@ void CompositionAnalysis::build(const Adjacency &g) {
 			// add parallel splits from reset states
 			if (not reset.empty()) {
 				for (int i = 0; i < (int)reset.size(); i++) {
-					build(g, (Composition::Type)composition, -i-1, reset[i]);
+					build(g, (Composition)composition, -i-1, reset[i]);
 				}
 			}
 		} else if (composition == Composition::CHOICE) {
@@ -697,7 +684,7 @@ void CompositionAnalysis::build(const Adjacency &g) {
 				for (int i = 0; i < (int)reset.size(); i++) {
 					branches.push_back(petri::iterator(transition::type, -i-1));
 				}
-				build(g, (Composition::Type)composition, -1, branches);
+				build(g, (Composition)composition, -1, branches);
 			}
 		}
 
@@ -709,7 +696,7 @@ void CompositionAnalysis::build(const Adjacency &g) {
 		for (petri::iterator i = g.begin(split_type); i != g.end(split_type); i++) {
 			if (not g.isValid(i)) continue;
 
-			build(g, (Composition::Type)composition, i.index, g.next(i));
+			build(g, (Composition)composition, i.index, g.next(i));
 		}
 
 		// See splitIsCovered() for documentation. Remove "covered" conditional splits.
@@ -740,7 +727,7 @@ void CompositionAnalysis::build(const Adjacency &g) {
 	}
 }
 
-void CompositionAnalysis::setSplitGroup(Composition::Type composition, petri::iterator node, SplitGroup g) {
+void CompositionAnalysis::setSplitGroup(Composition composition, petri::iterator node, SplitGroup g) {
 	std::vector<SplitGroup> *groups = splitGroupsIter(composition, node);
 	if (groups == nullptr) {
 		return;
@@ -754,7 +741,7 @@ void CompositionAnalysis::setSplitGroup(Composition::Type composition, petri::it
 	}
 }
 
-SplitGroup CompositionAnalysis::getSplitGroup(Composition::Type composition, petri::iterator node, int split) const {
+SplitGroup CompositionAnalysis::getSplitGroup(Composition composition, petri::iterator node, int split) const {
 	vector<SplitGroup> groups = splitGroupsOf(composition, node);
 	auto pos = lower_bound(groups.begin(), groups.end(), split);
 	if (pos != groups.end() and pos->split == split) {
@@ -763,7 +750,7 @@ SplitGroup CompositionAnalysis::getSplitGroup(Composition::Type composition, pet
 	return SplitGroup();
 }
 
-std::vector<SplitGroup> *CompositionAnalysis::splitGroupsIter(Composition::Type composition, petri::iterator node) {
+std::vector<SplitGroup> *CompositionAnalysis::splitGroupsIter(Composition composition, petri::iterator node) {
 	if (node.index < 0) {
 		return nullptr;
 	}
@@ -774,7 +761,7 @@ std::vector<SplitGroup> *CompositionAnalysis::splitGroupsIter(Composition::Type 
 	return &transitions[node.index].splits[composition];
 }
 
-std::vector<SplitGroup> CompositionAnalysis::splitGroupsOf(Composition::Type composition, petri::iterator node) const {
+std::vector<SplitGroup> CompositionAnalysis::splitGroupsOf(Composition composition, petri::iterator node) const {
 	if (node.index < 0) {
 		if (node.type == transition::type and composition == Composition::CHOICE and (int)reset.size() > 1) {
 			return vector<SplitGroup>(1, SplitGroup(-1, (int)reset.size(), vector<int>(1, node.index)));
@@ -788,7 +775,7 @@ std::vector<SplitGroup> CompositionAnalysis::splitGroupsOf(Composition::Type com
 	return transitions[node.index].splits[composition];
 }
 
-std::vector<SplitGroup> CompositionAnalysis::splitGroupsOf(Composition::Type composition, SplitGroup::Operation groupOperation, SplitGroup::Operation branchOperation, vector<petri::iterator> nodes) const {
+std::vector<SplitGroup> CompositionAnalysis::splitGroupsOf(Composition composition, SplitGroup::Operation groupOperation, SplitGroup::Operation branchOperation, vector<petri::iterator> nodes) const {
 	std::vector<SplitGroup> groups;
 	if (nodes.empty()) {
 		return groups;
@@ -878,7 +865,7 @@ bool CompositionAnalysis::isSequence(petri::iterator a, petri::iterator b, bool 
 		and (not always or not isChoice(a, b, false));
 }
 
-bool CompositionAnalysis::is(Composition::Type composition, petri::iterator a, petri::iterator b, bool always, bool bidir) const {
+bool CompositionAnalysis::is(Composition composition, petri::iterator a, petri::iterator b, bool always, bool bidir) const {
 	if (composition == Composition::SEQUENCE) {
 		return isSequence(a, b, always) and (not bidir or isSequence(b, a, always));
 	} else if (composition == Composition::CHOICE) {
@@ -894,7 +881,7 @@ bool CompositionAnalysis::is(Composition::Type composition, petri::iterator a, p
 // This assumes that a and b represent partial states. IE, there exists a set
 // of states which each contain all nodes in a and a set of states which each
 // contain all nodes in b.
-bool CompositionAnalysis::is(Composition::Type composition, petri::region a, petri::region b, bool always, bool bidir) const {
+bool CompositionAnalysis::is(Composition composition, petri::region a, petri::region b, bool always, bool bidir) const {
 	// sometimes composed in parallel? - Is there a shared parallel split with
 	// mutually exclusive branches in the group-intersected, branch-unioned
 	// parallel split groups of the nodes of each partial that aren't in the other?
@@ -993,7 +980,7 @@ bool CompositionAnalysis::is(Composition::Type composition, petri::region a, pet
 	return compare(SplitGroup::INTERSECT, SplitGroup::SYMMETRIC_DIFFERENCE, Ga, Gb);*/
 }
 
-vector<SplitGroup> CompositionAnalysis::invert(const Adjacency &g, Composition::Type composition, std::vector<SplitGroup> groups) const {
+vector<SplitGroup> CompositionAnalysis::invert(const Adjacency &g, Composition composition, std::vector<SplitGroup> groups) const {
 	int splitType = (composition == Composition::CHOICE ? place::type : transition::type);
 	for (auto &group : groups) {
 		vector<petri::iterator> n = g.next(petri::iterator(splitType, group.split));
@@ -1044,7 +1031,7 @@ bool CompositionAnalysis::crossesReset(vector<petri::iterator> pos) const {
 	return beforeReset and afterReset;
 }
 
-bound CompositionAnalysis::complete(Composition::Type composition, bound nodes) const {
+bound CompositionAnalysis::complete(Composition composition, bound nodes) const {
 	// In this function, we are given conditional groups of parallel
 	// nodes. In some cases, one group may entirely overlap another.
 	// We need to add nodes to differentiate them in the petri net
@@ -1262,7 +1249,7 @@ vector<array<petri::region, 2> > CompositionAnalysis::deinterfere(petri::region 
 // @param always If true, requires consistent (always) relationships; if false, allows occasional relationships
 // @param invert If true, inverts the relationship criteria, finding opposite relationships
 // @return A vector of vectors, where each inner vector contains a maximal clique of related nodes
-bound CompositionAnalysis::select(Composition::Type composition, vector<petri::iterator> nodes, bool always, bool invert) const {
+bound CompositionAnalysis::select(Composition composition, vector<petri::iterator> nodes, bool always, bool invert) const {
 	// ~always & ~invert - separate nodes that aren't sometimes composed as requested
 	// ~always &  invert - separate nodes that are sometimes composed as the opposite of requested
 	//  always & ~invert - separate nodes that aren't always composed as requested.
@@ -1281,7 +1268,7 @@ bound CompositionAnalysis::select(Composition::Type composition, vector<petri::i
 		vector<petri::iterator> R, P, X;
 	};
 
-	Composition::Type opposite = Composition::invert(composition);
+	Composition opposite = petri::invert(composition);
 
 	vector<BronKerboschFrame> frames;
 	frames.push_back(BronKerboschFrame());
@@ -1325,7 +1312,7 @@ bound CompositionAnalysis::select(Composition::Type composition, vector<petri::i
 }
 
 // Takes a strict selection of nodes (see graph::select() ) and regroups them into all non-strict selections
-bound CompositionAnalysis::group(Composition::Type composition, bound nodes, bool always, bool invert) const {
+bound CompositionAnalysis::group(Composition composition, bound nodes, bool always, bool invert) const {
 	// ~always & ~invert - group nodes that are sometimes composed as requested
 	// ~always &  invert - group nodes that aren't sometimes composed as the opposite of requested
 	//  always & ~invert - group nodes that are always composed as requested.
@@ -1335,7 +1322,7 @@ bound CompositionAnalysis::group(Composition::Type composition, bound nodes, boo
 		vector<int> R, P, X;
 	};
 
-	Composition::Type opposite = Composition::invert(composition);
+	Composition opposite = petri::invert(composition);
 
 	vector<BronKerboschFrame> frames;
 	frames.push_back(BronKerboschFrame());
@@ -1385,7 +1372,7 @@ bound CompositionAnalysis::group(Composition::Type composition, bound nodes, boo
 	return nodes;
 }
 
-bound CompositionAnalysis::partials(Composition::Type composition, petri::region nodes, vector<petri::iterator> other) const {
+bound CompositionAnalysis::partials(Composition composition, petri::region nodes, vector<petri::iterator> other) const {
 	nodes.sort();
 	if (other.empty()) {
 		for (auto i = begin(place::type); i != end(place::type); i++) {

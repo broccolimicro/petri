@@ -13,7 +13,7 @@ string print_splits(const CompositionAnalysis &a, petri::iterator node) {
 	return "t" + ::to_string(a.splitGroupsOf(Composition::PARALLEL, node)) + "p" + ::to_string(a.splitGroupsOf(Composition::CHOICE, node));
 }
 
-string should_be(const CompositionAnalysis &g, bool be, Composition::Type composition, petri::iterator a, petri::iterator b) {
+string should_be(const CompositionAnalysis &g, bool be, Composition composition, petri::iterator a, petri::iterator b) {
 	string comp = "sequence";
 	if (composition == Composition::PARALLEL) {
 		comp = "parallel";
@@ -27,7 +27,7 @@ string should_be(const CompositionAnalysis &g, bool be, Composition::Type compos
 	return a.to_string() + ":" + print_splits(g, a) + " should " + (not be ? "not " : "") + "be " + comp + " with " + b.to_string() + ":" + print_splits(g, b);
 }
 
-void test_always(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_always(const CompositionAnalysis &g, Composition composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			if (*i != *j) {
@@ -48,18 +48,18 @@ void test_always(const CompositionAnalysis &g, Composition::Type composition, ve
 			if (composition < 3) {
 				for (int k = 0; k < 3; k++) {
 					if (k != composition) {
-						EXPECT_FALSE(g.is((Composition::Type)k, *i, *j)) << should_be(g, false, (Composition::Type)k, *i, *j);
+						EXPECT_FALSE(g.is((Composition)k, *i, *j)) << should_be(g, false, (Composition)k, *i, *j);
 						if (bidir) {
-							EXPECT_FALSE(g.is((Composition::Type)k, *j, *i)) << should_be(g, false, (Composition::Type)k, *j, *i);
+							EXPECT_FALSE(g.is((Composition)k, *j, *i)) << should_be(g, false, (Composition)k, *j, *i);
 						}
 					}
 				}
 			} else {
 				for (int k = 3; k < 5; k++) {
 					if (k != composition) {
-						EXPECT_FALSE(g.is((Composition::Type)k, *i, *j)) << should_be(g, false, (Composition::Type)k, *i, *j);
+						EXPECT_FALSE(g.is((Composition)k, *i, *j)) << should_be(g, false, (Composition)k, *i, *j);
 						if (bidir) {
-							EXPECT_FALSE(g.is((Composition::Type)k, *j, *i)) << should_be(g, false, (Composition::Type)k, *j, *i);
+							EXPECT_FALSE(g.is((Composition)k, *j, *i)) << should_be(g, false, (Composition)k, *j, *i);
 						}
 					}
 				}
@@ -68,7 +68,7 @@ void test_always(const CompositionAnalysis &g, Composition::Type composition, ve
 	}
 }
 
-void test_sometimes(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_sometimes(const CompositionAnalysis &g, Composition composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			if (*i != *j) {
@@ -86,7 +86,7 @@ void test_sometimes(const CompositionAnalysis &g, Composition::Type composition,
 	}
 }
 
-void test_not(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_not(const CompositionAnalysis &g, Composition composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			EXPECT_FALSE(g.is(composition, *i, *j, false)) << should_be(g, false, composition, *i, *j);
@@ -97,7 +97,7 @@ void test_not(const CompositionAnalysis &g, Composition::Type composition, vecto
 	}
 }
 
-void test_not_always(const CompositionAnalysis &g, Composition::Type composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
+void test_not_always(const CompositionAnalysis &g, Composition composition, vector<petri::iterator> a, vector<petri::iterator> b=vector<petri::iterator>(), bool bidir=false) {
 	for (auto i = a.begin(); i != a.end(); i++) {
 		for (auto j = (b.empty() ? ::next(i) : b.begin()); j != (b.empty() ? a.end() : b.end()); j++) {
 			EXPECT_FALSE(g.is(composition, *i, *j, true)) << should_be(g, false, composition, *i, *j);

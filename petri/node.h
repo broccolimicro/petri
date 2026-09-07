@@ -8,13 +8,23 @@
 
 namespace petri {
 
+enum Composition {
+	CHOICE = 0,
+	PARALLEL = 1,
+	SEQUENCE = 2,
+	IMPLIES = 3,
+	EXCLUDES = 4
+};
+
+Composition invert(Composition t);
+
 struct place {
 	static const int type = 0;
 
 	place();
 	~place();
 
-	static place merge(int composition, const place &p0, const place &p1);
+	place &merge(Composition composition, const place &p1);
 };
 
 ostream &operator<<(ostream &os, const place &p);
@@ -25,11 +35,11 @@ struct transition {
 	transition();
 	~transition();
 
-	bool is_infeasible();
-	bool is_vacuous();
+	bool is_infeasible() const;
+	bool is_vacuous() const;
 
-	static transition merge(int composition, const transition &t0, const transition &t1);
-	static bool mergeable(int composition, const transition &t0, const transition &t1);
+	transition &merge(Composition composition, const transition &t1);
+	bool mergeable(Composition composition, const transition &t1) const;
 };
 
 ostream &operator<<(ostream &os, const transition &t);

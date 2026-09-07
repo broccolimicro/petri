@@ -747,12 +747,16 @@ struct graph {
 		return result;
 	}
 
-	virtual petri::iterator copy_combine(Composition::Type composition, petri::iterator i0, petri::iterator i1) {
+	virtual petri::iterator copy_combine(Composition composition, petri::iterator i0, petri::iterator i1) {
 		if (i0.type == place::type and i1.type == place::type) {
-			return create(place::merge(composition, places[i0.index], places[i1.index]));
+			petri::iterator result = create(places[i0.index]);
+			places[result.index].merge(composition, places[i1.index]);
+			return result;
 		} else if (i0.type == transition::type and i1.type == transition::type) {
-			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index])) {
-				return create(transition::merge(composition, transitions[i0.index], transitions[i1.index]));
+			if (transitions[i0.index].mergeable(composition, transitions[i1.index])) {
+				petri::iterator result = create(transitions[i0.index]);
+				transitions[result.index].merge(composition, transitions[i1.index]);
+				return result;
 			} else {
 				internal("petri::copy_combine", "transitions are not mergeable", __FILE__, __LINE__);
 			}
@@ -762,13 +766,13 @@ struct graph {
 		return petri::iterator();
 	}
 
-	virtual petri::iterator combine(Composition::Type composition, petri::iterator i0, petri::iterator i1) {
+	virtual petri::iterator combine(Composition composition, petri::iterator i0, petri::iterator i1) {
 		if (i0.type == place::type and i1.type == place::type) {
-			places[i0.index] = place::merge(composition, places[i0.index], places[i1.index]);
+			places[i0.index].merge(composition, places[i1.index]);
 			return i0;
 		} else if (i0.type == transition::type and i1.type == transition::type) {
-			if (transition::mergeable(composition, transitions[i0.index], transitions[i1.index])) {
-				transitions[i0.index] = transition::merge(composition, transitions[i0.index], transitions[i1.index]);
+			if (transitions[i0.index].mergeable(composition, transitions[i1.index])) {
+				transitions[i0.index].merge(composition, transitions[i1.index]);
 				return i0;
 			} else {
 				internal("petri::combine", "transitions are not mergeable", __FILE__, __LINE__);
@@ -999,7 +1003,7 @@ struct graph {
 		return t;
 	}
 
-	virtual petri::iterator duplicate(Composition::Type composition, petri::iterator i, bool add = true) {
+	virtual petri::iterator duplicate(Composition composition, petri::iterator i, bool add = true) {
 		petri::iterator d = copy(i);
 		if ((i.type == transition::type and composition == Composition::CHOICE) or (i.type == place::type and composition == Composition::PARALLEL)) {
 			for (int j = (int)arcs[i.type].size()-1; j >= 0; j--) {
@@ -1064,7 +1068,7 @@ struct graph {
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(Composition::Type composition, petri::iterator i, int num, bool add = true) {
+	virtual vector<petri::iterator> duplicate(Composition composition, petri::iterator i, int num, bool add = true) {
 		if (num == 0) {
 			return vector<petri::iterator>();
 		}
@@ -1145,7 +1149,7 @@ struct graph {
 		return d;
 	}
 
-	virtual vector<petri::iterator> duplicate(Composition::Type composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true) {
+	virtual vector<petri::iterator> duplicate(Composition composition, vector<petri::iterator> n, int num = 1, bool interleaved = false, bool add = true) {
 		vector<petri::iterator> result;
 		result.reserve(n.size()*num);
 		for (int i = 0; i < (int)n.size(); i++) {
@@ -1174,8 +1178,8 @@ struct graph {
 	virtual void pinch(petri::iterator n) {
 		pair<vector<petri::iterator>, vector<petri::iterator> > neighbors = erase(n);
 
-		vector<petri::iterator> left = duplicate((Composition::Type)n.type, neighbors.first, neighbors.second.size(), false);
-		vector<petri::iterator> right = duplicate((Composition::Type)n.type, neighbors.second, neighbors.first.size(), true);
+		vector<petri::iterator> left = duplicate((Composition)n.type, neighbors.first, neighbors.second.size(), false);
+		vector<petri::iterator> right = duplicate((Composition)n.type, neighbors.second, neighbors.first.size(), true);
 
 		for (int i = 0; i < (int)right.size(); i++) {
 			combine(Composition::SEQUENCE, left[i], right[i]);
@@ -1523,7 +1527,7 @@ struct graph {
 	// @param composition The composition type to use (Composition::SEQUENCE, choice, or parallel)
 	// @param g The Petri net to merge with the current one
 	// @return A mapping from original nodes to corresponding nodes in the merged net
-	virtual segment compose(Composition::Type composition, segment s0, segment s1, bool proper=false) {
+	virtual segment compose(Composition composition, segment s0, segment s1, bool proper=false) {
 		if (s0.source.empty()) {
 			s0 = s1;
 		} else if (s1.source.empty()) {
@@ -1822,7 +1826,7 @@ struct graph {
 				if (nj == ni and pj == pi and (aggressive
 						or (transitions[i.index].is_vacuous() and transitions[j.index].is_vacuous()))) {
 					if (debug) cout << "\tmerging internally conditioned transitions " << i << " and " << j << endl;
-					transitions[j.index] = transition::merge(Composition::CHOICE, transitions[i.index], transitions[j.index]);
+					transitions[j.index].merge(Composition::CHOICE, transitions[i.index]);
 					erase(i);
 					affect = true;
 					break;
@@ -1845,7 +1849,7 @@ struct graph {
 					and (aggressive
 						or (transitions[i.index].is_vacuous() or transitions[j.index].is_vacuous()))) {
 					if (debug) cout << "\tmerging internally parallel transitions " << i << " and " << j << endl;
-					transitions[j.index] = transition::merge(Composition::PARALLEL, transitions[i.index], transitions[j.index]);
+					transitions[j.index].merge(Composition::PARALLEL, transitions[i.index]);
 					erase(i);
 					erase(ni);
 					erase(pi);
