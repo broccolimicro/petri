@@ -2073,7 +2073,6 @@ struct graph {
 		for (int i = 0; i < (int)reset.size(); i++) {
 			result.reset.push_back(std::vector<petri::iterator>());
 			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
-				result.p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
 				result.reset.back().push_back(petri::iterator(place::type, reset[i].tokens[j].index));
 			}
 		}
@@ -2128,7 +2127,6 @@ struct graph {
 		for (int i = 0; i < (int)reset.size(); i++) {
 			result.reset.push_back(std::vector<petri::iterator>());
 			for (int j = 0; j < (int)reset[i].tokens.size(); j++) {
-				result.p[place::type][reset[i].tokens[j].index].push_back(petri::iterator(transition::type, -i-1));
 				result.reset.back().push_back(petri::iterator(place::type, reset[i].tokens[j].index));
 			}
 		}

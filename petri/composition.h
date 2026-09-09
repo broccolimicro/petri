@@ -71,7 +71,7 @@ struct CompositionAnalysis {
 
 	bool splitIsCovered(petri::iterator p, vector<petri::iterator> n) const;
 	void build(const Adjacency &g, Composition composition, int split, vector<petri::iterator> init);
-	void build(const Adjacency &g);
+	void build(Adjacency g);
 
 	void setSplitGroup(Composition composition, petri::iterator node, SplitGroup g);
 	SplitGroup getSplitGroup(Composition composition, petri::iterator node, int split) const;

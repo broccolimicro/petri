@@ -648,8 +648,13 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 //
 // The information computed by this function is essential for higher-level relationship
 // analysis like determining if nodes are in sequence, choice, or parallel relationships.
-void CompositionAnalysis::build(const Adjacency &g) {
+void CompositionAnalysis::build(Adjacency g) {
 	reset = g.reset;
+	for (size_t i = 0; i < reset.size(); i++) {
+		for (size_t j = 0; j < reset[i].size(); j++) {
+			g.p[place::type][reset[i][j].index].push_back(petri::iterator(transition::type, -i-1));
+		}
+	}
 	// DESIGN(edward.bingham) Choice must go first, because we use that to
 	// determine whether we're dealing with non-properly nested parallelism or
 	// shared conditional parallel branches. It just so happens that "choice" =

@@ -52,6 +52,8 @@ void ReachabilityAnalysis::build(const Adjacency &g, petri::iterator pos) {
 
 		int toIdx = index(curr);
 		for (auto i : g.prev(curr)) {
+			if (not i.valid()) continue;
+
 			int fromIdx = index(i);
 			if (seen.insert(i).second) {
 				distances[posIdx*nodes + fromIdx] = max(distances[posIdx*nodes + fromIdx], distances[posIdx*nodes + toIdx] + 1);
