@@ -1788,8 +1788,8 @@ struct graph {
 
 			if (not proper_nesting
 				or (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1))
-				or (n.size() == 1 and nn.size() == 1 and next(np).size() == 1 and np.size() == 1)
-				or (p.size() == 1 and pp.size() == 1 and prev(pn).size() == 1 and pn.size() == 1)) {
+				or (n.size() == 1 and pn.size() == 1 and pn[0] == i and nn.size() == 1)
+				or (p.size() == 1 and np.size() == 1 and np[0] == i and pp.size() == 1)) {
 				if (debug) cout << "\tpinching vacuous transition " << i << endl;
 				pinch(i);
 				affect = true;
