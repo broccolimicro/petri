@@ -1630,7 +1630,7 @@ struct graph {
 	}
 
 	// TODO(edward.bingham) I need to find vacuous loops and simplify them
-	virtual bool remove_vacuous_loops() {
+	virtual bool remove_vacuous_loops(bool debug=false) {
 		if (reset.empty()) {
 			return false;
 		}
@@ -1695,6 +1695,7 @@ struct graph {
 		std::set<petri::iterator> result;
 		std::set_difference(vacuousNodes.begin(), vacuousNodes.end(), activeNodes.begin(), activeNodes.end(), std::inserter(result, result.end()));
 		for (auto i = result.begin(); i != result.end(); i++) {
+			if (debug) cout << "\tremoving vacuous loop " << *i << endl;
 			erase(*i);
 		}
 		return not result.empty();
@@ -1863,26 +1864,30 @@ struct graph {
 
 	vector<strand> compute_strands(set<petri::iterator> from, set<petri::iterator> to, set<petri::iterator> excl=set<petri::iterator>()) const {
 		vector<strand> stack;
-		for (auto i = from.begin(); i != from.end(); i++) {
-			stack.push_back(strand({*i}));
+		for (auto i : from) {
+			if (to.find(i) == to.end()
+				and excl.find(i) == excl.end()) {
+				stack.push_back(strand({i}));
+			}
 		}
 
 		vector<strand> result;
 		while (not stack.empty()) {
 			strand curr = stack.back();
 			stack.pop_back();
-			if (excl.find(curr.back()) != excl.end()) {
-				continue;
-			} else if (to.find(curr.back()) != to.end()) {
-				result.push_back(curr);
-				continue;
-			}
 
 			vector<petri::iterator> n = next(curr.back());
-			for (auto i = n.begin(); i != n.end(); i++) {
-				if (not curr.contains(*i) and from.find(*i) == from.end()) {
+			for (auto i : n) {
+				if (curr.contains(i)
+					or excl.find(i) != excl.end()
+					or from.find(i) != from.end()) {
+					continue;
+				} else if (to.find(i) != to.end()) {
+					result.push_back(curr);
+					result.back().push_back(i);
+				} else {
 					stack.push_back(curr);
-					stack.back().push_back(*i);
+					stack.back().push_back(i);
 				}
 			}
 		}
@@ -1974,12 +1979,13 @@ struct graph {
 		return true;
 	}
 
-	virtual bool remove_redundant() {
+	virtual bool remove_redundant(bool debug = false) {
 		bool affect = false;
 		for (petri::iterator i(place::type, 0); i < (int)places.size(); i++) {
 			if (not is_valid(i)) continue;
 
 			if (is_redundant(i)) {
+				if (debug) cout << "\tremoving redundant place " << i << endl;
 				erase(i);
 				affect = true;
 			}
@@ -2014,9 +2020,9 @@ struct graph {
 
 			change = remove_infeasible(debug) or change;
 			change = pinch_vacuous(proper_nesting, debug) or change;
-			change = remove_redundant() or change;
+			change = remove_redundant(debug) or change;
 			change = compose_internal(aggressive, debug) or change;
-			change = remove_vacuous_loops() or change;
+			change = remove_vacuous_loops(debug) or change;
 			result = result or change;
 		}
 
