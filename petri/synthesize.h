@@ -31,15 +31,25 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 
 			std::vector<petri::iterator> p = t.prev(i);
 			std::vector<petri::iterator> n = t.next(i);
-			if (p.size() != 1u or n.size() != 1u) {
+
+			if (p.size() != 1u) {
 				continue;
 			}
 
-			if (p[0] == n[0]) {
-				controlflow::Tree<process> loop = t.transitions[p[0].index].loop();
-				t.erase(i);
-				t.insert_after(p[0], loop);
+			auto pos = find(n.begin(), n.end(), p[0]);
+			if (pos != n.end()) {
+				n.erase(pos);
+				for (int j = (int)t.arcs[place::type].size()-1; j >= 0; j--) {
+					if (t.arcs[place::type][j].from == i and t.arcs[place::type][j].to == p[0]) {
+						t.arcs[place::type].erase(t.arcs[place::type].begin() + j);
+					}
+				}
+
+				t.transitions[p[0].index].loop();
 				found = true;
+			}
+
+			if (n.size() != 1u) {
 				continue;
 			}
 
@@ -109,7 +119,7 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 						break;
 					}
 
-					if (j != n.size()-1) {
+					if (j != 0) {
 						toErase.push_back(nj);
 						toErase.push_back(nnj[0]);
 						toErase.push_back(nnnj[0]);
@@ -118,11 +128,10 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 				}
 
 				if (hasParallel) {
-					for (size_t j = 0; j < nn.size()-1; j++) {
-						t.transitions[nn.back().index].merge(petri::PARALLEL, t.transitions[nn[j].index]);
+					for (size_t j = nn.size()-1; j > 0; j--) {
+						t.transitions[nn[0].index].merge(petri::PARALLEL, t.transitions[nn[j].index]);
 					}
 					t.erase(toErase);
-					n[0] = n.back();
 					n.erase(n.begin()+1, n.end());
 					found = true;
 				}
@@ -133,14 +142,6 @@ bool graph_to_tree(graph<place, controlflow::Tree<process>, state> &t, const gra
 
 			std::vector<petri::iterator> p = t.prev(i);
 			if (p.size() != 1u) {
-				continue;
-			}
-
-			if (p[0] == n[0]) {
-				controlflow::Tree<process> loop = t.transitions[i.index].loop();
-				t.erase(i);
-				t.insert_after(p[0], loop);
-				found = true;
 				continue;
 			}
 

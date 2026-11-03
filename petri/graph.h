@@ -1165,6 +1165,22 @@ struct graph {
 		return result;
 	}
 
+	virtual petri::region duplicateRegion(Composition composition, petri::region n, bool add = true) {
+		petri::region result;
+		for (const petri::iterator &i : n.nodes) {
+			result.nodes.push_back(duplicate(composition, i));
+		}
+		return result;
+	}
+
+	virtual petri::bound duplicateBound(Composition composition, petri::bound n, bool add = true) {
+		petri::bound result;
+		for (const petri::region &r : n.regions) {
+			result.regions.push_back(duplicateRegion(composition, r, add));
+		}
+		return result;
+	}
+
 	// Pinch removes a node without affecting the connectivity, node dominance,
 	// or token flow of the graph by creating direct connections between
 	// predecessor and successor nodes
@@ -1787,7 +1803,7 @@ struct graph {
 				continue;
 			}
 
-			if (not proper_nesting
+			if ((not proper_nesting and (np.size() == 1 or pn.size() == 1))
 				or (p.size() == 1 and n.size() == 1 and (np.size() == 1 or pn.size() == 1))
 				or (n.size() == 1 and pn.size() == 1 and pn[0] == i and nn.size() == 1)
 				or (p.size() == 1 and np.size() == 1 and np[0] == i and pp.size() == 1)) {

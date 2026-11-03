@@ -159,8 +159,9 @@ struct Tree : petri::transition {
 				if (nodes[index].type == Node::CHOICE) {
 					printf("[");
 				} else if (nodes[index].type == Node::PARALLEL) {
-					printf("(");
+					printf("(|");
 				} else if (nodes[index].type == Node::SEQUENCE) {
+					printf("(;");
 				} else if (nodes[index].type == Node::LOOP) {
 					printf("*[");
 				}
@@ -180,6 +181,7 @@ struct Tree : petri::transition {
 				} else if (nodes[index].type == Node::PARALLEL) {
 					printf(")");
 				} else if (nodes[index].type == Node::SEQUENCE) {
+					printf(")");
 				} else if (nodes[index].type == Node::LOOP) {
 					printf("]");
 				}
