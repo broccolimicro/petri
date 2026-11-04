@@ -147,6 +147,7 @@ struct bound {
 	region operator[](int i) const;
 
 	bool empty() const;
+	bool hasEmptyRegion() const;
 	size_t size() const;
 
 	void clear();

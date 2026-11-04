@@ -418,6 +418,15 @@ bool bound::empty() const {
 	return regions.empty();
 }
 
+bool bound::hasEmptyRegion() const {
+	for (const auto &region : regions) {
+		if (region.empty()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 size_t bound::size() const {
 	return regions.size();
 }
@@ -540,11 +549,7 @@ bound &bound::compose(int composition, region r0) {
 }
 
 bound &bound::compose(int composition, bound b0) {
-	if (regions.empty()) {
-		regions = b0.regions;
-	} else if (b0.regions.empty()) {
-		// skip
-	} else if (composition == Composition::CHOICE) {
+	if (composition == Composition::CHOICE) {
 		for (auto i = b0.begin(); i != b0.end(); i++) {
 			compose(composition, *i);
 		}

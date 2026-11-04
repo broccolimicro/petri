@@ -433,52 +433,60 @@ struct graph {
 		}
 	}
 
-	virtual petri::iterator nest_in(region to) {
-		if (to.size() == 1u) {
-			return to[0];
+	virtual petri::region nest_in(region to) {
+		if (to.size() <= 1u) {
+			return to;
 		}
 
 		petri::iterator link = create(transition::type);
 		for (auto i = to.begin(); i != to.end(); i++) {
 			connect(link, *i);
 		}
-		return link;
+		return {link};
 	}
 
-	virtual petri::iterator nest_out(region from) {
-		if (from.size() == 1u) {
-			return from[0];
+	virtual petri::region nest_out(region from) {
+		if (from.size() <= 1u) {
+			return from;
 		}
 
 		petri::iterator link = create(transition::type);
 		for (auto i = from.begin(); i != from.end(); i++) {
 			connect(*i, link);
 		}
-		return link;
+		return {link};
 	}
 
-	virtual petri::iterator nest_in(bound to) {
+	virtual petri::bound nest_in(bound to) {
 		if (to.size() == 1u) {
-			return nest_in(to[0]);
+			return {nest_in(to[0])};
+		} else if (to.empty()) {
+			return petri::bound();
 		}
 
 		petri::iterator link = create(place::type);
 		for (auto i = to.begin(); i != to.end(); i++) {
-			connect(link, nest_in(*i));
+			if (not to.empty()) {
+				connect(link, nest_in(*i));
+			}
 		}
-		return link;
+		return {{link}};
 	}
 
-	virtual petri::iterator nest_out(bound from) {
+	virtual petri::bound nest_out(bound from) {
 		if (from.size() == 1u) {
-			return nest_out(from[0]);
+			return {nest_out(from[0])};
+		} else if (from.empty()) {
+			return petri::bound();
 		}
 
 		petri::iterator link = create(place::type);
 		for (auto i = from.begin(); i != from.end(); i++) {
-			connect(nest_out(*i), link);
+			if (not from.empty()) {
+				connect(nest_out(*i), link);
+			}
 		}
-		return link;
+		return {{link}};
 	}
 
 	virtual petri::iterator connect(petri::iterator from, petri::iterator to) {
@@ -1560,10 +1568,10 @@ struct graph {
 			}
 		} else {
 			if (proper) {
-				s0.source = bound({{nest_in(s0.source)}});
-				s0.sink = bound({{nest_out(s0.sink)}});
-				s1.source = bound({{nest_in(s1.source)}});
-				s1.sink = bound({{nest_out(s1.sink)}});
+				s0.source = nest_in(s0.source);
+				s0.sink = nest_out(s0.sink);
+				s1.source = nest_in(s1.source);
+				s1.sink = nest_out(s1.sink);
 			}
 			s0.compose(composition, s1);
 		}
