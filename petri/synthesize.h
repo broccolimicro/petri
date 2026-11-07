@@ -57,6 +57,21 @@ bool compress_sequence(graph<place, controlflow::Tree<process, place>, state> &t
 			continue;
 		}
 
+		bool foundReset = false;
+		for (size_t j = 0; j < g.reset.size(); j++) {
+			for (size_t k = 0; k < g.reset[j].tokens.size(); k++) {
+				if (g.reset[j].tokens[k] == i.index) {
+					foundReset = true;
+					break;
+				}
+			}
+			if (foundReset) {
+				break;
+			}
+		}
+		if (foundReset) {
+			continue;
+		}
 		
 		t.erase(i);
 		t.transitions[p[0].index].merge(petri::SEQUENCE, t.transitions[n[0].index]);
