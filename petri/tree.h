@@ -30,6 +30,8 @@ struct Node {
 		LOOP = 3,
 	};
 
+	// index into places
+	int place;
 	Type type;
 	std::vector<Index> procs;
 
@@ -37,13 +39,14 @@ struct Node {
 	~Node();
 };
 
-template <class Transition>
+template <typename Transition, typename Place>
 struct Tree : petri::transition {
 	index_vector<Node> nodes;
 
 	// DESIGN(edward.bingham) if transitions is empty, but the graph is filled,
 	// then the transition indices point to an array external to this structure.
 	// See isExternal().
+	index_vector<Place> places;
 	index_vector<Transition> transitions;
 	int root;
 
@@ -63,11 +66,15 @@ struct Tree : petri::transition {
 	~Tree() {
 	}
 
+	Node &top() {
+		return nodes[root];
+	}
+
 	bool isExternal() const {
 		return transitions.empty();
 	}
 
-	Tree<Transition> &loop() {
+	Tree<Transition, Place> &loop() {
 		int newRoot = nodes.emplace(Node::LOOP);
 		if (root >= 0) {
 			nodes[newRoot].procs.push_back(Index(Index::NODE, root));
@@ -76,13 +83,13 @@ struct Tree : petri::transition {
 		return *this;
 	}
 
-	bool mergeable(petri::Composition composition, const Tree<Transition> &t1) const {
+	bool mergeable(petri::Composition composition, const Tree<Transition, Place> &t1) const {
 		return composition == petri::CHOICE
 			or composition == petri::PARALLEL
 			or composition == petri::SEQUENCE;
 	}
 
-	Tree<Transition> &merge(petri::Composition composition, const Tree<Transition> &t1) {
+	Tree<Transition, Place> &merge(petri::Composition composition, const Tree<Transition, Place> &t1) {
 		if (t1.root < 0) {
 			return *this;
 		}
@@ -200,6 +207,67 @@ struct Tree : petri::transition {
 	}
 };
 
+template <typename Transition, typename Place>
+ostream &operator<<(ostream &os, const Tree<Transition, Place> &t) {
+	if (t.root < 0) {
+		return os;
+	}
+
+	struct Frame {
+		int index;
+		int process;
+	};
+
+	std::vector<Frame> stack(1, {t.root, 0});
+	while (not stack.empty()) {
+		int curr = stack.size()-1;
+		int index = stack[curr].index;
+		int proc = stack[curr].process;
+
+		if (proc == 0) {
+			if (t.nodes[index].type == Node::CHOICE) {
+				os << "[";
+			} else if (t.nodes[index].type == Node::PARALLEL) {
+				os << "(|";
+			} else if (t.nodes[index].type == Node::SEQUENCE) {
+				os << "(;";
+			} else if (t.nodes[index].type == Node::LOOP) {
+				os << "*[";
+			}
+		} else if (proc < (int)t.nodes[index].procs.size()) {
+			if (t.nodes[index].type == Node::CHOICE) {
+				os << ":";
+			} else if (t.nodes[index].type == Node::PARALLEL) {
+				os << "||";
+			} else if (t.nodes[index].type == Node::SEQUENCE) {
+				os << ";";
+			} else if (t.nodes[index].type == Node::LOOP) {
+				os << ":";
+			}
+		} else {
+			if (t.nodes[index].type == Node::CHOICE) {
+				os << "]";
+			} else if (t.nodes[index].type == Node::PARALLEL) {
+				os << ")";
+			} else if (t.nodes[index].type == Node::SEQUENCE) {
+				os << ")";
+			} else if (t.nodes[index].type == Node::LOOP) {
+				os << "]";
+			}
+			stack.pop_back();
+			continue;
+		}
+
+		if (t.nodes[index].procs[proc].type == Index::TRANSITION) {
+			os << "T" << t.nodes[index].procs[proc].index;
+		} else if (t.nodes[index].procs[proc].type == Index::NODE) {
+			stack.push_back({t.nodes[index].procs[proc].index, 0});
+		}
+
+		stack[curr].process++;
+	}
+	return os;
+}
 
 
 }

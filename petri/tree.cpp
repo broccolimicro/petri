@@ -17,6 +17,7 @@ Index::~Index() {
 
 Node::Node(Node::Type type) {
 	this->type = type;
+	this->place = -1;
 }
 
 Node::~Node() {
