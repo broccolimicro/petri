@@ -8,12 +8,13 @@
 
 namespace petri {
 
+// Describes how two nodes relate in the execution of a Petri net.
 enum Composition {
-	CHOICE = 0,
-	PARALLEL = 1,
-	SEQUENCE = 2,
-	IMPLIES = 3,
-	EXCLUDES = 4
+	CHOICE = 0, // The nodes belong to alternative branches of a decision.
+	PARALLEL = 1, // The nodes belong to concurrent branches that can be active at the same time.
+	SEQUENCE = 2, // The nodes occur in order along the same execution, with one preceding the other.
+	IMPLIES = 3, // An execution that includes the first node also includes the second.
+	EXCLUDES = 4 // An execution can include the first node while leaving out the second.
 };
 
 Composition invert(Composition t);

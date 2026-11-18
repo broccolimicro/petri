@@ -12,7 +12,7 @@ using namespace petri;
 using namespace std;
 
 void run_test(const graph<place, transition, state<token> > &g, bool isProper) {
-	graph<place, controlflow::Tree<transition>, state<token> > tree;
+	graph<place, controlflow::Tree<transition, place>, state<token> > tree;
 	EXPECT_EQ(graph_to_tree(tree, g), isProper);
 
 	tree.print();

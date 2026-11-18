@@ -12,6 +12,21 @@
 
 namespace petri {
 
+// Records which outgoing branches of a Petri-net split apply to a node.
+//
+// `split` is the index of the place or transition where the split occurs.
+// `branch` contains the indices of the immediate successors that start
+// the represented branches. `count` is the total number of outgoing
+// branches at the split, even when `branch` contains only a subset.
+// A synthetic reset split uses `split == -1`.
+//
+// Keep `branch` sorted in ascending order with unique indices when
+// passing this group to `compare()` or `merge()`. The constructor stores
+// the branch list as supplied.
+//
+// Ordering uses `split` alone. Equality between two groups checks
+// `split` and the branch indices in order. `count` does not affect
+// equality. Comparisons with an integer use only `split`.
 struct SplitGroup {
 	SplitGroup();
 	SplitGroup(int split, int count, vector<int> branch=vector<int>());
@@ -47,12 +62,41 @@ bool compare(int group_operation, int branch_operation, vector<SplitGroup> g0, v
 vector<SplitGroup> merge(int group_operation, int branch_operation, vector<SplitGroup> g0, vector<SplitGroup> g1);
 void mergeInplace(int group_operation, int branch_operation, vector<SplitGroup> &g0, const vector<SplitGroup> &g1, set<int> exclude=set<int>());
 
+// Stores branch membership for one place or transition in the Petri net.
+//
+// Index `splits` with `Composition::CHOICE` for groups from choice splits
+// at places, or with `Composition::PARALLEL` for groups from parallel
+// splits at transitions. Each list is sorted by split ID and contains at
+// most one group per split. Each group records which branches of that
+// split reach the node.
+//
+// `merges` is reserved for merge groups. The current analysis leaves
+// both lists empty.
 struct SplitGroups {
-	// index with place::type or transition::type
 	std::array<std::vector<SplitGroup>, 2> splits;
 	std::array<std::vector<SplitGroup>, 2> merges;
 };
 
+// Analyzes choice and parallel composition in a Petri net.
+//
+// Construct from an `Adjacency` graph or call `build()` to compute split
+// groups for each place and transition. A split group records which
+// branches of a choice or parallel split reach a node. Use
+// `splitGroupsOf()` to get the groups for one node or combine the groups
+// for several nodes.
+//
+// `build()` analyzes choice splits at places before it analyzes parallel
+// splits at transitions. It uses the choice groups to handle parallel
+// branches that depend on earlier choices. It removes choice splits
+// whose outcome is already determined by an earlier choice.
+//
+// The analysis stores the graph's reset markings. It treats multiple
+// reset markings as branches of a synthetic choice split and the places
+// within each marking as branches of a synthetic parallel split.
+//
+// Use `is()` to test sequence, choice, parallelism, implication, or
+// exclusion between nodes or regions. Call `build()` again after
+// changing the graph or its reset markings.
 struct CompositionAnalysis {
 	index_vector<SplitGroups> places;
 	index_vector<SplitGroups> transitions;

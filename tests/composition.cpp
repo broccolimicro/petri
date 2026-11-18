@@ -1506,3 +1506,170 @@ TEST(composition, compose_proper_m2_2x2_2) {
 	EXPECT_TRUE(connected(g, t[5], p[5]));
 	EXPECT_TRUE(connected(g, p[5], t[3]));
 }
+
+TEST(composition_regression, groupingIsInvariantUnderRegionOrder) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 2);
+	CompositionAnalysis analysis(g.adjacency());
+	analysis.setSplitGroup(Composition::CHOICE, p[1], SplitGroup(0, 2, {0}));
+
+	ASSERT_TRUE(analysis.is(Composition::EXCLUDES, p[0], p[1]));
+	ASSERT_FALSE(analysis.is(Composition::EXCLUDES, p[1], p[0]));
+
+	const auto first = petri::region::from_nodes({p[0]});
+	const auto second = petri::region::from_nodes({p[1]});
+
+	petri::bound forwardOrder;
+	forwardOrder.push_back(first);
+	forwardOrder.push_back(second);
+
+	petri::bound reverseOrder;
+	reverseOrder.push_back(second);
+	reverseOrder.push_back(first);
+
+	EXPECT_EQ(analysis.group(Composition::EXCLUDES, forwardOrder).size(),
+		analysis.group(Composition::EXCLUDES, reverseOrder).size());
+}
+
+TEST(composition_regression, partialsDoNotAddTheSeedNodeAgain) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 1);
+	CompositionAnalysis analysis(g.adjacency());
+
+	for (auto composition : {Composition::PARALLEL, Composition::IMPLIES}) {
+		SCOPED_TRACE(composition);
+		const auto result = analysis.partials(composition, petri::region::from_nodes({p[0]}));
+		ASSERT_EQ(result.size(), 1u);
+		EXPECT_EQ(result[0].size(), 1u);
+	}
+}
+
+TEST(composition_regression, choicePartialsRequireEveryPairToMatch) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 3);
+	CompositionAnalysis analysis(g.adjacency());
+	analysis.setSplitGroup(Composition::CHOICE, p[0], SplitGroup(0, 2, {0}));
+	analysis.setSplitGroup(Composition::CHOICE, p[1], SplitGroup(0, 2, {0}));
+	analysis.setSplitGroup(Composition::CHOICE, p[2], SplitGroup(0, 2, {1}));
+
+	ASSERT_FALSE(analysis.is(Composition::CHOICE, p[0], p[1]));
+	ASSERT_TRUE(analysis.is(Composition::CHOICE, p[0], p[2]));
+	ASSERT_TRUE(analysis.is(Composition::CHOICE, p[1], p[2]));
+	const auto result = analysis.partials(Composition::CHOICE,
+		petri::region::from_nodes({p[0]}), {p[1], p[2]});
+	ASSERT_EQ(result.size(), 2u);
+	EXPECT_EQ(result[0].size() + result[1].size(), 3u);
+}
+
+TEST(composition_regression, outputWithNoParentBranchesDoesNotCoverChoice) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 1);
+	auto t = g.create(transition(), 2);
+	CompositionAnalysis analysis(g.adjacency());
+	const int parent = 1;
+	analysis.setSplitGroup(Composition::CHOICE, p[0],
+		SplitGroup(parent, 2, {t[0].index, t[1].index}));
+	analysis.setSplitGroup(Composition::CHOICE, t[0], SplitGroup(parent, 2, {t[0].index}));
+	analysis.setSplitGroup(Composition::CHOICE, t[1], SplitGroup(parent, 2, {}));
+
+	EXPECT_FALSE(analysis.splitIsCovered(p[0], t));
+}
+
+TEST(composition_regression, completePreservesRegionOrderWhenBranchDifferenceIsEmpty) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 2);
+	CompositionAnalysis analysis(g.adjacency());
+	for (auto node : p) {
+		analysis.setSplitGroup(Composition::CHOICE, node, SplitGroup(0, 2, {0}));
+	}
+	petri::bound input;
+	input.push_back(petri::region::from_nodes({p[0]}));
+	input.push_back(petri::region::from_nodes({p[0], p[1]}));
+
+	const auto result = analysis.complete(Composition::PARALLEL, input);
+	ASSERT_EQ(result.size(), input.size());
+	EXPECT_TRUE(result[0] == input[0]);
+	EXPECT_TRUE(result[1] == input[1]);
+}
+
+TEST(composition_regression, inPlaceBranchDifferenceMatchesMerge) {
+	vector<SplitGroup> lhs{SplitGroup(0, 3, {0, 1})};
+	const vector<SplitGroup> rhs{SplitGroup(0, 3, {1, 2})};
+	const auto expected = petri::merge(SplitGroup::INTERSECT, SplitGroup::DIFFERENCE, lhs, rhs);
+	ASSERT_EQ(expected.size(), 1u);
+	ASSERT_EQ(expected[0].branch, (vector<int>{0}));
+
+	mergeInplace(SplitGroup::INTERSECT, SplitGroup::DIFFERENCE, lhs, rhs);
+	ASSERT_EQ(lhs.size(), 1u);
+	EXPECT_EQ(lhs[0].branch, expected[0].branch);
+	EXPECT_EQ(lhs[0].count, expected[0].count);
+}
+
+TEST(composition_regression, disconnectedComponentsDoNotEstablishSequenceOrImplication) {
+	graph<place, transition, state<token> > g;
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 2);
+	g.connect({p[0], t[0], p[1]});
+	g.connect({p[2], t[1], p[3]});
+
+	CompositionAnalysis analysis(g.adjacency());
+	for (bool always : {false, true}) {
+		SCOPED_TRACE(always);
+		EXPECT_FALSE(analysis.is(Composition::SEQUENCE, t[0], t[1], always));
+		EXPECT_FALSE(analysis.is(Composition::SEQUENCE, t[1], t[0], always));
+		EXPECT_FALSE(analysis.is(Composition::IMPLIES, t[0], t[1], always));
+		EXPECT_FALSE(analysis.is(Composition::IMPLIES, t[1], t[0], always));
+	}
+}
+
+// These tests record the current compare() contract. Change the expectations
+// if the operation names are changed to use the standard set definitions.
+TEST(composition_regression, compareBranchSymmetricDifferenceRequiresTwoExclusiveBranches) {
+	const vector<SplitGroup> narrow{SplitGroup(0, 3, {0})};
+	const vector<SplitGroup> wide{SplitGroup(0, 3, {0, 1})};
+	const vector<SplitGroup> overlap{SplitGroup(0, 3, {0, 2})};
+
+	EXPECT_FALSE(compare(SplitGroup::INTERSECT, SplitGroup::SYMMETRIC_DIFFERENCE, narrow, wide));
+	EXPECT_TRUE(compare(SplitGroup::INTERSECT, SplitGroup::NOT_EQUAL, narrow, wide));
+	EXPECT_TRUE(compare(SplitGroup::INTERSECT, SplitGroup::SYMMETRIC_DIFFERENCE, wide, overlap));
+}
+
+TEST(composition_regression, compareGroupSymmetricDifferenceChecksOnlyUnsharedSplits) {
+	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
+	const vector<SplitGroup> shared{SplitGroup(0, 3, {1})};
+	const vector<SplitGroup> unshared{SplitGroup(1, 3, {0})};
+	const vector<SplitGroup> full{SplitGroup(1, 1, {0})};
+
+	EXPECT_FALSE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, lhs, shared));
+	EXPECT_TRUE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, lhs, {}));
+	EXPECT_TRUE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, {}, unshared));
+	EXPECT_FALSE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, {}, full));
+}
+
+TEST(composition_regression, compareGroupSubsetSkipsBranchChecks) {
+	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
+	const vector<SplitGroup> rhs{SplitGroup(0, 3, {1}), SplitGroup(1, 3, {0})};
+
+	for (auto groupOperation : {SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL}) {
+		SCOPED_TRACE(groupOperation);
+		EXPECT_TRUE(compare(groupOperation, SplitGroup::SUBSET_EQUAL, lhs, rhs));
+		EXPECT_FALSE(compare(groupOperation, SplitGroup::SUBSET, lhs, rhs));
+		EXPECT_FALSE(compare(groupOperation, SplitGroup::NOT_EQUAL, lhs, rhs));
+	}
+}
+
+TEST(composition_regression, compareGroupSubsetDistinguishesStrictAndEqualSplitIds) {
+	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
+	const vector<SplitGroup> sameSplits{SplitGroup(0, 3, {1})};
+	const vector<SplitGroup> superset{SplitGroup(0, 3, {1}), SplitGroup(1, 3, {0})};
+	const vector<SplitGroup> disjoint{SplitGroup(1, 3, {0})};
+
+	// Group subset operations compare split IDs in either direction.
+	EXPECT_FALSE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, sameSplits));
+	EXPECT_TRUE(compare(SplitGroup::SUBSET_EQUAL, SplitGroup::SUBSET_EQUAL, lhs, sameSplits));
+	EXPECT_TRUE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, superset));
+	EXPECT_TRUE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, superset, lhs));
+	EXPECT_FALSE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, disjoint));
+	EXPECT_FALSE(compare(SplitGroup::SUBSET_EQUAL, SplitGroup::SUBSET_EQUAL, lhs, disjoint));
+}
+

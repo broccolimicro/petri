@@ -58,17 +58,53 @@ ostream &operator<<(ostream &os, const SplitGroup &g0) {
 	return os;
 }
 
+// Compare two sorted lists of split groups by split ID and branch ID.
+//
+// Each list must contain at most one group per split ID, in ascending order.
+// Each group must contain unique branch IDs in ascending order. The function
+// does not sort the inputs.
+//
+// @param group_operation Controls how the function checks split IDs.
+// - `INTERSECT` checks branches at shared splits and skips unshared splits.
+// - `DIFFERENCE` also accepts a split found only in `g0` if its branch
+//   list contains fewer than `count` entries.
+// - `NEGATIVE_DIFFERENCE` also accepts a split found only in `g1` if its
+//   branch list contains fewer than `count` entries.
+// - `SYMMETRIC_DIFFERENCE` accepts an unshared split on either side if
+//   its branch list contains fewer than `count` entries.
+// - `SUBSET` requires at least one unshared split, with all unshared
+//   splits on the same side.
+// - `SUBSET_EQUAL` permits identical split IDs or unshared splits on
+//   only one side.
+//
+// @param branch_operation Controls the branch check at shared splits.
+// - `INTERSECT` accepts a shared branch ID.
+// - `DIFFERENCE` accepts a branch ID found only in `g0`.
+// - `NEGATIVE_DIFFERENCE` accepts a branch ID found only in `g1`.
+// - `SYMMETRIC_DIFFERENCE` requires each side to have an exclusive
+//   branch ID at the same split.
+// - `NOT_EQUAL` accepts an exclusive branch ID on either side.
+// - `SUBSET` requires at least one exclusive branch ID, with all
+//   exclusive branch IDs on the same side across the shared splits.
+// - `SUBSET_EQUAL` also permits no exclusive branch IDs, including
+//   when there are no shared splits.
+//
+// @param g0 First list of split groups.
+// @param g1 Second list of split groups.
+//
+// @return `true` when an applicable check succeeds. With group
+// `INTERSECT`, the branch operation determines the result. With group
+// `DIFFERENCE` or `NEGATIVE_DIFFERENCE`, a qualifying unshared split
+// or a successful branch check can return `true`. With group
+// `SYMMETRIC_DIFFERENCE`, only unshared splits affect the result.
+// Otherwise, returns `false`.
+//
+// @note Shared branches are checked only for group `INTERSECT`,
+// `DIFFERENCE`, and `NEGATIVE_DIFFERENCE`. The final subset check
+// requires both operation conditions to hold. As implemented, group
+// `SUBSET` and `SUBSET_EQUAL` can return `true` only with branch
+// `SUBSET_EQUAL`. `UNION` is unsupported at both levels.
 bool compare(int group_operation, int branch_operation, vector<SplitGroup> g0, vector<SplitGroup> g1) {
-	// group_operation is one of:
-	// SplitGroup::INTERSECT
-	// SplitGroup::DIFFERENCE
-	// SplitGroup::SUBSET
-
-	// branch_operation is one of:
-	// SplitGroup::INTERSECT
-	// SplitGroup::DIFFERENCE
-	// SplitGroup::SUBSET
-
 	int branch_cmp = -1;
 	int group_cmp = -1;
 
@@ -176,16 +212,28 @@ bool compare(int group_operation, int branch_operation, vector<SplitGroup> g0, v
 // Is there a data-structure difference between the always-/every- and the
 // sometimes-/any- preconditioned questions? What kind of considerations do I
 // need for operations between those two types of split groups?
+
+// Merge two sorted lists of split groups by split ID.
+//
+// @pre Each input list has unique split IDs in ascending order.
+// Each branch list has unique branch IDs in ascending order.
+//
+// @param group_operation Selects which split groups to keep.
+// - `SplitGroup::INTERSECT` keeps only splits present in both inputs.
+// - `SplitGroup::UNION` keeps splits present in either input.
+//
+// @param branch_operation Selects which branches to keep at shared splits.
+// - `SplitGroup::INTERSECT` keeps branches present in both groups.
+// - `SplitGroup::UNION` keeps branches present in either group.
+// - `SplitGroup::DIFFERENCE` keeps branches present only in `g0`.
+//
+// @param g0 First split-group list. Supplies `count` for each shared split.
+// @param g1 Second split-group list.
+//
+// @return A list sorted by split ID, with each branch list sorted by
+// branch ID. The result keeps shared splits even when the branch operation
+// produces an empty list. It copies retained unshared groups as-is.
 vector<SplitGroup> merge(int group_operation, int branch_operation, vector<SplitGroup> g0, vector<SplitGroup> g1) {
-	// group_operation is one of:
-	// SplitGroup::INTERSECT
-	// SplitGroup::UNION
-
-	// branch_operation is one of:
-	// SplitGroup::INTERSECT
-	// SplitGroup::UNION
-	// SplitGroup::DIFFERENCE
-
 	vector<SplitGroup> result;
 	int i = 0, j = 0;
 	while (i < (int)g0.size() or j < (int)g1.size()) {
@@ -870,6 +918,28 @@ bool CompositionAnalysis::isSequence(petri::iterator a, petri::iterator b, bool 
 		and (not always or not isChoice(a, b, false));
 }
 
+// Tests a composition relationship between two Petri-net nodes.
+//
+// @param composition Relationship to test. Use `SEQUENCE`, `CHOICE`,
+// `PARALLEL`, `IMPLIES`, or `EXCLUDES`.
+//
+// `CHOICE` tests for different branch membership at a shared choice split.
+// `PARALLEL` tests for a shared parallel split where each node has a branch the other lacks.
+// `SEQUENCE` tests for consistent branch containment across shared splits of each type.
+// `IMPLIES` tests whether no shared choice split has an exclusive branch on each side.
+// `EXCLUDES` tests whether the first node has a branch absent from the second at a shared choice split,
+// or the second node has an unshared choice split with fewer than all its branches.
+//
+// @param a First node.
+// @param b Second node.
+// @param always Use the stricter test for the selected relationship.
+// @param bidir For `SEQUENCE` and `IMPLIES`, require the test to pass
+// in both argument orders. For `EXCLUDES`, accept either order.
+// `CHOICE` and `PARALLEL` ignore this flag.
+//
+// @return Whether the selected test passes. For identical nodes,
+// `IMPLIES` and `EXCLUDES` return true. `SEQUENCE`, `CHOICE`, and
+// `PARALLEL` return false.
 bool CompositionAnalysis::is(Composition composition, petri::iterator a, petri::iterator b, bool always, bool bidir) const {
 	if (composition == Composition::SEQUENCE) {
 		return isSequence(a, b, always) and (not bidir or isSequence(b, a, always));
@@ -886,6 +956,23 @@ bool CompositionAnalysis::is(Composition composition, petri::iterator a, petri::
 // This assumes that a and b represent partial states. IE, there exists a set
 // of states which each contain all nodes in a and a set of states which each
 // contain all nodes in b.
+
+// Tests a composition relationship between two partial states.
+//
+// Each region must represent a partial state whose nodes can all occur
+// together. The function tests pairs with one node from each region
+// and skips pairs that contain the same node twice.
+//
+// @param composition Relationship to test.
+// @param a First region.
+// @param b Second region.
+// @param always Passed to the node test for each pair.
+// @param bidir Passed to the node test for each pair.
+//
+// @return For `PARALLEL` and `IMPLIES`, true if every tested pair passes.
+// For `CHOICE`, `SEQUENCE`, and `EXCLUDES`, true if any tested pair passes.
+// If there are no pairs to test, only `PARALLEL` and `IMPLIES` return true.
+// Unsupported relationships return false.
 bool CompositionAnalysis::is(Composition composition, petri::region a, petri::region b, bool always, bool bidir) const {
 	// sometimes composed in parallel? - Is there a shared parallel split with
 	// mutually exclusive branches in the group-intersected, branch-unioned
