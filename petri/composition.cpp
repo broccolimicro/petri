@@ -459,8 +459,7 @@ bool CompositionAnalysis::splitIsCovered(petri::iterator p, vector<petri::iterat
 // Computes and propagates split-merge relationship information for a specific split point.
 //
 // This function analyzes how nodes in the Petri net relate to a specific split point,
-// identifying which execution branches they belong to. It is fundamental for understanding
-// concurrent behaviors and choice patterns in the net. The algorithm performs a sophisticated
+// identifying which execution branches they belong to. The algorithm performs a
 // flow analysis using forward and backward traversal to handle properly nested and non-properly
 // nested splits and merges.
 //
@@ -508,6 +507,7 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 		enabled.clear();
 		//cout << "step " << ::to_string(seen) << endl;
 
+		// Figure out which nodes we can step through and which nodes are blocked
 		map<petri::iterator, SplitGroup> blocked;
 		for (int type = 0; type < 2; type++) {
 			for (petri::iterator to = g.begin(type); to != g.end(type); to++) {
@@ -516,51 +516,56 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 				bool isDisabled = false;
 				bool isEnabled = false;
 				SplitGroup toSplit = getSplitGroup(composition, to, split);
-				// Ensure that we haven't encountered this split yet.
-				if (toSplit.split != split) {
-					toSplit.split = split;
-					toSplit.count = init.size();
+				// If the next node to be enabled already has this split in it's split
+				// group list, then we've encountered a loop and we should exit.
+				if (toSplit.split == split) continue;
 
-					// Check to make sure we've visited all of the input nodes and
-					// derive the split group for this node.
-					for (auto from = g.prev(to).begin(); from != g.prev(to).end(); from++) {
-						SplitGroup fromSplit = getSplitGroup(composition, *from, split);
-						if (fromSplit.split != split) {
-							isDisabled = true;
-							if (type == transition::type
-								and (composition == Composition::CHOICE
-									or (composition == Composition::PARALLEL
-										and compare(SplitGroup::NEGATIVE_DIFFERENCE, SplitGroup::DIFFERENCE,
-											splitGroupsOf(Composition::CHOICE, splitNode),
-											splitGroupsOf(Composition::CHOICE, *from))))) {
-								toSplit.branch.clear();
-								break;
-							}
-							continue;
+				toSplit.split = split;
+				toSplit.count = init.size();
+
+				// Check to make sure we've visited all of the input nodes and
+				// derive the split group for this node.
+				for (auto from = g.prev(to).begin(); from != g.prev(to).end(); from++) {
+					SplitGroup fromSplit = getSplitGroup(composition, *from, split);
+					if (fromSplit.split != split) {
+						// If one of the incoming nodes of `to` does not yet have this
+						// split, then we haven't visited it yet. Either, this is a merge
+						// from a non-properly nested petri net, in which case we'll be
+						// perminantly blocked and have to push through, or it is a merge
+						// we simply have not gotten to yet.
+						isDisabled = true;
+						if (type == transition::type
+							and (composition == Composition::CHOICE
+								or (composition == Composition::PARALLEL
+									and compare(SplitGroup::NEGATIVE_DIFFERENCE, SplitGroup::DIFFERENCE,
+										splitGroupsOf(Composition::CHOICE, splitNode),
+										splitGroupsOf(Composition::CHOICE, *from))))) {
+							// If this is a parallel merge (at `to`) and we're looking for conditional composition, then 
+							// or this is a parallel merge (at `to`) and we're looking for parallel composition 
+							toSplit.branch.clear();
+							break;
 						}
-						isEnabled = true;
-
-						if (from == g.prev(to).begin()
-							or not (to.type == transition::type and composition == Composition::CHOICE)) {
-							toSplit.branch.insert(
-								toSplit.branch.end(),
-								fromSplit.branch.begin(),
-								fromSplit.branch.end());
-							sort(toSplit.branch.begin(), toSplit.branch.end());
-							toSplit.branch.erase(unique(toSplit.branch.begin(), toSplit.branch.end()), toSplit.branch.end());
-						} else {
-							toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
-						}
+						continue;
 					}
+					isEnabled = true;
 
-					// If we've visited at least one of the input nodes, then this
-					// might be a blocked merge. If we've visited all of the input
-					// nodes, then we can make forward progress.
-					if (isEnabled and isDisabled) {
-						blocked.insert({to, toSplit});
-					} else if (isEnabled) {
-						enabled.insert({to, toSplit});
+					if (from == g.prev(to).begin()
+						or not (to.type == transition::type and composition == Composition::CHOICE)) {
+						toSplit.branch.insert(toSplit.branch.end(), fromSplit.branch.begin(), fromSplit.branch.end());
+						sort(toSplit.branch.begin(), toSplit.branch.end());
+						toSplit.branch.erase(unique(toSplit.branch.begin(), toSplit.branch.end()), toSplit.branch.end());
+					} else {
+						toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
 					}
+				}
+
+				// If we've visited at least one of the input nodes, then this
+				// might be a blocked merge. If we've visited all of the input
+				// nodes, then we can make forward progress.
+				if (isEnabled and isDisabled) {
+					blocked.insert({to, toSplit});
+				} else if (isEnabled) {
+					enabled.insert({to, toSplit});
 				}
 			}
 		}
