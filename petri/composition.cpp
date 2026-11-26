@@ -1582,5 +1582,181 @@ vector<petri::iterator> CompositionAnalysis::addRedundant(vector<petri::iterator
 	return p;
 }*/
 
+std::vector<Condition> CompositionAnalysis::elaborateConditions(const petri::Adjacency &adj) const {
+	std::vector<Condition> result;
+
+	// Start with all valid transitions and no branch assignments.
+	Condition initial;
+	for (size_t i = 0; i < transitions.size(); ++i) {
+		if (transitions.is_valid(i)) {
+			initial.transitions.push_back(i);
+		}
+	}
+
+	// A graph with no valid transitions has no conditions.
+	if (initial.transitions.empty()) {
+		return result;
+	}
+
+	// Explore partial conditions with a depth-first stack.
+	std::vector<Condition> stack;
+	stack.push_back(std::move(initial));
+
+	while (not stack.empty()) {
+		// Take the most recently queued partial condition.
+		Condition frame = std::move(stack.back());
+		stack.pop_back();
+
+		// Find the lowest unassigned split whose controlling choices permit it.
+		const SplitGroup *nextGroup = nullptr;
+		const SplitGroup *deferredGroup = nullptr;
+
+		for (size_t transition : frame.transitions) {
+			const auto &groups = transitions[transition].splits[Composition::CHOICE];
+			for (const auto &group : groups) {
+				const auto assigned = std::lower_bound(
+					frame.groups.begin(), frame.groups.end(), group.split);
+				if (assigned != frame.groups.end() and assigned->split == group.split) {
+					continue;
+				}
+
+				bool blocked = false;
+				bool inactive = false;
+
+				if (group.split >= 0) {
+					const auto &parents = places[group.split].splits[Composition::CHOICE];
+					for (const auto &parent : parents) {
+						if (parent.split == group.split
+							or static_cast<int>(parent.branch.size()) == parent.count) {
+							continue;
+						}
+
+						const auto choice = std::lower_bound(
+							frame.groups.begin(), frame.groups.end(), parent.split);
+						if (choice == frame.groups.end() or choice->split != parent.split) {
+							blocked = true;
+						} else if (not std::binary_search(
+							parent.branch.begin(), parent.branch.end(), choice->branch.front())) {
+							inactive = true;
+							break;
+						}
+					}
+				}
+
+				if (inactive) {
+					continue;
+				}
+
+				auto &candidate = blocked ? deferredGroup : nextGroup;
+				if (candidate == nullptr or group.split < candidate->split) {
+					candidate = &group;
+				}
+			}
+		}
+
+		// If dependencies prevent progress, fall back to the lowest deferred split.
+		if (nextGroup == nullptr) {
+			nextGroup = deferredGroup;
+		}
+
+		// Save the condition when no remaining transition has an unprocessed split.
+		if (nextGroup == nullptr) {
+			const bool selectionsSurvive = std::all_of(
+				frame.groups.begin(), frame.groups.end(),
+				[&frame](const SplitGroup &group) {
+					if (group.split < 0) {
+						return true;
+					}
+
+					const auto selected = static_cast<size_t>(group.branch.front());
+					return std::binary_search(
+						frame.transitions.begin(), frame.transitions.end(), selected);
+				});
+
+			if (selectionsSurvive) {
+				result.push_back(std::move(frame));
+			}
+			continue;
+		}
+
+		// Get all outgoing branches from the reset markings or the split place.
+		const int split = nextGroup->split;
+		const bool tracePair =
+			std::binary_search(frame.transitions.begin(), frame.transitions.end(), 1u)
+			and std::binary_search(frame.transitions.begin(), frame.transitions.end(), 4u);
+
+		if (tracePair) {
+			std::cerr << "assigned";
+			for (const auto &group : frame.groups) {
+				std::cerr << ' ' << group;
+			}
+			std::cerr << "  next split " << split
+				<< "  deferred " << (nextGroup == deferredGroup) << '\n';
+
+			for (size_t transition : {1u, 4u}) {
+				std::cerr << "  t" << transition << " choice groups";
+				for (const auto &group : transitions[transition].splits[Composition::CHOICE]) {
+					std::cerr << ' ' << group;
+				}
+				std::cerr << '\n';
+			}
+		}
+
+		std::vector<int> branches;
+		if (split == -1) {
+			for (size_t i = 0; i < reset.size(); ++i) {
+				branches.push_back(-static_cast<int>(i) - 1);
+			}
+		} else {
+			for (auto branch : adj.next(petri::iterator(petri::place::type, split))) {
+				branches.push_back(branch.index);
+			}
+		}
+
+		// Sort and deduplicate the branch IDs before adding stack entries.
+		std::sort(branches.begin(), branches.end());
+		branches.erase(std::unique(branches.begin(), branches.end()), branches.end());
+
+		// Find each transition's constraint for this split, if it has one.
+		std::vector<const petri::SplitGroup *> constraints;
+		constraints.reserve(frame.transitions.size());
+		for (size_t transition : frame.transitions) {
+			const auto &groups = transitions[transition].splits[petri::Composition::CHOICE];
+			const auto group = std::lower_bound(groups.begin(), groups.end(), split);
+			constraints.push_back(group != groups.end() and group->split == split
+				? &*group : nullptr);
+		}
+
+		// Push branches in reverse order so the stack visits them in ascending order.
+		for (auto branch = branches.rbegin(); branch != branches.rend(); ++branch) {
+			// Keep unconstrained transitions and those that permit this branch.
+			std::vector<size_t> matching;
+			matching.reserve(frame.transitions.size());
+
+			for (size_t i = 0; i < frame.transitions.size(); ++i) {
+				const auto *constraint = constraints[i];
+				if (constraint == nullptr or std::binary_search(
+					constraint->branch.begin(), constraint->branch.end(), *branch)) {
+					matching.push_back(frame.transitions[i]);
+				}
+			}
+
+			// Queue the branch assignment if at least one transition matches.
+			if (not matching.empty()) {
+				Condition child{frame.groups, std::move(matching)};
+				const auto pos = std::lower_bound(child.groups.begin(), child.groups.end(), split);
+				child.groups.insert(pos, SplitGroup(split, static_cast<int>(branches.size()), {*branch}));
+				stack.push_back(std::move(child));
+			}
+		}
+	}
+
+	return result;
+}
+
+/*std::vector<Condition> CompositionAnalysis::elaborateConditions(const petri::Adjacency &adj, ) const {
+	
+}*/
+
 }
 

@@ -80,6 +80,11 @@ struct SplitGroups {
 	std::array<std::vector<SplitGroup>, 2> merges;
 };
 
+struct Condition {
+	std::vector<SplitGroup> groups;
+	std::vector<size_t> transitions;
+};
+
 // Analyzes choice and parallel composition in a Petri net.
 //
 // Construct from an `Adjacency` graph or call `build()` to compute split
@@ -149,6 +154,10 @@ struct CompositionAnalysis {
 	bool isRedundantTo(petri::iterator p0, vector<petri::iterator> p1) const;
 	bool isRedundant(petri::iterator p0) const;
 	vector<petri::iterator> addRedundant(vector<petri::iterator> p) const;*/
+
+	std::vector<Condition> elaborateConditions(const petri::Adjacency &adj) const;
 };
+
+//std::vector<Condition> elaborateConditions(const petri::Adjacency &adj) const;
 
 }

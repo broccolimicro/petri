@@ -193,6 +193,9 @@ struct segment {
 	bound sink;
 	bound reset;
 
+	// the dominators of the top most loop or empty if no loop exists in this segment
+	bound domin;
+
 	segment();
 	segment(bound source, bound sink);
 	~segment();

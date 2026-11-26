@@ -63,6 +63,7 @@ struct graph {
 	// index by from.type
 	array<vector<arc>, 2> arcs;
 	vector<state> reset;
+	bound domin;
 
 	graph() {
 	}

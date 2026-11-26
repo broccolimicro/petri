@@ -644,12 +644,14 @@ void segment::clear() {
 	source.clear();
 	sink.clear();
 	reset.clear();
+	domin.clear();
 }
 
 void segment::erase(petri::iterator i) {
 	source.erase(i);
 	sink.erase(i);
 	reset.erase(i);
+	domin.erase(i);
 }
 
 void segment::erase(region r0, bool rsorted) {
@@ -660,6 +662,7 @@ void segment::erase(region r0, bool rsorted) {
 	source.erase(r0, true);
 	sink.erase(r0, true);
 	reset.erase(r0, true);
+	domin.erase(r0, true);
 }
 
 bool segment::remap(region from, region to, bool rsorted) {
@@ -677,6 +680,7 @@ void segment::compose(int composition, segment s0) {
 	source.compose(composition, s0.source);
 	sink.compose(composition, s0.sink);
 	reset.compose(composition, s0.reset);
+	domin.compose(composition, s0.domin);
 }
 
 string segment::to_string() const {

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <utility>
 
 #include <petri/graph.h>
 #include <petri/state.h>
@@ -115,6 +116,21 @@ bool connected(const graph<place, transition, state<token> > &g, petri::iterator
 		}
 	}
 	return false;
+}
+
+void test_has_condition(const std::vector<petri::Condition> &conds, const std::vector<size_t> &transitions) {
+	int best = -1;
+	int bestSize = 0;
+	for (size_t i = 0; i < conds.size(); i++) {
+		int size = vector_intersection_size(conds[i].transitions, transitions);
+		if (size > bestSize) {
+			bestSize = size;
+			best = i;
+		}
+	}
+
+	ASSERT_TRUE(bestSize > 0);
+	EXPECT_EQ(conds[best].transitions, transitions);
 }
 
 TEST(composition, always_choice) {
@@ -1507,169 +1523,614 @@ TEST(composition, compose_proper_m2_2x2_2) {
 	EXPECT_TRUE(connected(g, p[5], t[3]));
 }
 
-TEST(composition_regression, groupingIsInvariantUnderRegionOrder) {
-	graph<place, transition, state<token> > g;
-	auto p = g.create(place(), 2);
-	CompositionAnalysis analysis(g.adjacency());
-	analysis.setSplitGroup(Composition::CHOICE, p[1], SplitGroup(0, 2, {0}));
+TEST(composition_conditions, emptyGraph) {
+	graph<place, transition, state<token>> g;
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
 
-	ASSERT_TRUE(analysis.is(Composition::EXCLUDES, p[0], p[1]));
-	ASSERT_FALSE(analysis.is(Composition::EXCLUDES, p[1], p[0]));
-
-	const auto first = petri::region::from_nodes({p[0]});
-	const auto second = petri::region::from_nodes({p[1]});
-
-	petri::bound forwardOrder;
-	forwardOrder.push_back(first);
-	forwardOrder.push_back(second);
-
-	petri::bound reverseOrder;
-	reverseOrder.push_back(second);
-	reverseOrder.push_back(first);
-
-	EXPECT_EQ(analysis.group(Composition::EXCLUDES, forwardOrder).size(),
-		analysis.group(Composition::EXCLUDES, reverseOrder).size());
+	EXPECT_TRUE(comp.elaborateConditions(adj).empty());
 }
 
-TEST(composition_regression, partialsDoNotAddTheSeedNodeAgain) {
-	graph<place, transition, state<token> > g;
-	auto p = g.create(place(), 1);
-	CompositionAnalysis analysis(g.adjacency());
+TEST(composition_conditions, straightLineAndDisconnectedTransition) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 2);
+	const auto t = g.create(transition(), 4);
+	g.connect({t[0], p[0], t[1], p[1], t[2]});
 
-	for (auto composition : {Composition::PARALLEL, Composition::IMPLIES}) {
-		SCOPED_TRACE(composition);
-		const auto result = analysis.partials(composition, petri::region::from_nodes({p[0]}));
-		ASSERT_EQ(result.size(), 1u);
-		EXPECT_EQ(result[0].size(), 1u);
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0, 1, 2, 3});
+}
+
+TEST(composition_conditions, skipsUnusedTransitionIndices) {
+	graph<place, transition, state<token>> g;
+	g.create(transition(), 3);
+	const auto adj = g.adjacency();
+
+	// Leave a gap between two valid transition slots.
+	CompositionAnalysis comp;
+	comp.transitions.alloc(3);
+	comp.transitions.emplace_at(0);
+	comp.transitions.emplace_at(2);
+	ASSERT_FALSE(comp.transitions.is_valid(1));
+
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0, 2});
+}
+
+TEST(composition_conditions, binaryChoiceKeepsUnconstrainedTransitions) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 1);
+	const auto t = g.create(transition(), 4);
+	g.connect({t[0], p[0], t[1]});
+	g.connect(std::vector<petri::iterator>{p[0], t[2]});
+	// t[3] is disconnected and has no choice constraints.
+
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 3});
+	test_has_condition(conditions, {0, 2, 3});
+}
+
+TEST(composition_conditions, conditionalMergeKeepsTheFollowingTransition) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 2);
+	const auto t = g.create(transition(), 4);
+	g.connect({t[0], p[0], t[1], p[1], t[3]});
+	g.connect({p[0], t[2], p[1]});
+
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 3});
+	test_has_condition(conditions, {0, 2, 3});
+}
+
+TEST(composition_conditions, transitionCanMatchTwoOfThreeBranches) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 1);
+	const auto t = g.create(transition(), 4);
+	g.connect(std::vector<petri::iterator>{p[0], t[0]});
+	g.connect(std::vector<petri::iterator>{p[0], t[1]});
+	g.connect(std::vector<petri::iterator>{p[0], t[2]});
+
+	const auto adj = g.adjacency();
+	CompositionAnalysis comp(adj);
+	// Supply the recorded group directly to isolate the branch filter.
+	comp.setSplitGroup(Composition::CHOICE, t[3],
+		SplitGroup(p[0].index, 3, {t[0].index, t[2].index}));
+
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 3u);
+	test_has_condition(conditions, {0, 3});
+	test_has_condition(conditions, {1});
+	test_has_condition(conditions, {2, 3});
+	for (const auto &condition : conditions) {
+		EXPECT_EQ(condition.groups.front().count, 3);
 	}
 }
 
-TEST(composition_regression, choicePartialsRequireEveryPairToMatch) {
-	graph<place, transition, state<token> > g;
-	auto p = g.create(place(), 3);
-	CompositionAnalysis analysis(g.adjacency());
-	analysis.setSplitGroup(Composition::CHOICE, p[0], SplitGroup(0, 2, {0}));
-	analysis.setSplitGroup(Composition::CHOICE, p[1], SplitGroup(0, 2, {0}));
-	analysis.setSplitGroup(Composition::CHOICE, p[2], SplitGroup(0, 2, {1}));
+TEST(composition_conditions, independentChoicesFormAllCombinations) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 2);
+	const auto t = g.create(transition(), 5);
+	g.connect({t[0], p[0], t[1]});
+	g.connect(std::vector<petri::iterator>{p[0], t[2]});
+	g.connect({t[0], p[1], t[3]});
+	g.connect(std::vector<petri::iterator>{p[1], t[4]});
 
-	ASSERT_FALSE(analysis.is(Composition::CHOICE, p[0], p[1]));
-	ASSERT_TRUE(analysis.is(Composition::CHOICE, p[0], p[2]));
-	ASSERT_TRUE(analysis.is(Composition::CHOICE, p[1], p[2]));
-	const auto result = analysis.partials(Composition::CHOICE,
-		petri::region::from_nodes({p[0]}), {p[1], p[2]});
-	ASSERT_EQ(result.size(), 2u);
-	EXPECT_EQ(result[0].size() + result[1].size(), 3u);
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 4u);
+	test_has_condition(conditions, {0, 1, 3});
+	test_has_condition(conditions, {0, 1, 4});
+	test_has_condition(conditions, {0, 2, 3});
+	test_has_condition(conditions, {0, 2, 4});
 }
 
-TEST(composition_regression, outputWithNoParentBranchesDoesNotCoverChoice) {
-	graph<place, transition, state<token> > g;
-	auto p = g.create(place(), 1);
-	auto t = g.create(transition(), 2);
-	CompositionAnalysis analysis(g.adjacency());
-	const int parent = 1;
-	analysis.setSplitGroup(Composition::CHOICE, p[0],
-		SplitGroup(parent, 2, {t[0].index, t[1].index}));
-	analysis.setSplitGroup(Composition::CHOICE, t[0], SplitGroup(parent, 2, {t[0].index}));
-	analysis.setSplitGroup(Composition::CHOICE, t[1], SplitGroup(parent, 2, {}));
+TEST(composition_conditions, multipleResetMarkingsUseSyntheticBranches) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 2);
+	const auto t = g.create(transition(), 2);
+	g.connect(std::vector<petri::iterator>{p[0], t[0]});
+	g.connect(std::vector<petri::iterator>{p[1], t[1]});
+	g.reset.push_back(state<token>({token(p[0].index)}));
+	g.reset.push_back(state<token>({token(p[1].index)}));
 
-	EXPECT_FALSE(analysis.splitIsCovered(p[0], t));
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {1});
+	test_has_condition(conditions, {0});
 }
 
-TEST(composition_regression, completePreservesRegionOrderWhenBranchDifferenceIsEmpty) {
-	graph<place, transition, state<token> > g;
-	auto p = g.create(place(), 2);
-	CompositionAnalysis analysis(g.adjacency());
-	for (auto node : p) {
-		analysis.setSplitGroup(Composition::CHOICE, node, SplitGroup(0, 2, {0}));
+TEST(composition_conditions, dropsBranchWithNoMatchingTransitions) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 1);
+	const auto t = g.create(transition(), 2);
+	g.connect(std::vector<petri::iterator>{p[0], t[0]});
+	g.connect(std::vector<petri::iterator>{p[0], t[1]});
+
+	const auto adj = g.adjacency();
+	CompositionAnalysis comp(adj);
+	comp.setSplitGroup(Composition::CHOICE, t[1], SplitGroup(p[0].index, 2, {}));
+
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0});
+}
+
+TEST(composition_conditions, choiceInLoopAssignsTheSplitOncePerCondition) {
+	graph<place, transition, state<token>> g;
+	const auto p = g.create(place(), 2);
+	const auto t = g.create(transition(), 3);
+	g.connect({t[0], p[0], t[1], p[1], t[0]});
+	g.connect({p[0], t[2], p[1]});
+
+	const auto adj = g.adjacency();
+	const CompositionAnalysis comp(adj);
+	const auto conditions = comp.elaborateConditions(adj);
+
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1});
+	test_has_condition(conditions, {0, 2});
+}
+
+TEST(composition_conditions, nestedChoiceDoesNotAssignAnInactiveSplit) {
+	for (bool innerFirst : {false, true}) {
+		SCOPED_TRACE(innerFirst);
+		graph<place, transition, state<token>> g;
+		const auto p = g.create(place(), 2);
+		const auto t = g.create(transition(), 4);
+		const auto outer = p[innerFirst ? 1 : 0];
+		const auto inner = p[innerFirst ? 0 : 1];
+		g.connect({outer, t[0], inner, t[1]});
+		g.connect(std::vector<petri::iterator>{inner, t[2]});
+		g.connect(std::vector<petri::iterator>{outer, t[3]});
+
+		const auto adj = g.adjacency();
+		const CompositionAnalysis comp(adj);
+		const auto conditions = comp.elaborateConditions(adj);
+
+		EXPECT_EQ(conditions.size(), 3u);
+		test_has_condition(conditions, {0, 1});
+		test_has_condition(conditions, {0, 2});
+		test_has_condition(conditions, {3});
 	}
-	petri::bound input;
-	input.push_back(petri::region::from_nodes({p[0]}));
-	input.push_back(petri::region::from_nodes({p[0], p[1]}));
-
-	const auto result = analysis.complete(Composition::PARALLEL, input);
-	ASSERT_EQ(result.size(), input.size());
-	EXPECT_TRUE(result[0] == input[0]);
-	EXPECT_TRUE(result[1] == input[1]);
 }
 
-TEST(composition_regression, inPlaceBranchDifferenceMatchesMerge) {
-	vector<SplitGroup> lhs{SplitGroup(0, 3, {0, 1})};
-	const vector<SplitGroup> rhs{SplitGroup(0, 3, {1, 2})};
-	const auto expected = petri::merge(SplitGroup::INTERSECT, SplitGroup::DIFFERENCE, lhs, rhs);
-	ASSERT_EQ(expected.size(), 1u);
-	ASSERT_EQ(expected[0].branch, (vector<int>{0}));
+TEST(composition_conditions, always_choice) {
+	//          ->t0-->p1-->t1-           .
+	//         /               \          .
+	//  t5-->p0                 >p3-->t4  .
+	//         \               /          .
+	//          ->t2-->p2-->t3-           .
 
-	mergeInplace(SplitGroup::INTERSECT, SplitGroup::DIFFERENCE, lhs, rhs);
-	ASSERT_EQ(lhs.size(), 1u);
-	EXPECT_EQ(lhs[0].branch, expected[0].branch);
-	EXPECT_EQ(lhs[0].count, expected[0].count);
-}
-
-TEST(composition_regression, disconnectedComponentsDoNotEstablishSequenceOrImplication) {
 	graph<place, transition, state<token> > g;
+
 	auto p = g.create(place(), 4);
-	auto t = g.create(transition(), 2);
-	g.connect({p[0], t[0], p[1]});
-	g.connect({p[2], t[1], p[3]});
+	auto t = g.create(transition(), 6);
 
-	CompositionAnalysis analysis(g.adjacency());
-	for (bool always : {false, true}) {
-		SCOPED_TRACE(always);
-		EXPECT_FALSE(analysis.is(Composition::SEQUENCE, t[0], t[1], always));
-		EXPECT_FALSE(analysis.is(Composition::SEQUENCE, t[1], t[0], always));
-		EXPECT_FALSE(analysis.is(Composition::IMPLIES, t[0], t[1], always));
-		EXPECT_FALSE(analysis.is(Composition::IMPLIES, t[1], t[0], always));
+	g.connect({t[5], p[0], t[0], p[1], t[1], p[3], t[4]});
+	g.connect({p[0], t[2], p[2], t[3], p[3]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 4, 5});
+	test_has_condition(conditions, {2, 3, 4, 5});
+}
+
+TEST(composition_conditions, always_parallel) {
+	//          ->p0-->t1-->p1-           .
+	//         /               \          .
+	//  p5-->t0                 >t3-->p4  .
+	//         \               /          .
+	//          ->p2-->t2-->p3-           .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 6);
+	auto t = g.create(transition(), 4);
+
+	g.connect({p[5], t[0], p[0], t[1], p[1], t[3], p[4]});
+	g.connect({t[0], p[2], t[2], p[3], t[3]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0, 1, 2, 3});
+}
+
+TEST(composition_conditions, regular_interleaved) {
+	//  =->*p0-->t0-->p1-->t1-=  .
+	//       \ /  \ /            .
+	//        X    X             .
+	//       / \  / \            .
+	//  =->*p2-->t2-->p3-->t3-=  .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 4);
+
+	g.connect({p[0], t[0], p[1], t[1], p[0]});
+	g.connect({p[2], t[2], p[3], t[3], p[2]});
+
+	g.connect(p[0], t[2]);
+	g.connect(p[2], t[0]);
+
+	g.connect(t[0], p[3]);
+	g.connect(t[2], p[1]);
+
+	g.reset.push_back(state<token>({token(p[0].index), token(p[2].index)}));
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 3});
+	test_has_condition(conditions, {1, 2, 3});
+}
+
+TEST(composition_conditions, regular_parallel) {
+	//  =>t0-->p0-->t1-->*p1-->=  .
+	//     \      /  \       /    .
+	//      ->p2 /    ->*p3 /     .
+	//          X          X      .
+	//      ->p4 \    ->*p5 \     .
+	//     /      \  /       \    .
+	//  =>t2-->p6-->t3-->*p7-->=  .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 8);
+	auto t = g.create(transition(), 4);
+
+	g.connect({t[0], p[0], t[1], p[1], t[0]});
+	g.connect({t[2], p[6], t[3], p[7], t[2]});
+
+	g.connect({t[0], p[2], t[3], p[5], t[0]});
+	g.connect({t[2], p[4], t[1], p[3], t[2]});
+
+	g.reset.push_back(state<token>({token(p[1].index), token(p[3].index), token(p[5].index), token(p[7].index)}));
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0, 1, 2, 3});
+}
+
+TEST(composition_conditions, regular_choice) {
+	//  =>p0*->t0-->p1-->t1-->=  .
+	//     \      /  \      /    .
+	//      ->t2 /    ->t3 /     .
+	//          X         X      .
+	//      ->t4 \    ->t5 \     .
+	//     /      \  /      \    .
+	//  =>p2-->t6-->p3-->t7-->=  .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 4);
+	auto t = g.create(transition(), 8);
+
+	g.connect({p[0], t[0], p[1], t[1], p[0]});
+	g.connect({p[2], t[6], p[3], t[7], p[2]});
+
+	g.connect({p[0], t[2], p[3], t[5], p[0]});
+	g.connect({p[2], t[4], p[1], t[3], p[2]});
+
+	g.reset.push_back(state<token>({token(p[0].index)}));
+	g.reset.push_back(state<token>({token(p[2].index)}));
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	cout << "elaborate conditions" << endl;
+	for (const auto &cond : conditions) {
+		cout << cond.transitions << endl;
 	}
+
+	ASSERT_EQ(conditions.size(), 8u);
+	test_has_condition(conditions, {0, 1});
+	test_has_condition(conditions, {0, 3});
+	test_has_condition(conditions, {2, 5});
+	test_has_condition(conditions, {2, 7});
+	test_has_condition(conditions, {1, 4});
+	test_has_condition(conditions, {3, 4});
+	test_has_condition(conditions, {5, 6});
+	test_has_condition(conditions, {6, 7});
 }
 
-// These tests record the current compare() contract. Change the expectations
-// if the operation names are changed to use the standard set definitions.
-TEST(composition_regression, compareBranchSymmetricDifferenceRequiresTwoExclusiveBranches) {
-	const vector<SplitGroup> narrow{SplitGroup(0, 3, {0})};
-	const vector<SplitGroup> wide{SplitGroup(0, 3, {0, 1})};
-	const vector<SplitGroup> overlap{SplitGroup(0, 3, {0, 2})};
+TEST(composition_conditions, choice_parallel) {
+	//          -->p1-->t1-->p2           .
+	//         /               \          .
+	//     ->t0-->p3-->t2-->p4-->t3-      .
+	//    /                         \     .
+	//  p0                           >p6  .
+	//    \                         /     .
+	//     ->t4-->p5-->t5-----------      .
 
-	EXPECT_FALSE(compare(SplitGroup::INTERSECT, SplitGroup::SYMMETRIC_DIFFERENCE, narrow, wide));
-	EXPECT_TRUE(compare(SplitGroup::INTERSECT, SplitGroup::NOT_EQUAL, narrow, wide));
-	EXPECT_TRUE(compare(SplitGroup::INTERSECT, SplitGroup::SYMMETRIC_DIFFERENCE, wide, overlap));
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 7);
+	auto t = g.create(transition(), 6);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[3]});
+	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
+	g.connect({p[0], t[4], p[5], t[5], p[6]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 3});
+	test_has_condition(conditions, {4, 5});
 }
 
-TEST(composition_regression, compareGroupSymmetricDifferenceChecksOnlyUnsharedSplits) {
-	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
-	const vector<SplitGroup> shared{SplitGroup(0, 3, {1})};
-	const vector<SplitGroup> unshared{SplitGroup(1, 3, {0})};
-	const vector<SplitGroup> full{SplitGroup(1, 1, {0})};
+TEST(composition_conditions, parallel_choice) {
+	//          -->t1-->p1-->t2           .
+	//         /               \          .
+	//     ->p0-->t3-->p2-->t4-->p3-      .
+	//    /                         \     .
+	//  t0                           >t6  .
+	//    \                         /     .
+	//     ->p4-->t5-->p5-----------      .
 
-	EXPECT_FALSE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, lhs, shared));
-	EXPECT_TRUE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, lhs, {}));
-	EXPECT_TRUE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, {}, unshared));
-	EXPECT_FALSE(compare(SplitGroup::SYMMETRIC_DIFFERENCE, SplitGroup::NOT_EQUAL, {}, full));
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 6);
+	auto t = g.create(transition(), 7);
+
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[3]});
+	g.connect({p[0], t[3], p[2], t[4], p[3], t[6]});
+	g.connect({t[0], p[4], t[5], p[5], t[6]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 5, 6});
+	test_has_condition(conditions, {0, 3, 4, 5, 6});
 }
 
-TEST(composition_regression, compareGroupSubsetSkipsBranchChecks) {
-	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
-	const vector<SplitGroup> rhs{SplitGroup(0, 3, {1}), SplitGroup(1, 3, {0})};
+TEST(composition_conditions, sequence_choice_parallel) {
+	//           -->p1-->t1-->p2                    -->t7-->p8-->t8               .
+	//          /               \                  /               \              .
+	//      ->t0-->p3-->t2-->p4-->t3-          ->p7-->t9-->p9-->t10->p10-         .
+	//     /                         \        /                          \        .
+	// =>p0                           >p6-->t6                            >t12-=  .
+	//     \                         /        \                          /        .
+	//      ->t4-->p5-->t5-----------          ->p11->t11->p12-----------         .
 
-	for (auto groupOperation : {SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL}) {
-		SCOPED_TRACE(groupOperation);
-		EXPECT_TRUE(compare(groupOperation, SplitGroup::SUBSET_EQUAL, lhs, rhs));
-		EXPECT_FALSE(compare(groupOperation, SplitGroup::SUBSET, lhs, rhs));
-		EXPECT_FALSE(compare(groupOperation, SplitGroup::NOT_EQUAL, lhs, rhs));
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 13);
+	auto t = g.create(transition(), 13);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[3]});
+	g.connect({t[0], p[3], t[2], p[4], t[3], p[6]});
+	g.connect({p[0], t[4], p[5], t[5], p[6]});
+	g.connect(p[6], t[6]);
+	g.connect({t[6], p[7], t[7], p[8], t[8], p[10]});
+	g.connect({p[7], t[9], p[9], t[10], p[10], t[12]});
+	g.connect({t[6], p[11], t[11], p[12], t[12]});
+	g.connect(t[12], p[0]);
+
+	g.reset.push_back(state<token>({token(p[0].index)}));
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 4u);
+	test_has_condition(conditions, {0, 1, 2, 3, 6, 7, 8, 11, 12});
+	test_has_condition(conditions, {0, 1, 2, 3, 6, 9, 10, 11, 12});
+	test_has_condition(conditions, {4, 5, 6, 7, 8, 11, 12});
+	test_has_condition(conditions, {4, 5, 6, 9, 10, 11, 12});
+}
+
+
+TEST(composition_conditions, nonproper_choice) {
+	//     ->t0-->p1-->t1-->p2-->t2-      .
+	//    /         \               \     .
+	//  p0           ->t6-           >p5  .
+	//    \               \         /     .
+	//     ->t3-->p3-->t4-->p4-->t5-      .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 6);
+	auto t = g.create(transition(), 7);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[2], p[5]});
+	g.connect({p[0], t[3], p[3], t[4], p[4], t[5], p[5]});
+
+	g.connect(p[1], t[6]);
+	g.connect(t[6], p[4]);
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 3u);
+	test_has_condition(conditions, {0, 1, 2});
+	test_has_condition(conditions, {0, 5, 6});
+	test_has_condition(conditions, {3, 4, 5});
+}
+
+TEST(composition_conditions, nonproper_parallel) {
+	//     ->p0-->t1-->p1-->t2-->p2-      .
+	//    /         \               \     .
+	//  t0           ->p6-           >t5  .
+	//    \               \         /     .
+	//     ->p3-->t3-->p4-->t4-->p5-      .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 7);
+	auto t = g.create(transition(), 6);
+
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[2], t[5]});
+	g.connect({t[0], p[3], t[3], p[4], t[4], p[5], t[5]});
+
+	g.connect(t[1], p[6]);
+	g.connect(p[6], t[4]);
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 1u);
+	test_has_condition(conditions, {0, 1, 2, 3, 4, 5});
+}
+
+TEST(composition_conditions, shared_parallel) {
+	//          ->p1-->t1-->p2-->t2-->p3             .
+	//         /                        \            .
+	//     ->t0                          ->t5        .
+	//    /    \                        /    \       .
+	//  p0      ->p4-->t3-->p5-->t4-->p6      ->p10  .
+	//    \    /                        \    /       .
+	//     ->t6                          ->t9        .
+	//         \                        /            .
+	//          ->p7-->t7-->p8-->t8-->p9             .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 11);
+	auto t = g.create(transition(), 10);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[2], p[3], t[5], p[10]});
+	g.connect({t[0], p[4], t[3], p[5], t[4], p[6], t[5]});
+	g.connect({p[0], t[6], p[4]});
+	g.connect({p[6], t[9], p[10]});
+	g.connect({t[6], p[7], t[7], p[8], t[8], p[9], t[9]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 3, 4, 5});
+	test_has_condition(conditions, {3, 4, 6, 7, 8, 9});
+}
+
+TEST(composition_conditions, shared_choice) {
+	//          ->t1-->p1-->t2-->p2-->t3             .
+	//         /                        \            .
+	//     ->p0                          ->p5        .
+	//    /    \                        /    \       .
+	//  t0      ->t4-->p3-->t5-->p4-->t6      ->t10  .
+	//    \    /                        \    /       .
+	//     ->p6                          ->p9        .
+	//         \                        /            .
+	//          ->t7-->p7-->t8-->p8-->t9             .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 10);
+	auto t = g.create(transition(), 11);
+
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[2], t[3], p[5], t[10]});
+	g.connect({p[0], t[4], p[3], t[5], p[4], t[6], p[5]});
+	g.connect({t[0], p[6], t[4]});
+	g.connect({t[6], p[9], t[10]});
+	g.connect({p[6], t[7], p[7], t[8], p[8], t[9], p[9]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	cout << "elaborate conditions" << endl;
+	for (const auto &cond : conditions) {
+		cout << cond.transitions << endl;
 	}
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 3, 4, 5, 6, 10});
+	test_has_condition(conditions, {0, 4, 5, 6, 7, 8, 9, 10});
 }
 
-TEST(composition_regression, compareGroupSubsetDistinguishesStrictAndEqualSplitIds) {
-	const vector<SplitGroup> lhs{SplitGroup(0, 3, {0})};
-	const vector<SplitGroup> sameSplits{SplitGroup(0, 3, {1})};
-	const vector<SplitGroup> superset{SplitGroup(0, 3, {1}), SplitGroup(1, 3, {0})};
-	const vector<SplitGroup> disjoint{SplitGroup(1, 3, {0})};
+TEST(composition_conditions, regular_choice_parallel) {
+	//           ->p1-->t1--          .
+	//          /           \         .
+	//      ->t0             p2       .
+	//     /    \           /  \      .
+	//    /      ->p3-->t2 /    \     .
+	//  p0                X      >t6  .
+	//    \      ->p4-->t3 \    /     .
+	//     \    /           \  /      .
+	//      ->t4             p5       .
+	//          \           /         .
+	//           ->p6-->t5--          .
 
-	// Group subset operations compare split IDs in either direction.
-	EXPECT_FALSE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, sameSplits));
-	EXPECT_TRUE(compare(SplitGroup::SUBSET_EQUAL, SplitGroup::SUBSET_EQUAL, lhs, sameSplits));
-	EXPECT_TRUE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, superset));
-	EXPECT_TRUE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, superset, lhs));
-	EXPECT_FALSE(compare(SplitGroup::SUBSET, SplitGroup::SUBSET_EQUAL, lhs, disjoint));
-	EXPECT_FALSE(compare(SplitGroup::SUBSET_EQUAL, SplitGroup::SUBSET_EQUAL, lhs, disjoint));
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 7);
+	auto t = g.create(transition(), 7);
+
+	g.connect({p[0], t[0], p[1], t[1], p[2], t[6]});
+	g.connect({t[0], p[3], t[2], p[5]});
+	g.connect({t[4], p[4], t[3], p[2]});
+	g.connect({p[0], t[4], p[6], t[5], p[5], t[6]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 6});
+	test_has_condition(conditions, {3, 4, 5, 6});
 }
+
+/* This structure violates liveness
+
+TEST(composition_conditions, regular_parallel_choice) {
+	// Without guards, this would deadlock when t3 and t4 or t1 and t6 are
+	// executed in parallel.
+	//           ->t1-->p1--          .
+	//          /           \         .
+	//      ->p0             t2       .
+	//     /    \           /  \      .
+	//    /      ->t3-->p2 /    \     .
+	//  t0                X      >p6  .
+	//    \      ->t4-->p3 \    /     .
+	//     \    /           \  /      .
+	//      ->p4             t5       .
+	//          \           /         .
+	//           ->t6-->p5--          .
+
+	graph<place, transition, state<token> > g;
+
+	auto p = g.create(place(), 7);
+	auto t = g.create(transition(), 7);
+
+	g.connect({t[0], p[0], t[1], p[1], t[2], p[6]});
+	g.connect({p[0], t[3], p[2], t[5]});
+	g.connect({p[4], t[4], p[3], t[2]});
+	g.connect({t[0], p[4], t[6], p[5], t[5], p[6]});
+
+	CompositionAnalysis comp(g.adjacency());
+
+	auto conditions = comp.elaborateConditions(g.adjacency());
+	ASSERT_EQ(conditions.size(), 2u);
+	test_has_condition(conditions, {0, 1, 2, 4});
+	test_has_condition(conditions, {0, 3, 5, 6});
+}*/
+
+
 
