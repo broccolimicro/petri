@@ -18,6 +18,16 @@ SplitGroup::SplitGroup(int split, int count, vector<int> branch) {
 
 SplitGroup::~SplitGroup() {}
 
+void SplitGroup::unionWith(std::vector<int> newBranches) {
+	branch.insert(branch.end(), newBranches.begin(), newBranches.end());
+	sort(branch.begin(), branch.end());
+	branch.erase(unique(branch.begin(), branch.end()), branch.end());
+}
+
+void SplitGroup::intersectWith(std::vector<int> newBranches) {
+	branch = vector_intersection(branch, newBranches);
+}
+
 string SplitGroup::to_string() const {
 	return "(" + ::to_string(split) + "," + ::to_string(branch) + "/" + ::to_string(count) + ")";
 }
@@ -499,16 +509,18 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 	// unblock the merge that is closest to the split
 
 	// Forward iteration step
-	//cout << "start loop " << split << endl;
 	map<petri::iterator, SplitGroup> enabled;
+	map<petri::iterator, SplitGroup> blocked;
 	map<petri::iterator, int> order;
 	int orderLevel = 0;
 	do {
 		enabled.clear();
-		//cout << "step " << ::to_string(seen) << endl;
+		blocked.clear();
 
 		// Figure out which nodes we can step through and which nodes are blocked
-		map<petri::iterator, SplitGroup> blocked;
+		// On each iteration, apply rules to all nodes and pull
+		// the tokens forward rather than start from the nodes and
+		// push them forward.
 		for (int type = 0; type < 2; type++) {
 			for (petri::iterator to = g.begin(type); to != g.end(type); to++) {
 				if (not g.isValid(to)) continue;
@@ -527,51 +539,56 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 				// derive the split group for this node.
 				for (auto from = g.prev(to).begin(); from != g.prev(to).end(); from++) {
 					SplitGroup fromSplit = getSplitGroup(composition, *from, split);
-					if (fromSplit.split != split) {
-						// If one of the incoming nodes of `to` does not yet have this
-						// split, then we haven't visited it yet. Either, this is a merge
-						// from a non-properly nested petri net, in which case we'll be
-						// perminantly blocked and have to push through, or it is a merge
-						// we simply have not gotten to yet.
-						isDisabled = true;
-						if (type == transition::type
-							and (composition == Composition::CHOICE
-								or (composition == Composition::PARALLEL
-									and compare(SplitGroup::NEGATIVE_DIFFERENCE, SplitGroup::DIFFERENCE,
-										splitGroupsOf(Composition::CHOICE, splitNode),
-										splitGroupsOf(Composition::CHOICE, *from))))) {
-							// If this is a parallel merge (at `to`) and we're looking for conditional composition, then 
-							// or this is a parallel merge (at `to`) and we're looking for parallel composition 
-							toSplit.branch.clear();
-							break;
+					if (fromSplit.split == split) {
+						isEnabled = true;
+
+						if (from != g.prev(to).begin()
+							and to.type == transition::type
+							and composition == Composition::CHOICE) {
+							toSplit.intersectWith(fromSplit.branch);
+						} else {
+							toSplit.unionWith(fromSplit.branch);
 						}
 						continue;
 					}
-					isEnabled = true;
 
-					if (from == g.prev(to).begin()
-						or not (to.type == transition::type and composition == Composition::CHOICE)) {
-						toSplit.branch.insert(toSplit.branch.end(), fromSplit.branch.begin(), fromSplit.branch.end());
-						sort(toSplit.branch.begin(), toSplit.branch.end());
-						toSplit.branch.erase(unique(toSplit.branch.begin(), toSplit.branch.end()), toSplit.branch.end());
-					} else {
-						toSplit.branch = vector_intersection(toSplit.branch, fromSplit.branch);
+					// If one of the incoming nodes of `to` does not yet have this
+					// split, then we haven't visited it yet. Either, this is a merge
+					// from a non-properly nested petri net, in which case we'll be
+					// perminantly blocked and have to push through, or it is a merge
+					// we simply have not gotten to yet.
+					isDisabled = true;
+					if (to.type == transition::type
+						and (composition == Composition::CHOICE
+							or (composition == Composition::PARALLEL
+								and compare(SplitGroup::NEGATIVE_DIFFERENCE, SplitGroup::DIFFERENCE,
+									splitGroupsOf(Composition::CHOICE, splitNode),
+									splitGroupsOf(Composition::CHOICE, *from))))) {
+						// We want to clear the split branch at for t0 at
+						// t4, but not t1 in this case.
+						//     ->p0-->t1-->p1-->t2-->p2-      .
+						//    /         \               \     .
+						//  t0           ->p6-           >t5  .
+						//    \               \         /     .
+						//     ->p3-->t3-->p4-->t4-->p5-      .
+						toSplit.branch.clear();
+						break;
 					}
+				}
+				if (not isEnabled) {
+					continue;
 				}
 
 				// If we've visited at least one of the input nodes, then this
 				// might be a blocked merge. If we've visited all of the input
 				// nodes, then we can make forward progress.
-				if (isEnabled and isDisabled) {
+				if (isDisabled) {
 					blocked.insert({to, toSplit});
-				} else if (isEnabled) {
+				} else {
 					enabled.insert({to, toSplit});
 				}
 			}
 		}
-
-		//cout << "enabled: " << ::to_string(enabled) << endl;
-		//cout << "blocked: " << ::to_string(blocked) << endl;
 
 		if (enabled.empty() and not blocked.empty()) {
 			// We are stuck at a non-properly nested merge somewhere. We need to
@@ -587,7 +604,6 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 			}
 			orderLevel++;
 
-			//cout << ::to_string(order) << " " << to_string(seen) << endl;
 			auto first = blocked.begin();
 			for (auto i = ::next(blocked.begin()); i != blocked.end(); i++) {
 				bool AtoB = g.precedes(i->first, first->first, seen);
@@ -603,22 +619,18 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 					first = i;
 				}
 			}
-			//cout << "forcing " << first->first << endl;
 			enabled.insert(*first);
 		}
 
+		// If we reach a terminal node or a loop, then we add this to the frontier
+		// for the next phase of the algorithm. We'll start from this frontier and
+		// work backward to delete completed split branches back to the last merge
 		for (auto i = enabled.begin(); i != enabled.end(); i++) {
-			sort(i->second.branch.begin(), i->second.branch.end());
-			i->second.branch.erase(
-				unique(i->second.branch.begin(), i->second.branch.end()),
-				i->second.branch.end());
 			if (g.next(i->first).empty()) {
-				//cout << "ready frontier end adding " << i->first << endl;
 				frontier.push_back(i->first);
 			}
 			for (auto j : g.next(i->first)) {
 				if (getSplitGroup(composition, j, split).split == split) {
-					//cout << "ready frontier loop adding " << i->first << endl;
 					frontier.push_back(i->first);
 				}
 			}
@@ -630,14 +642,9 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 			seen.insert(i->first);
 		}
 	} while (not enabled.empty());
-	//cout << "done loop" << endl;
 
 	sort(frontier.begin(), frontier.end());
 	frontier.erase(unique(frontier.begin(), frontier.end()), frontier.end());
-
-	//cout << ::to_string(frontier) << endl;
-	//print();
-	//cout << endl << endl;
 
 	// reverse iteration step: walk backward from the identified recursion
 	// points and delete back to the last encountered merge
@@ -679,10 +686,6 @@ void CompositionAnalysis::build(const Adjacency &g, Composition composition, int
 			todo.erase(unique(todo.begin(), todo.end()), todo.end());
 		}
 	}
-
-	//cout << "done backtrack" << endl;
-	//print();
-	//cout << endl << endl;
 }
 
 // Analyzes and computes all split-merge relationships throughout the Petri net.
@@ -1473,12 +1476,12 @@ bound CompositionAnalysis::partials(Composition composition, petri::region nodes
 	nodes.sort();
 	if (other.empty()) {
 		for (auto i = begin(place::type); i != end(place::type); i++) {
-			if (isValid(i) and is(composition, {i}, nodes)) {
+			if (isValid(i) and is(composition, {i}, nodes) and not nodes.contains(i)) {
 				other.push_back(i);
 			}
 		}
 		for (auto i = begin(transition::type); i != end(transition::type); i++) {
-			if (isValid(i) and is(composition, {i}, nodes)) {
+			if (isValid(i) and is(composition, {i}, nodes) and not nodes.contains(i)) {
 				other.push_back(i);
 			}
 		}

@@ -47,6 +47,9 @@ struct SplitGroup {
 	std::vector<int> branch; // index of transitions/places coming out of split
 	int count; // total number of branches out of this split
 
+	void unionWith(std::vector<int> newBranches);
+	void intersectWith(std::vector<int> newBranches);
+
 	string to_string() const;
 };
 
